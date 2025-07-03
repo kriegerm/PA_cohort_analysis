@@ -1,1 +1,15 @@
-saved_analysis_files/
+# Ignore everything
+*
+
+# But not files in the root directory
+!*/
+
+# Re-allow all files at the root level
+!*.*
+
+
+# Ignore R workspace files
+*.RData
+*.rda
+*.rdata
+*.Rhistory
