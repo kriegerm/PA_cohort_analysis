@@ -1,0 +1,8 @@
+"0","plots <- lapply(resolution, function(rank) {"
+"0","  plot_pca(phyloseq_obj = ps_f, "
+"0","           rank_transformation = rank, "
+"0","           variable = ""Type"", "
+"0","           colors_list = colors_all)})"
+"0",""
+"0","combined_plot <- wrap_plots(plots, ncol = 2) & theme(legend.position = ""bottom"") "
+"0","combined_plot"

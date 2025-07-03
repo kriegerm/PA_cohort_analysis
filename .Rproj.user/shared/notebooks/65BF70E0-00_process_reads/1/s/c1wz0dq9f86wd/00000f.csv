@@ -1,0 +1,95 @@
+"0","library(""pacman"")"
+"0","pacman::p_load(""rmarkdown"", ""tidyverse"", ""phyloseq"", ""knitr"",""kableExtra"", ""here"", ""plyr"", ""microViz"")"
+"2","trying URL 'https://bioconductor.org/packages/3.21/bioc/src/contrib/phyloseq_1.52.0.tar.gz'
+"
+"2","Content type 'application/x-gzip'"
+"2"," length 6358865 bytes (6.1 MB)
+"
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","="
+"2","
+"
+"2","downloaded 6.1 MB
+
+"
+"2","* installing *source* package ‘phyloseq’ ...
+"
+"2","** this is package ‘phyloseq’ version ‘1.52.0’
+"
+"2","** using staged installation
+"
+"2","** R
+"
+"2","** data
+"
+"2","** inst
+"
+"2","** byte-compile and prepare package for lazy loading
+"
+"1","Error in loadNamespace(i, c(lib.loc, .libPaths()), versionCheck = vI[[i]]) : 
+  there is no package called ‘GenomeInfoDbData’
+Calls: <Anonymous> ... loadNamespace -> withRestarts -> withOneRestart -> doWithOneRestart
+Execution halted
+"
+"2","ERROR: lazy loading failed for package ‘phyloseq’
+"
+"2","* removing ‘/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/library/phyloseq’
+"
+"2","
+"
+"2",""
+"2","The downloaded source packages are in
+	‘/private/var/folders/sh/bylv8p_n12b4lswcnwg84fxw0000gn/T/RtmpR1RqvR/downloaded_packages’"
+"2",""
+"2","
+"
+"0","here::i_am(""00_process_reads.Rmd"")"
+"0",""

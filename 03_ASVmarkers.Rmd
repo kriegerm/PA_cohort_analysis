@@ -1,0 +1,213 @@
+---
+title: "03_ASVmarkers"
+author: "Madeline Krieger"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    theme: "cosmo"
+    code_folding: "show"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE,
+                      warning = FALSE,
+                      error = FALSE,
+                      fig.path = "./figures/02/",
+                      fig.keep = "all",
+                      dev = c("png"),
+                      cache = FALSE,
+                      # Do not use lazy loading which fails for large objects
+                      cache.lazy = FALSE)
+```
+
+
+# 1.0 Load and Define
+
+## 1.1 Load packages and presets
+### 1.1.1 Packages
+```{r 1.1_load-packages}
+library("pacman")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "readxl", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "ldatuning", "cowplot", "MicrobiomeStat", "microbiomeMarker")
+
+here::i_am("03_ASVmarkers.Rmd")
+
+``` 
+
+
+### 1.1.2 My packages
+```{r}
+source("MK_Microbiome_Functions.R")
+```
+
+
+
+### 1.1.2 Colors and presents
+```{r}
+colors_all= c("Abscess" = "#FF495C", "Tumor"="#F0C808","Plaque"="#083D77", "AN"="#43AA8B" )
+plot_colors= c("Abscess" = "#FF495C", "Plaque"="#083D77","abscess" = "#FF495C", "plaque"="#083D77", 
+               "abnormal" = "#FF495C", "control"="#083D77",  "Abnormal" = "#FF495C", "Control"="#083D77"  )
+
+core_colors = c("#FAAA00", "#3399FF","#F76F8E","#083D77","#B8D4E3", "#FF495C","#477071", '#03CEA4',  "#5F00BA", "#BDAC9E", "white", "#FFD900")
+
+
+pal20 <- createPalette(22, c("#F76F8E","#03CEA4", "#083D77"), range = c(30, 80))
+pal20 <- unname(as.list(pal20))
+
+resolution <- c("Phylum", "Class", "Order", "Family", "Genus", "Species")
+
+set.seed(1234)
+date = Sys.Date()
+```
+
+
+## 1.2 Load data and process
+
+### 1.2.1 Load Data from 00
+```{r}
+library(janitor)
+
+
+# Load the saved Rds file
+loaded_objects <- readRDS("00data.rds")
+
+# Assign back the objects to the environment, if needed
+list2env(loaded_objects, .GlobalEnv)
+
+ps_obj_ped_fs <- subset_samples(ps_fs, Study == "Pediatric")
+
+ps_sglom <- tax_glom(ps_obj_ped_fs, taxrank = "Species", NArm = TRUE)
+
+ps_sglom <- psmelt(ps_sglom)
+ 
+ps_sglom_df <- ps_sglom %>%
+    dplyr::select(c("Sample", "Abundance", "Species")) %>%
+    pivot_wider(names_from = "Species", values_from = "Abundance") %>% t() %>% as.data.frame() %>%
+  row_to_names(row_number = 1) %>%
+  mutate_all(., function(x) as.numeric(as.character(x)))
+
+
+
+```
+
+
+
+# 3.0 Species
+```{r}
+
+# Select columns ending in "-P"
+otu_tab_P <- ps_sglom_df[, grepl("-P$", colnames(ps_sglom_df))]
+colnames(otu_tab_P) <- sub("-P$", "", colnames(otu_tab_P))
+
+# Select columns ending in "-A"
+otu_tab_A <- ps_sglom_df[, grepl("-A$", colnames(ps_sglom_df))]
+colnames(otu_tab_A) <- sub("-A$", "", colnames(otu_tab_A))
+```
+
+
+
+
+```{r}
+fraction_threshold <- 0.75  # Retain ASVs present in at least 99% of samples
+
+# Count total number of samples (columns)
+n_samples <- ncol(otu_tab_A)
+min_pass_samples <- ceiling(fraction_threshold * n_samples)
+
+# Logical matrix where TRUE indicates a non-zero abundance
+otu_tab_A_nonzero <- otu_tab_A > 0
+
+# Identify rows (ASVs) with non-zero values in >= 99% of samples
+valid_rows <- rowSums(otu_tab_A_nonzero) >= min_pass_samples
+
+# Filter the OTU table
+otu_tab_A_filtered <- otu_tab_A[valid_rows, ]
+
+# Get the retained ASV IDs
+asv_ids_A <- rownames(otu_tab_A_filtered)
+asv_ids_A
+```
+
+```{r}
+fraction_threshold <- 0.75  # Retain ASVs present in at least 99% of samples
+
+# Count total number of samples (columns)
+n_samples <- ncol(otu_tab_P)
+min_pass_samples <- ceiling(fraction_threshold * n_samples)
+
+# Logical matrix where TRUE indicates a non-zero abundance
+otu_tab_P_nonzero <- otu_tab_P > 0
+
+# Identify rows (ASVs) with non-zero values in >= 99% of samples
+valid_rows <- rowSums(otu_tab_P_nonzero) >= min_pass_samples
+
+# Filter the OTU table
+otu_tab_P_filtered <- otu_tab_P[valid_rows, ]
+
+# Get the retained ASV IDs
+asv_ids_P <- rownames(otu_tab_P_filtered)
+asv_ids_P
+```
+
+
+```{r}
+common_elements <- intersect(asv_ids_P, asv_ids_A)
+
+ps_sglom_df_n <- sweep(ps_sglom_df, 2, colSums(ps_sglom_df), FUN = "/") 
+
+#otu_tab_subset <- ps_sglom_df[rownames(ps_sglom_df) %in% common_elements, ]
+otu_tab_subset <- ps_sglom_df_n[rownames(ps_sglom_df_n) %in% common_elements, ]
+
+
+otu_tab_subset_long <- otu_tab_subset %>%
+  rownames_to_column(var = "taxa") %>%
+  pivot_longer(
+    cols = -taxa,
+    names_to = "Sample_Tag",
+    values_to = "Count"
+  ) %>%
+  mutate(
+    Sample = str_extract(Sample_Tag, "^[0-9]+"),
+    Type = str_extract(Sample_Tag, "(?<=-)[AP]")
+  ) %>%
+  select(taxa, Sample, Type, Count) %>%
+  pivot_wider(
+    names_from = Type,
+    values_from = Count
+  )
+
+```
+
+```{r fig.width=9, fig.height=2}
+
+# 1. Create a new column for the A/P ratio
+df_ratio <- otu_tab_subset_long %>%
+  mutate(
+    Ratio = ifelse(P == 0 | A == 0, NA, log(A / P))  # NA for 0s to allow greying
+  ) 
+
+ggplot(df_ratio, aes(x = Sample, y = taxa, fill = Ratio)) +
+  geom_tile(color = "white", linewidth = 0.2) +  # thinner tile borders
+  scale_fill_gradientn(
+    colors = c("#91bfdb", "#fee090", "#fc8d59", "#d73027"),  # prettier diverging palette
+    na.value = "grey90",  # softer grey
+    name = "A / P Ratio"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 10, face = "bold"),
+    axis.text.y = element_text(size = 9),
+    axis.title = element_text(face = "bold"),
+    panel.grid = element_blank(),
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5)
+  ) +
+  labs(
+    title = "Heatmap of A:P Ratio Across Samples",
+    x = "Sample ID",
+    y = "Taxa"
+  )
+```
+

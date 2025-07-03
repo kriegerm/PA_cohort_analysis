@@ -1,0 +1,7 @@
+"0","# Load the saved Rds file"
+"0","loaded_objects <- readRDS(""00data.rds"")"
+"0",""
+"0","# Assign back the objects to the environment, if needed"
+"0","list2env(loaded_objects, .GlobalEnv)"
+"1","<environment: R_GlobalEnv>
+"
