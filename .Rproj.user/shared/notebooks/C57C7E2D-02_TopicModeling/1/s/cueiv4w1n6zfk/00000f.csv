@@ -1,5 +1,0 @@
-"0","library(""pacman"")"
-"0","pacman::p_load(""rmarkdown"", ""tidyverse"", ""phyloseq"", ""knitr"",""kableExtra"", ""here"", ""plyr"", ""ggpubr"", ""microViz"", ""readxl"", ""microbiome"", ""pheatmap"", ""vegan"", ""reshape2"", ""magrittr"", ""microshades"", ""pheatmap"",""vegan"", ""data.table"", ""Polychrome"", ""fantaxtic"",""cetcolor"", ""ldatuning"", ""cowplot"", ""MicrobiomeStat"", ""randomForest"", ""caret"", ""mlbench"", ""MLmetrics"", ""mia"", ""here"", ""patchwork"", ""digest"", ""ANCOMBC"", ""Maaslin2"", ""microbiomeMarker"", ""tidytext"")"
-"0",""
-"0","here::i_am(""02_TopicModeling.Rmd"")"
-"0",""
