@@ -1,5 +1,5 @@
 ---
-title: "Process reads: Pediatric"
+title: "Process reads: Adult Abscess"
 author: "Madeline Krieger"
 date: "`r Sys.Date()`"
 output:
@@ -65,35 +65,26 @@ date = Sys.Date()
 ## 2.1 Import data and construct phyloseq
 ```{r process_pediatric}
 #Define variables and file locations
-biom_location <- "../Pediatric_cohort/Qiime2/blast/Files_For_Phyloseq/feature_table_w_taxonomy.biom"
-tree_location <- "../Pediatric_cohort/Qiime2/Tree/Unfiltered_Rooted_tree_for_phyloseq/tree.nwk"
-sampledata_location <- "../Pediatric_cohort/Qiime2/Files_For_Phyloseq/metadata_phyloseq.tsv"
+biom_location <- "../PRJNA547446_adult_abscess/Qiime2/blast/Files_For_Phyloseq/feature_table_w_taxonomy.biom"
+tree_location <- "../PRJNA547446_adult_abscess/Qiime2/Tree/Unfiltered_Rooted_tree_for_phyloseq/tree.nwk"
+sampledata_location <- "../PRJNA547446_adult_abscess/Qiime2/Files_For_Phyloseq/metadata_phyloseq.tsv"
 
 #Run pre-processing functions
 construct_phyloseq("ps", biom_location, tree_location, sampledata_location)
+test <- ps@sam_data
 ```
 
 
-# 2.2 Remove any ASVs that were in the blanks
+# 2.2 Remove any ASVs that were in the blanks: Skip for Adult because we don't have blanks
 ```{r}
-ps_contam <- subset_samples(ps, Type == "Blank")
-ps_contam_otu <- ps_contam@otu_table %>% as.data.frame() 
-ps_contam_otu <- ps_contam_otu[rowSums(ps_contam_otu[, sapply(ps_contam_otu, is.numeric)]) > 1000, ] %>% as.data.frame()
 
-contam_list <- rownames(ps_contam_otu)
-
-tax_contam <- tax_table(ps)[contam_list, ] %>% as.data.frame()
-
-
-#Remove those ASVs from the main dataframe
-ps <- prune_taxa(!(taxa_names(ps) %in% contam_list), ps)
 ```
 
 # 2.3 Additional filtering
 ```{r}
-filter_phyloseq(ps, "Pediatric", Contam_g, Contam_f, Contam_s)
-```
+filter_phyloseq(ps, "AdultAbscess", Contam_g, Contam_f, Contam_s)
 
+```
 
 ### 2.4 Re-label ASVs
 ```{r}
@@ -136,5 +127,5 @@ plot <- hist(counts, main="Histogram of Counts", xlab="Counts", ylab="Frequency"
 ```{r}
 saveRDS(list(ps_f=ps_f, 
              ps_fs= ps_fs), 
-             file = paste0("00data_Pediatric.rds"))
+             file = paste0("00data_AdultAbscess.rds"))
 ```

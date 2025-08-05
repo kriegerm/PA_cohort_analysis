@@ -14,3 +14,4 @@
 *.rdata
 *.Rhistory
 .Rproj.user
+saved_analysis_files

@@ -8,7 +8,7 @@ date = Sys.Date()
 
 #Make output directory for data saved from functions
 # Specify the directory path
-dir_path <- "saved_analysis_files"
+dir_path <- "../saved_analysis_files"
 
 # Check if the directory exists
 if (!dir.exists(dir_path)) {
@@ -124,34 +124,39 @@ filter_unmatched_samples_Pediatric <- function(phyloseq_obj) {
 ## Filter for unmatched samples
 #This function is used inside the function filter_phyloseq
 filter_unmatched_samples <- function(phyloseq_obj) {
-  # Extract the sample data
-  sample_data_df <- sample_data(phyloseq_obj)
-  sample_data_df <- sample_data_df %>% as.matrix() %>% as.data.frame()
+  # Extract sample data with sample_names as a column
+  sample_data_df <- as(sample_data(phyloseq_obj), "data.frame")
+  sample_data_df$SampleID <- rownames(sample_data_df)  # These are sample_names()
   
-  # Ensure the necessary columns exist
-  required_columns <- c("Sample", "Type")
-  if (!all(required_columns %in% colnames(sample_data_df))) {
-    stop("The sample data must contain 'Sample' and 'Type' columns.")
+  # Check for required columns
+  if (!all(c("Sample", "Type") %in% colnames(sample_data_df))) {
+    stop("Sample data must contain 'Sample' and 'Type' columns.")
   }
   
-  # Count the number of unique 'Type' entries for each individual
+  # Step 1: Find Samples (i.e., individuals) that only have one Type
   type_counts <- sample_data_df %>%
-    dplyr::select(c("Sample", "Type")) %>%
+    dplyr::filter(Type %in% c("Plaque", "Abscess")) %>%
     dplyr::group_by(Sample) %>%
-    dplyr::summarize(num_types = n_distinct(Type), .groups = "drop") 
-
-    # Filter for samples with only one type
-  single_type_samples <- type_counts %>%
-    filter(num_types == 1) %>%
-    pull(Sample)
+    dplyr::summarise(num_types = n_distinct(Type), .groups = "drop")
   
-  print(single_type_samples)
+  # Step 2: Get the Sample IDs (individuals) to drop
+  single_type_sample_values <- type_counts %>%
+    dplyr::filter(num_types == 1) %>%
+    dplyr::pull(Sample)
   
-  filtered_phyloseq_obj <- prune_samples(!(phyloseq_obj@sam_data$Sample) %in% single_type_samples, phyloseq_obj)
-
-  # Return the list of sample IDs
+  # Step 3: Find the sample_names (SampleID) associated with those individuals
+  sample_names_to_remove <- sample_data_df %>%
+    dplyr::filter(Sample %in% single_type_sample_values) %>%
+    dplyr::pull(SampleID)
+  
+  # Print for confirmation
+  message("Samples being removed (sample_names):")
+  print(sample_names_to_remove)
+  
+  # Step 4: Prune phyloseq object
+  filtered_phyloseq_obj <- prune_samples(!(sample_names(phyloseq_obj) %in% sample_names_to_remove), phyloseq_obj)
+  
   return(filtered_phyloseq_obj)
-
 }
 
 
@@ -1018,7 +1023,7 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
                      fixed_effects = group, 
                      plot_heatmap = F, 
                      plot_scatter = F,
-                     output = paste0(date, "maaslin2_output"), 
+                     output = paste0("saved_analysis_files/", date, "maaslin2_output"), 
                      analysis_method = analysis_method,
                      normalization = normalization, 
                      transform  = transform)
