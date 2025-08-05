@@ -360,7 +360,7 @@ plot_all_taxa <- function(ps_obj,
 #combined_plot <- wrap_plots(plots, ncol = 2) & theme(legend.position = "bottom") 
 
 # Function to create plots
-plot_pca <- function(phyloseq_obj, rank_transformation, variable, colors_list=NULL) {
+plot_pca_microviz <- function(phyloseq_obj, rank_transformation, variable, colors_list=NULL) {
   # Transform and calculate distance
   phylo_trans <- phyloseq_obj %>% tax_fix() %>% tax_transform(rank = rank_transformation, trans = "identity")
   dist_matrix <- dist_calc(phylo_trans, "euclidean")
@@ -405,7 +405,7 @@ plot_pca <- function(phyloseq_obj, rank_transformation, variable, colors_list=NU
 #combined_plot <- wrap_plots(plots, ncol = 2) & theme(legend.position = "bottom") 
 
 # Function to create plots
-plot_PCoA <- function(phyloseq_obj, rank_transformation, trans_type, dist_cal_type, ord_calc_method, variable, colors_list=NULL) {
+plot_PCoA_microviz <- function(phyloseq_obj, rank_transformation, trans_type, dist_cal_type, ord_calc_method, variable, colors_list=NULL) {
   # Transform and calculate distance
   phylo_trans <- phyloseq_obj %>% tax_fix() %>%
     tax_transform(rank = rank_transformation, trans = trans_type)
@@ -435,6 +435,545 @@ plot_PCoA <- function(phyloseq_obj, rank_transformation, trans_type, dist_cal_ty
 
 }
 
+#BIG function to compare different ordination methods 
+compare_ordination_methods <- function(phyloseq_obj,
+                                       rank_transformations = c("Species", "Genus", "Phylum"),
+                                       trans_types = c("relab", "clr", "identity", "log"),
+                                       dist_cal_types = c("euclidean", "bray", "jaccard"),
+                                       ord_calc_methods = c("PCA", "PCoA", "NMDS"),
+                                       No_axes_to_correlated_with_LibSize = 2,
+                                       variance_threshold = 0.80) { #find the number of axes needed for PCA and PCoA that explain this percent of variance  
+  library(phyloseq)
+  library(vegan)
+  library(cluster)
+  library(dplyr)
+  library(tibble)
+  library(purrr)
+  library(digest)
+  library(ggplot2)
+  
+  #Create a parameter hash so that you can just load results if they've already been run in an identical way
+  param_hash <- digest(list(
+    phyloseq_obj = phyloseq_obj,
+    rank_transformations = rank_transformations,
+    trans_types = trans_types,
+    dist_cal_types = dist_cal_types,
+    ord_calc_methods = ord_calc_methods,
+    No_axes_to_correlated_with_LibSize = No_axes_to_correlated_with_LibSize,
+    variance_threshold = variance_threshold  # Include in hash for reproducibility
+  ))
+  
+  dir.create("saved_analysis_files", showWarnings = FALSE)
+  result_file <- file.path("saved_analysis_files", paste0("ordination_parameter_sweep_result_", param_hash, ".rds"))
+  
+  if (file.exists(result_file)) {
+    message("Analysis already run. Loading results...")
+    return(readRDS(result_file))
+  } else {
+    message("Running analysis...")
+  }
+  
+  #Define the CLR transformation
+  clr_transform <- function(mat, pseudocount = 1) {
+    mat <- mat + pseudocount
+    log_mat <- log(mat)
+    gm <- rowMeans(log_mat)
+    sweep(log_mat, 1, gm)
+  }
+  
+  validate_transformation_distance <- function(trans_type, dist_type, ord_method) {
+    ord_method <- toupper(ord_method)
+    trans_type <- tolower(trans_type)
+    dist_type <- tolower(dist_type)
+    
+    ## Warnings and strict incompatibilities
+    
+    # CLR requires Euclidean
+    if (trans_type == "clr" && dist_type != "euclidean") {
+      stop("CLR transformation is only compatible with Euclidean distance.")
+    }
+    
+    # NMDS is discouraged with Euclidean 
+    if (ord_method == "NMDS" && dist_type == "euclidean") {
+      warning("NMDS with Euclidean distance is discouraged in ecological/microbiome data. Prefer Bray or Jaccard.")
+    }
+    
+    # NMDS with CLR is not supported (theoretically questionable)
+    if (ord_method == "NMDS" && trans_type == "clr") {
+      stop("NMDS is not compatible with CLR-transformed data.")
+    }
+    
+    # Identity (raw counts) with Bray is discouraged
+    if (trans_type == "identity" && dist_type == "bray") {
+      stop("Using raw counts with Bray-Curtis distance may give misleading results. Consider using relative abundance or log transformation.")
+    }
+
+    # Log transformation with Jaccard is questionable
+    if (trans_type == "log" && dist_type == "jaccard") {
+      stop("Jaccard distance with log-transformed data is rarely appropriate. Use presence/absence or relative abundance instead.")
+    }
+    
+    # Log transformation with Bray: acceptable, but might want a warning
+    if (trans_type == "log" && dist_type == "bray") {
+      stop("Log-transformed data with Bray-Curtis distance is valid, but ensure zero handling is appropriate.")
+    }
+    
+    return(dist_type)
+  }
+  
+  #Initiate empty results list and set counter
+  results_list <- list()
+  counter <- 1
+  
+  #Begin looping
+  for (rank_trans in rank_transformations) {
+    for (trans_type in trans_types) {
+      for (ord_method in ord_calc_methods) {
+        ord_method_upper <- toupper(ord_method)
+        
+        #PCA only uses euclidean, so if  necessary set that
+        dist_types_to_use <- if (ord_method_upper == "PCA") "euclidean" else dist_cal_types
+        
+        for (dist_type in dist_types_to_use) {
+          message(sprintf("Trying: %s | %s | %s | %s", rank_trans, trans_type, dist_type, ord_method))
+          
+          #Try the combination - if it's not compatible that's ok, it'll skip it
+          try({
+            phylo_trans <- tax_glom(phyloseq_obj, taxrank = rank_trans)
+            otu_mat <- as.matrix(otu_table(phylo_trans))
+            if (taxa_are_rows(phylo_trans)) {
+              otu_mat <- t(otu_mat)
+            }
+            
+            if (trans_type == "identity") {
+              otu_trans <- otu_mat
+            } else if (trans_type == "log") {
+              otu_trans <- log1p(otu_mat)
+            } else if (trans_type == "relab") {
+              otu_trans <- sweep(otu_mat, 1, rowSums(otu_mat), FUN = "/")
+            } else if (trans_type == "clr") {
+              otu_trans <- clr_transform(otu_mat)
+            } else {
+              stop("Unsupported transformation.")
+            }
+            
+            #Remove rows where the variance is 0
+            otu_trans <- otu_trans[, apply(otu_trans, 2, var) != 0]
+            
+            #Use the function defined at the beginning to validate that the transformation and distance type will work
+            dist_type_valid <- validate_transformation_distance(trans_type, dist_type, ord_method)
+            
+            #Intiate empty components to fill with the functions below
+            scores_df <- NULL
+            var_expl <- NULL
+            stress <- NA
+            n_components_for_variance <- NA 
+            
+            if (ord_method_upper == "PCA") {
+              ord <- prcomp(otu_trans, center = TRUE, scale. = TRUE)
+              scores_df <- as.data.frame(ord$x)
+              colnames(scores_df) <- paste0("Axis", 1:ncol(scores_df))
+              var_expl <- ord$sdev^2 / sum(ord$sdev^2)
+              
+              # Calculate components needed to explain the variance threshold
+              cumulative_var <- cumsum(var_expl)
+              n_components_for_variance <- as.numeric(which(cumulative_var >= variance_threshold)[1])
+              
+            } else if (ord_method_upper == "PCOA") {
+              
+              #Binarize for Jaccard
+              if (dist_type_valid == "jaccard") {
+                dist_mat <- vegdist(otu_trans, method = "jaccard", binary=TRUE)
+              } else if (dist_type_valid != "jaccard") {
+                dist_mat <- vegdist(otu_trans, method = dist_type_valid)
+              }
+              
+              n_samples <- attr(dist_mat, "Size") 
+              ord <- cmdscale(dist_mat, k = n_samples - 1, eig = TRUE)
+              scores_df <- as.data.frame(ord$points)
+              colnames(scores_df) <- paste0("Axis", 1:ncol(scores_df))
+              var_expl <- ord$eig / sum(ord$eig)
+              
+              # Calculate components needed to explain the variance threshold
+              cumulative_var <- cumsum(var_expl)
+              n_components_for_variance <- as.numeric(which(cumulative_var >= variance_threshold)[1])
+              
+            } else if (ord_method_upper == "NMDS") {
+              
+              #Binarize for Jaccard
+              if (dist_type_valid == "jaccard") {
+                dist_mat <- vegdist(otu_trans, method = "jaccard", binary=TRUE)
+              } else if (dist_type_valid != "jaccard") {
+                dist_mat <- vegdist(otu_trans, method = dist_type_valid)
+              }
+              
+              ord <- metaMDS(dist_mat, trymax = 100)
+              scores_df <- as.data.frame(ord$points)
+              colnames(scores_df) <- paste0("Axis", 1:ncol(scores_df))
+              stress <- ord$stress
+              n_components_for_variance <- as.numeric(2) #Automatically set because there are only two axes - need this to be a value for later
+            }
+            
+            #Join the metadata with the scores_df
+            scores_df$SampleID <- rownames(scores_df)
+            meta_df <- sample_data(phylo_trans) %>% as.matrix() %>% as.data.frame()
+            scores_df <- dplyr::left_join(scores_df, meta_df, by = "SampleID")
+            scores_df$LibrarySize <- sample_sums(phyloseq_obj)[scores_df$SampleID]
+            
+            #Code just to correlate the first axis with the library size
+            #rho <- as.numeric(suppressWarnings(cor.test(scores_df$LibrarySize, scores_df$Axis1, method = "spearman")$estimate))
+            
+            # Determine number of axes to correlate with LibrarySize
+            num_axes_available <- sum(grepl("^Axis\\d+$", colnames(scores_df)))
+            num_axes_to_correlate <- if (ord_method_upper == "NMDS") {
+              min(2, num_axes_available)
+            } else {
+              min(No_axes_to_correlated_with_LibSize, num_axes_available) #Just make sure you are only uses the avaliable number of axes in case you specified more than are avaliable
+            }
+            
+            # Compute Spearman rho for each axis
+            rho_vals <- map_dbl(1:num_axes_to_correlate, function(i) {
+              axis_col <- paste0("Axis", i)
+              suppressWarnings(cor.test(scores_df$LibrarySize, scores_df[[axis_col]], method = "spearman")$estimate)
+            })
+            
+            # Name the rho values
+            names(rho_vals) <- paste0("axis", 1:num_axes_to_correlate)
+            
+            #Find the variation explained by the first two axes
+            var1 <- var2 <- NA
+            if (!is.null(var_expl)) {
+              var1 <- var_expl[1] * 100
+              var2 <- var_expl[2] * 100
+            }
+            
+            #TYPE-based silhouette
+            pca_mat <- scores_df[, paste0("Axis", 1:n_components_for_variance)] #Selects the scores up to the number of axes needed to capture the % of variance specified at input
+            
+            #Calculate silhouette score based on Type only
+            scores_df$Type <- factor(scores_df$Type)
+            cluster_labels <- as.integer(scores_df$Type)
+            sil <- silhouette(cluster_labels, dist(pca_mat))
+            sil_df <- as.data.frame(sil[, 1:3])
+            sil_df$Type <- scores_df$Type
+            colnames(sil_df) <- c("Cluster", "Neighbor", "Silhouette", "Type")
+            
+            #Find the media sil score per type
+            sil_medians <- sil_df %>%
+              group_by(Type) %>%
+              dplyr::summarise(median_silhouette = median(Silhouette, na.rm = TRUE)) %>%
+              pivot_wider(names_from = Type, values_from = median_silhouette, names_prefix = "sil_median_")
+            
+            #Return results!
+            row_result <- c(
+              rank_transformation = rank_trans,
+              trans_type = trans_type,
+              dist_cal_type = dist_type,
+              ord_calc_method = ord_method,
+              spearman_rho = rho_vals,
+              var_expl_axis1 = var1,
+              var_expl_axis2 = var2,
+              nmds_stress = stress,
+              n_components_for_variance = n_components_for_variance  # Add to result
+            )
+            
+            #Save the results in the 
+            row_result <- c(row_result, sil_medians)
+            results_list[[counter]] <- row_result
+            counter <- counter + 1
+          })
+        }
+      }
+    }
+  }
+  
+  results_df <- results_list %>%
+    map(~{
+      .x[setdiff(names(.x), NULL)]  # Drop NULLs
+    }) %>%
+    bind_rows() %>%
+    mutate(across(-c(rank_transformation, trans_type, dist_cal_type, ord_calc_method), as.numeric))
+  
+  saveRDS(results_df, result_file)
+  return(results_df)
+}
+
+
+#Comprehensive ordination plot
+run_ordination_with_validation <- function(phyloseq_obj,
+                                           rank_transformation = "Genus",
+                                           trans_type = "clr",
+                                           ord_calc_method = "PCoA",
+                                           dist_cal_type = "bray",
+                                           component_num = 2,
+                                           variable = "Type",
+                                           Axis_1 = "Axis1",
+                                           Axis_2 = "Axis2",
+                                           colors_list = NULL) {
+  library(phyloseq)
+  library(vegan)
+  library(ggplot2)
+  library(dplyr)
+  library(tibble)
+  library(rlang)
+  
+  # Validator
+  validate_transformation_distance <- function(trans_type, dist_type, ord_method) {
+    ord_method <- toupper(ord_method)
+    trans_type <- tolower(trans_type)
+    dist_type <- tolower(dist_type)
+    
+    # ----- Strict incompatibilities -----
+    
+    # CLR requires Euclidean
+    if (trans_type == "clr" && dist_type != "euclidean") {
+      stop("CLR transformation is only compatible with Euclidean distance.")
+    }
+    
+    # NMDS is discouraged with Euclidean (but allowed)
+    if (ord_method == "NMDS" && dist_type == "euclidean") {
+      warning("NMDS with Euclidean distance is discouraged in ecological/microbiome data. Prefer Bray or Jaccard.")
+    }
+    
+    # NMDS with CLR is not supported (theoretically questionable)
+    if (ord_method == "NMDS" && trans_type == "clr") {
+      stop("NMDS is not compatible with CLR-transformed data.")
+    }
+    
+    # ----- Warnings for discouraged combos -----
+    
+    # Identity (raw counts) with Bray is discouraged
+    if (trans_type == "identity" && dist_type == "bray") {
+      warning("Using raw counts with Bray-Curtis distance may give misleading results. Consider using relative abundance or log transformation.")
+    }
+    
+    # Identity with Jaccard doesn't make sense
+    if (trans_type == "identity" && dist_type == "jaccard") {
+      warning("Jaccard distance is intended for presence/absence data. Consider binarizing or using a different transformation.")
+    }
+    
+    # Log transformation with Jaccard is questionable
+    if (trans_type == "log" && dist_type == "jaccard") {
+      warning("Jaccard distance with log-transformed data is rarely appropriate. Use presence/absence or relative abundance instead.")
+    }
+    
+    # Log transformation with Bray: acceptable, but might want a warning
+    if (trans_type == "log" && dist_type == "bray") {
+      warning("Log-transformed data with Bray-Curtis distance is valid, but ensure zero handling is appropriate.")
+    }
+    
+    return(dist_type)
+  }
+  
+  # CLR transformation
+  clr_transform <- function(mat, pseudocount = 1) {
+    mat <- mat + pseudocount
+    log_mat <- log(mat)
+    gm <- rowMeans(log_mat)
+    clr_mat <- sweep(log_mat, 1, gm)
+    return(clr_mat)
+  }
+  
+  # Agglomerate
+  phylo_trans <- tax_glom(phyloseq_obj, taxrank = rank_transformation)
+  otu_mat <- otu_table(phylo_trans)
+  if (taxa_are_rows(phylo_trans)) {
+    otu_mat <- t(otu_mat)
+  }
+  
+  # Transform
+  if (trans_type == "identity") {
+    otu_trans <- otu_mat
+  } else if (trans_type == "log") {
+    otu_trans <- log1p(otu_mat)
+  } else if (trans_type == "relab") {
+    otu_trans <- sweep(otu_mat, 1, rowSums(otu_mat), FUN = "/")
+  } else if (trans_type == "clr") {
+    otu_trans <- clr_transform(otu_mat, pseudocount = 1)
+  } else {
+    stop("Unsupported transformation type.")
+  }
+  
+  # Remove zero-variance columns
+  otu_trans <- otu_trans[, apply(otu_trans, 2, var) != 0]
+  
+  ord_calc_method <- toupper(ord_calc_method)
+  dist_type_valid <- validate_transformation_distance(trans_type, dist_cal_type, ord_calc_method)
+  
+  # Ordination
+  if (ord_calc_method == "PCA") {
+    dist_type_valid <- "euclidean"
+    ord_obj <- prcomp(otu_trans, center = TRUE, scale. = TRUE)
+    if (component_num > ncol(ord_obj$x)) {
+      stop(paste0("Requested component_num = ", component_num,
+                  " but only ", ncol(ord_obj$x), " components are available from PCA."))
+    }
+    
+    scores_df <- ord_obj$x[, 1:component_num] %>% as.data.frame()
+    colnames(scores_df) <- paste0("Axis", seq_len(component_num))
+    
+    var_explained <- ord_obj$sdev^2 / sum(ord_obj$sdev^2)
+    
+  } else if (ord_calc_method == "PCOA") {
+    
+    #Binarize for Jaccard
+    if (dist_type_valid == "jaccard") {
+      dist_mat <- vegdist(otu_trans, method = "jaccard", binary=TRUE)
+    } else if (dist_type_valid != "jaccard") {
+      dist_mat <- vegdist(otu_trans, method = dist_type_valid)
+    }
+    
+    n_samples <- attr(dist_mat, "Size") 
+    ord_obj <- cmdscale(dist_mat, k = n_samples - 1, eig = TRUE)
+    scores_df <- as.data.frame(ord_obj$points)
+    colnames(scores_df) <- paste0("Axis", 1:ncol(scores_df))
+    var_expl <- ord_obj$eig / sum(ord_obj$eig)
+    
+    
+  } else if (ord_calc_method == "NMDS") {
+    
+    #Binarize for Jaccard
+    if (dist_type_valid == "jaccard") {
+      dist_mat <- vegdist(otu_trans, method = "jaccard", binary=TRUE)
+    } else if (dist_type_valid != "jaccard") {
+      dist_mat <- vegdist(otu_trans, method = dist_type_valid)
+    }
+    
+    ord_obj <- metaMDS(dist_mat, trymax = 100)
+    scores_df <- as.data.frame(ord_obj$points)
+    colnames(scores_df) <- paste0("Axis", 1:ncol(scores_df))
+    stress <- ord_obj$stress
+  }
+  
+  # Merge metadata
+  scores_df$SampleID <- rownames(scores_df)
+  
+  metadata_df <- sample_data(phylo_trans) %>% as.matrix() %>% as.data.frame() %>% select(c("SampleID", "Type"))
+  
+  scores_df <- dplyr::left_join(scores_df, metadata_df, by = "SampleID")
+
+
+  # Plot
+  
+  # Label axes with variance explained if available
+  x_lab <- Axis_1
+  y_lab <- Axis_2
+  
+  if (exists("var_explained")) {
+    axis_nums <- as.numeric(gsub("\\D", "", c(Axis_1, Axis_2)))
+    x_lab <- paste0(Axis_1, " (", round(var_explained[axis_nums[1]] * 100, 1), "%)")
+    y_lab <- paste0(Axis_2, " (", round(var_explained[axis_nums[2]] * 100, 1), "%)")
+  }
+  
+  p <- ggplot(scores_df, aes(x = !!sym(Axis_1), y = !!sym(Axis_2))) +
+    geom_point(aes(fill = !!sym(variable), color = !!sym(variable)), alpha = 0.8, size = 2, shape = 21) +
+    ggtitle(paste0(rank_transformation, " - ", ord_calc_method, " (", trans_type, ", ", dist_cal_type, ")")) +
+    stat_ellipse(aes(color = !!sym(variable))) +
+    theme_bw() +
+    labs(x = x_lab, y = y_lab)+
+    theme(
+      plot.title = element_text(face = "bold", size = 12, hjust = .5),
+      legend.text = element_text(size = 14),
+      legend.title = element_text(size = 14),
+      axis.text = element_text(size = 10, vjust = 0.5, hjust = 1)
+    )
+  
+  if (!is.null(colors_list)) {
+    p <- p +
+      scale_fill_manual(values = colors_list) +
+      scale_color_manual(values = colors_list)
+  }
+  
+  # Axis1 vs library size
+  scores_df$LibrarySize <- sample_sums(phyloseq_obj)[scores_df$SampleID]
+  lib_size_with_Axis1 <- ggplot(scores_df, aes(x = LibrarySize, y = Axis1)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = TRUE, color = "blue") +
+    labs(x = "Library Size", y = paste0(Axis_1), title = paste0(Axis_1, " vs Library Size")) +
+    theme_minimal()
+  lib_size_with_Axis1_corr <- cor.test(scores_df$LibrarySize, scores_df[[Axis_1]], method = "spearman")
+  
+  
+  # Scree/L-plot for PCA or PCoA
+  if (ord_calc_method %in% c("PCA", "PCOA")) {
+    if (ord_calc_method == "PCA") {
+      eig_vals <- ord_obj$sdev^2
+    } else if (ord_calc_method == "PCOA") {
+      eig_vals <- ord_obj$eig
+    }
+    
+    var_explained <- eig_vals / sum(eig_vals)
+    axis_labels <- paste0("Axis", seq_along(var_explained))
+    scree_df <- data.frame(Axis = factor(axis_labels, levels = axis_labels),
+                           VarianceExplained = var_explained)
+    
+    l_plot <- ggplot(scree_df[1:component_num, ], aes(x = Axis, y = VarianceExplained)) +
+      geom_bar(stat = "identity", fill = "steelblue") +
+      geom_text(aes(label = round(VarianceExplained, 3)), vjust = -0.5, size = 3) +
+      labs(title = paste("Variance Explained per Axis -", ord_calc_method),
+           y = "Proportion of Variance Explained", x = NULL) +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  } else {
+    l_plot <- NULL
+  }
+  
+  return(list(
+    plot = p,
+    scores = scores_df,
+    ordination = ord_obj,
+    lib_size_with_Axis1_plot = lib_size_with_Axis1, 
+    lib_size_with_Axis1_corr = lib_size_with_Axis1_corr,
+    l_plot = l_plot
+  ))
+}
+
+
+# Analyze Silhouette score using "Type" as cluster label and return plot
+analyze_type_clustering_on_pca <- function(scores_df,
+                                           component_num = 3,
+                                           colors_list = NULL) {
+  library(ggplot2)
+  library(dplyr)
+  library(cluster)
+  
+  # Extract PCA axes
+  pca_matrix <- scores_df[, paste0("Axis", 1:component_num)]
+  
+  # Ensure 'Type' is a factor
+  scores_df$Type <- factor(scores_df$Type)
+  
+  # Calculate distance matrix and silhouette scores using "Type" as cluster labels
+  dist_matrix <- dist(pca_matrix)
+  cluster_labels <- as.integer(scores_df$Type)  # silhouette() needs numeric cluster labels
+  
+  sil <- silhouette(cluster_labels, dist_matrix)
+  
+  sil_df <- as.data.frame(sil[, 1:3])
+  sil_df$Type <- scores_df$Type
+  colnames(sil_df) <- c("Cluster", "Neighbor", "Silhouette", "Type")
+  
+  # Boxplot of silhouette scores by Type
+  sil_plot <- ggplot(sil_df, aes(x = Type, y = Silhouette, fill = Type)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.9) +
+    geom_jitter(width = 0.2, size = 1, alpha = 0.5) +
+    stat_summary(fun = median, geom = "text", aes(label = round(..y.., 2)),
+                 vjust = -0.5, color = "white", fontface = "bold", size = 3.5) +
+    labs(title = "Silhouette Scores by Type",
+         x = "Type",
+         y = "Silhouette Score") +
+    theme_bw() 
+  
+  if (!is.null(colors_list)) {
+    sil_plot <- sil_plot + scale_fill_manual(values = colors_list)
+  }
+  
+  return(list(
+    scores = scores_df,
+    silhouette_df = sil_df,
+    sil_plot = sil_plot
+  ))
+}
 
 
 # DA Analyses
@@ -1771,30 +2310,24 @@ create_topic_model <- function(counts_data, k_value, alpha, method){
 #plot_beta(result, 15)
 #Plot beta, or the numbers that are assigned to each word in a topic. If the beta score is higher, the word matters more in that topic.
 
-plot_beta <- function(lda_result, n_top_topics){
-    top_terms <- result$b_df %>% 
+plot_beta <- function(lda_result, n_top_topics, b_df){
+    top_terms <- b_df %>% 
       group_by(topic) %>% 
       top_n(n_top_topics, beta) %>%
-      ungroup() %>%
-      mutate(
-        term_clean = term %>%
-          gsub("^g__|^s__", "", .) %>%      # remove g__ or s__ at the start
-          gsub("__[0-9]+$", "", .) %>%       # remove trailing _1, _2, etc.
-          gsub("_", " ", .)                 # replace _ with space
-      )
-    
+      ungroup() 
+
     top_terms %>% 
       ggplot(aes(
-        x = tidytext::reorder_within(term_clean, beta, topic),  # descending order
+        x = tidytext::reorder_within(term, beta, topic),  # descending order
         y = beta,
         fill = factor(topic)
       )) +
       geom_bar(stat = 'identity', show.legend = FALSE) +
       facet_wrap(~ topic, scales = "free") +
       coord_flip() +
-      scale_x_reordered(
-        labels = function(x) parse(text = paste0("italic('", x, "')"))
-      ) +
+      # scale_x_reordered(
+      #   labels = function(x) parse(text = paste0("italic('", x, "')"))
+      # ) +
       theme_bw(base_size = 12) +
       scale_fill_viridis_d() +
       labs(x = NULL, y = "Beta")
@@ -1807,9 +2340,9 @@ plot_beta <- function(lda_result, n_top_topics){
 
 #If you view the topics_wide data frame, you can see that each document has a gamma score for each topic. Some gamma scores are larger than others. This suggests that a document’s content is predominantly in one topic as opposed to another.
 
-heatmap_gamma <- function(lda_results, type_column){
+heatmap_gamma <- function(lda_results, type_column, g_df){
     
-    topics_wide <- lda_results$g_df %>%
+    topics_wide <- g_df %>%
       pivot_wider(names_from = topic,
                   values_from = gamma)
 
@@ -1851,8 +2384,8 @@ heatmap_gamma <- function(lda_results, type_column){
 #plot_gamma_umap(results, "Type", type_colors)
 
 
-plot_gamma_umap <- function(lda_results, type_column, type_colors ){
-    topics_wide <- result$g_df %>%
+plot_gamma_umap <- function(lda_results, type_column, type_colors, g_df ){
+    topics_wide <- g_df %>%
           pivot_wider(names_from = topic,
                       values_from = gamma) 
     
@@ -1885,9 +2418,9 @@ plot_gamma_umap <- function(lda_results, type_column, type_colors ){
 
 ###Membership of topic by Type
 
-topic_membership <- function(lda_result, type_column, colors){
+topic_membership <- function(lda_result, type_column, colors, g_df){
   
-      topics_wide <- lda_result$g_df %>%
+      topics_wide <- g_df %>%
             pivot_wider(names_from = topic,
                         values_from = gamma)
       
@@ -1913,10 +2446,10 @@ topic_membership <- function(lda_result, type_column, colors){
 ### Heatmap of rel abundance in original data of top taxa
 #This is throwing an error with some ps objects, so I need to troubleshoot
 
-relab_heatmap <- function(lda_results, psobj, rank, type_column, topic_no, n_top_words){
+relab_heatmap <- function(lda_results, psobj, rank, type_column, topic_no, n_top_words, b_df){
 
     #Gather a list of all the most important taxa(words) in the topic
-    taxa_list <- lda_results$b_df %>%
+    taxa_list <- b_df %>%
       filter(topic == topic_no) %>%
       top_n(n_top_words, beta) %>% #takes the words with the top 10 beta scores
       distinct(term) %>%
