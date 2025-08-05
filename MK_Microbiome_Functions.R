@@ -468,8 +468,7 @@ compare_ordination_methods <- function(phyloseq_obj,
     variance_threshold = variance_threshold  # Include in hash for reproducibility
   ))
   
-  dir.create("saved_analysis_files", showWarnings = FALSE)
-  result_file <- file.path("saved_analysis_files", paste0("ordination_parameter_sweep_result_", param_hash, ".rds"))
+  result_file <- file.path("saved_analysis_files/", paste0("ordination_parameter_sweep_result_", param_hash, ".rds"))
   
   if (file.exists(result_file)) {
     message("Analysis already run. Loading results...")
