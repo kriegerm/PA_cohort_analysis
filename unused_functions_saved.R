@@ -284,3 +284,183 @@ analyze_kmeans_on_pca <- function(scores_df,
     bar_plot = bar_plot
   ))
 }
+
+
+# LDA Data prep functions
+
+### Iteratively find thresholds
+#threshold_iterations <-  seq(.5, 1, by = .05)
+#result_table <- find_thresholds_iteratively(ps_obj_ped_fs, "Genus", threshold_iterations)
+
+find_thresholds_iteratively <- function(psobj, rank, required_percent_taxa_seq) {
+  
+  # Initialize an empty data frame to store results
+  results <- data.frame(
+    required_percent_taxa = numeric(),
+    number_of_numeric_columns = integer(),
+    threshold = numeric(),
+    stringsAsFactors = FALSE
+  )
+  
+  # Agglomerate at rank
+  core_ps <- tax_glom(psobj, taxrank = rank)
+  core_ps <- norm_tss(core_ps)
+  
+  # Extract otu matrix and other data (some of which aren't necessary for below, but I'm keeping for future use)
+  otu_mat <- as.matrix(otu_table(core_ps))
+  total_ASVs <- length(rowSums(otu_mat))
+  non_zero_ASVs <- sum(rowSums(otu_mat) > 0)
+  
+  # Find the minimum non-zero value in the entire OTU table
+  min_value <- min(as.vector(otu_mat)[as.vector(otu_mat) > 0], na.rm = TRUE)
+  
+  # Prepare the taxa matrix for filtering
+  tax_mat <- psmelt(core_ps) %>%
+    dplyr::select(c("Sample", "Abundance", rank)) %>%
+    pivot_wider(names_from = rank, values_from = "Abundance")
+  
+  # Loop through each value of required_percent_taxa
+  for (required_percent_taxa in required_percent_taxa_seq) {
+    
+    # Find columns that meet the criteria
+    filtered_df <- tax_mat[, colMeans(tax_mat >= min_value, na.rm = TRUE) >= required_percent_taxa]
+    
+    # Ensure the dataframe has stuff in it
+    if (ncol(filtered_df) > 1) {
+      
+      numeric_cols <- filtered_df[, sapply(filtered_df, is.numeric), drop = FALSE]
+      # Count the number of numeric columns
+      num_numeric_cols <- ncol(numeric_cols)
+      
+      # Find the new minimum non-zero value across all numeric columns
+      threshold <- min(numeric_cols[numeric_cols > 0], na.rm = TRUE)
+    } else {
+      # If no numeric columns, set values accordingly
+      num_numeric_cols <- 0
+      threshold <- NA
+    }
+    
+    # Add the result to the results data frame
+    results <- rbind(results, data.frame(
+      required_percent_taxa = required_percent_taxa,
+      number_of_numeric_columns = num_numeric_cols,
+      threshold = threshold,
+      stringsAsFactors = FALSE
+    ))
+  }
+  
+  print(results)
+  # Return the final results table
+  return(results)
+}
+
+
+
+### Find filtering threshold - set value
+
+#threshold <- find_threshold(ps_obj_ped_fs, "Genus", .95)
+
+
+find_threshold <- function(psobj, rank, required_percent_taxa){
+  
+  #Agglomerate at rank
+  core_ps <- tax_glom(psobj, taxrank = rank)
+  core_ps <- norm_tss(core_ps)
+  
+  #Extract otu matrix and other data (some of which aren't necessary for below, but I'm keeping for future use)
+  otu_mat <- as.matrix(otu_table(core_ps))
+  total_ASVs <- length(rowSums(otu_mat))
+  non_zero_ASVs <- sum(rowSums(otu_mat) > 0)
+  
+  #Find the minimum non-zero value in the entire OTU table, which is what we will pass to the filtering script
+  min_value <- min(as.vector(otu_mat)[as.vector(otu_mat) > 0], na.rm = TRUE)
+  
+  #Prepare the taxa matrix for filtering
+  tax_mat <- psmelt(core_ps) %>%
+    dplyr::select(c("Sample", "Abundance", rank)) %>%
+    pivot_wider(names_from = rank, values_from = "Abundance")
+  
+  # Find columns that meet the criteria: At least x% (defined in the function by user) of the samples have these taxa above a minimum threshold (calculated above)
+  filtered_df <- tax_mat[, colMeans(tax_mat >= min_value, na.rm = TRUE) >= required_percent_taxa]
+  
+  print(filtered_df)
+  if (ncol(filtered_df) > 1) {
+    # Select only numeric columns
+    numeric_cols <- filtered_df[sapply(filtered_df, is.numeric)]
+    
+    # Find the new minimum non-zero value across all numeric columns
+    threshold <- min(numeric_cols[numeric_cols > 0], na.rm = TRUE)
+  } else{
+    threshold = NA
+    print("No taxa retained at this filtering threshold!")
+  }
+  # Return that threshold for later use
+  return(threshold)
+}
+
+
+
+
+
+### Prep and binarize input
+#This works for all topic modeling algorithms as a pre-processing step
+#results_threshold <- prep_data_binarize(ps_obj_ped_fs, "Genus", threshold)
+#meta_data <- results_threshold$meta_data
+#counts_data <- results_threshold$counts_data
+
+#Prepare data from phyloseq object and binarize at a certain threshold of relative abundance
+prep_data_binarize <- function(phy_obj, taxa_level, binarization_threshold, type_column){
+  # Extract metadata
+  meta_data <- phy_obj@sam_data %>% 
+    as.matrix() %>% as.data.frame() %>% 
+    dplyr::select(c(type_column, "Sample"))
+  
+  #Create Relative Abundance Table
+  counts_data <- tax_glom(phy_obj, taxa_level) %>%
+    norm_tss(.) %>% 
+    psmelt(.)  %>%
+    dplyr::select(c("Sample", "Abundance", taxa_level)) %>%
+    pivot_wider(names_from = taxa_level, values_from = "Abundance") %>%
+    column_to_rownames(var="Sample") %>%
+    mutate(across(where(is.numeric), ~ ifelse(. >= binarization_threshold, 1, 0))) #Apply binarization threshold
+  
+  # Extract row names
+  row_names <- rownames(counts_data)
+  
+  # Convert columns to integer
+  counts_data <- as.data.frame(lapply(counts_data, as.integer))
+  
+  # Reassign row names
+  rownames(counts_data) <- row_names
+  
+  
+  #Reformat data into long format
+  counts_data_long <- counts_data %>%
+    pivot_longer(
+      cols = everything(), 
+      names_to = "taxa", 
+      values_to = "Count"
+    )
+  
+  #Create a histogram
+  p <- ggplot(counts_data_long, aes(x = Count)) +
+    geom_histogram(binwidth = 0.5, fill = "blue", color = "black", alpha = 0.7) +
+    labs(title = "Histogram of Values", x = "Value", y = "Frequency") +
+    stat_bin(
+      binwidth = 0.5,
+      aes(label = after_stat(count)),
+      geom = "text",
+      vjust = -0.5, # Adjust the vertical position of the text
+      color = "black",
+      size = 3
+    ) +
+    theme_bw()
+  
+  print(p)
+  
+  
+  # Return metadata and counts data as a named list
+  return(list(meta_data = meta_data, counts_data = counts_data))
+  
+}
+

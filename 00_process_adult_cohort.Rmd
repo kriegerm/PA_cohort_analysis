@@ -77,13 +77,13 @@ test <- ps@sam_data
 
 # 2.2 Remove any ASVs that were in the blanks: Skip for Adult because we don't have blanks
 ```{r}
+source("MK_Microbiome_Functions.R")
 
 ```
 
 # 2.3 Additional filtering
 ```{r}
 filter_phyloseq(ps, "AdultAbscess", Contam_g, Contam_f, Contam_s)
-
 ```
 
 ### 2.4 Re-label ASVs

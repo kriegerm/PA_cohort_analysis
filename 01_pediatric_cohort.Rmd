@@ -16,7 +16,7 @@ output:
 knitr::opts_chunk$set(message = FALSE,
                       warning = FALSE,
                       error = FALSE,
-                      fig.path = "./figures/01/",
+                      fig.path = "../figures/01_pediatric/",
                       fig.keep = "all",
                       dev = c("png"),
                       cache = FALSE,
@@ -31,7 +31,7 @@ knitr::opts_chunk$set(message = FALSE,
 ### 1.1.1 Packages
 ```{r 1.1_load-packages}
 library("pacman")
-pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "cowplot", "MicrobiomeStat", "randomForest", "caret", "mlbench", "MLmetrics", "mia", "here", "patchwork", "digest", "ANCOMBC", "Maaslin2", "microbiomeMarker", "fantaxtic", "topicmodels", "ldatuning")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "cowplot", "MicrobiomeStat", "randomForest", "caret", "mlbench", "MLmetrics", "mia", "here", "patchwork", "digest", "ANCOMBC", "Maaslin2", "microbiomeMarker", "fantaxtic", "topicmodels", "ldatuning", "umap", "tidytext", "cluster")
 
 here::i_am("01_pediatric_cohort.Rmd")
 ``` 
@@ -72,7 +72,7 @@ date = Sys.Date()
 ### 1.2.1 Load Data from 00
 ```{r}
 # Load the saved Rds file
-loaded_objects <- readRDS("00data.rds")
+loaded_objects <- readRDS("00data_Pediatric.rds")
 
 # Assign back the objects to the environment, if needed
 list2env(loaded_objects, .GlobalEnv)
@@ -126,6 +126,8 @@ result_df <- compare_ordination_methods(
   No_axes_to_correlated_with_LibSize = 2,
   variance_threshold = 0.80  # Set variance threshold 
 )
+
+
 result_df
 ```
 
@@ -559,7 +561,7 @@ plot_all_taxa(ps_obj = ps_fs,
 runANCOM(ps_fs, 
          tax_level = "Phylum", 
          group = "Type", 
-         name_of_saved_results = "ancombc_results_phy", 
+         name_of_saved_results = "saved_analysis_files/ancombc_results_phy", 
          plot_type = "dot",
          Log2FC_cutoff = 0.5,
          plot_heights = c(1,2), 
@@ -571,7 +573,7 @@ runANCOM(ps_fs,
 runANCOM(ps_fs, 
          tax_level = "Genus", 
          group = "Type", 
-         name_of_saved_results = "ancombc_results_gen", 
+         name_of_saved_results = "saved_analysis_files/ancombc_results_gen", 
          plot_type = "dot",
          plot_heights = c(1, 8), 
          plot_colors = colors_all )
@@ -582,7 +584,7 @@ runANCOM(ps_fs,
 runANCOM(ps_fs, 
          tax_level = "Species", 
          group = "Type", 
-         name_of_saved_results = "ancombc_results_sp", 
+         name_of_saved_results = "saved_analysis_files/ancombc_results_sp", 
          plot_type = "dot",
          #Log2FC_cutoff = 0.5,
          plot_heights = c(1, 8),
@@ -880,6 +882,7 @@ ggplot(results, aes(x = prevalence, y = percent_OTUs)) +
   theme_minimal()
 
 ```
+
 ## Core microbiome heatmap
 ```{r, fig.height=5, fig.width=5}
 
@@ -958,22 +961,31 @@ plot
 
 # 9.0 Topic modeling
 
-## Threshold iterations
-```{r, eval=FALSE}
-threshold_iterations <-  seq(.75, 1.02, by = .02)
-result_table <- find_thresholds_iteratively(ps_fs, "Genus", threshold_iterations)
-result_table
-```
+## Iterate through scaling factors and topic numbers to choose the ideal combination
+```{r}
+iterate_res <- iterate_scaling_factors(ps_fs, 
+                        "Genus",
+                        scale_factors = c(10, 100, 1000, 10000), 
+                        k_values= c(2, 3, 4, 5, 6), 
+                        auto_chose_k = FALSE, 
+                        type_column = "Type", 
+                        method = "Gibbs")
 
-## Find filtering threshold
-```{r, eval=FALSE}
-threshold <- find_threshold(ps_fs, "Genus", .90)
-threshold
+iterate_res$results %>%
+  mutate(
+    sil_sum = sil_median_Abscess + sil_median_Plaque,
+    sil_rank = min_rank(dplyr::desc(sil_sum))) %>% # Rank from highest to lowest
+    arrange(sil_rank) %>% kable() 
+
+# %>%
+#     kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+#                 full_width = F,
+#                 position = "center")
 ```
 
 ## Prep and scale input
 ```{r}
-results_scaling <- prep_data_scale(ps_obj_ped_fs, "Genus", 100, "Type")
+results_scaling <- prep_data_scale(ps_fs, "Genus", 1000, "Type")
 meta_data <- results_scaling$meta_data
 counts_data <- results_scaling$counts_data
 ```
@@ -982,19 +994,21 @@ counts_data <- results_scaling$counts_data
 Note: There is no alpha value here
 ```{r}
 topics <- seq(from = 2, to = 10, by = 1)
-RunFindTopicsNumber(counts_data, topics, "Gibbs")
+res <- RunFindTopicsNumber(counts_data, topics, "Gibbs")
+res$metrics_df
 ```
 
+
 ## LDA: Create the model
-NOTE: Change the number of topics and create a perplexity elbow plot
+You can use the info from the optimum topic numbers printed out in the above function, or adjust as needed.
 ```{r}
-result <- create_topic_model(counts_data, 5, TRUE, "Gibbs")
+result <- create_topic_model(counts_data, 2, TRUE, "Gibbs")
 model <- result$lda_model
 ```
 
 ## Plot beta
-```{r, fig.height=5, fig.width=15}
-plot_beta(result, 4, result$b_df)
+```{r, fig.height=4, fig.width=10}
+plot_beta(result, 10, result$b_df)
 ```
 
 ## Heatmap of gamma scores 
@@ -1005,25 +1019,27 @@ heatmap_gamma(result, "Type", result$g_df)
 ## UMAP of gamma scores
 ```{r fig.height=6, fig.width=6}
 library(umap)
-plot_gamma_umap(results, "Type", plot_colors, result$g_df)
+type_colors <- c("Abscess" = "red", "Plaque" = "blue")
+plot_gamma_umap(results, "Type", type_colors, result$g_df)
 ```
 
 ##Membership of topic by Type
 ```{r, fig.height=3.5, fig.width=4}
-topic_membership(result, "Type", plot_colors, result$g_df)
+topic_membership(result, "Type", type_colors, result$g_df)
 ```
 
 
 ## Heatmap of rel abundance in original data of top taxa
 ```{r, fig.height=3, fig.width=7}
-relab_heatmap(result, ps_obj_ped_fs, "Genus", "Type", 3, 5, result$b_df)
+relab_heatmap(result, ps_fs, "Genus", "Type", topic_no=1, n_top_words=10, result$b_df)
+
+relab_heatmap(result, ps_fs, "Genus", "Type", topic_no=2, n_top_words=10, result$b_df)
 ```
 
-```{r, fig.height=3, fig.width=7}
-relab_heatmap(result, ps_obj_ped_fs, "Genus", "Type", 2, 5, result$b_df)
-```
+
 
 ```{r}
+#This is kind of a weird heatmap, I'm not sure it's actualy usful. 
 
 posterior_results <- posterior(model)
 topics_terms <- posterior_results$terms 
@@ -1043,4 +1059,9 @@ pheatmap(log(topics_terms),
          show_colnames = TRUE)
 
 ```
+
+
+
+
+
 

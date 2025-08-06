@@ -124,6 +124,12 @@ filter_unmatched_samples_Pediatric <- function(phyloseq_obj) {
 ## Filter for unmatched samples
 #This function is used inside the function filter_phyloseq
 filter_unmatched_samples <- function(phyloseq_obj) {
+  
+  #Make sure only Plaque and Abscess samples are retained
+  phyloseq_obj <- subset_samples(phyloseq_obj, Type %in% c("Abscess", "Plaque"))
+  
+  print(phyloseq_obj@sam_data)
+  
   # Extract sample data with sample_names as a column
   sample_data_df <- as(sample_data(phyloseq_obj), "data.frame")
   sample_data_df$SampleID <- rownames(sample_data_df)  # These are sample_names()
@@ -133,29 +139,28 @@ filter_unmatched_samples <- function(phyloseq_obj) {
     stop("Sample data must contain 'Sample' and 'Type' columns.")
   }
   
-  # Step 1: Find Samples (i.e., individuals) that only have one Type
+  #Find Samples (i.e., individuals) that only have one Type
   type_counts <- sample_data_df %>%
     dplyr::filter(Type %in% c("Plaque", "Abscess")) %>%
     dplyr::group_by(Sample) %>%
     dplyr::summarise(num_types = n_distinct(Type), .groups = "drop")
   
-  # Step 2: Get the Sample IDs (individuals) to drop
+  # Get the Sample IDs (individuals) to drop
   single_type_sample_values <- type_counts %>%
     dplyr::filter(num_types == 1) %>%
     dplyr::pull(Sample)
   
-  # Step 3: Find the sample_names (SampleID) associated with those individuals
+  #Find the sample_names (SampleID) associated with those individuals
   sample_names_to_remove <- sample_data_df %>%
     dplyr::filter(Sample %in% single_type_sample_values) %>%
     dplyr::pull(SampleID)
   
   # Print for confirmation
-  message("Samples being removed (sample_names):")
+  print("Samples being removed (sample_names):")
   print(sample_names_to_remove)
   
-  # Step 4: Prune phyloseq object
+  # Prune phyloseq object
   filtered_phyloseq_obj <- prune_samples(!(sample_names(phyloseq_obj) %in% sample_names_to_remove), phyloseq_obj)
-  
   return(filtered_phyloseq_obj)
 }
 
@@ -196,13 +201,11 @@ filter_phyloseq <- function(phylo_obj, study, Contam_g, Contam_f, Contam_s) {
   
    #Remove all samples that are not paired (i.e. only have one plaque and one abscess)
   if (study == "Pediatric") {
-  phylo_obj_f <- filter_unmatched_samples_Pediatric(phylo_obj_f)
+    phylo_obj_f <- filter_unmatched_samples_Pediatric(phylo_obj_f)
   }else if (study != "Pediatric") {
-  phylo_obj_f <- filter_unmatched_samples(phylo_obj_f)
+    phylo_obj_f <- filter_unmatched_samples(phylo_obj_f)
   }
-  
-  print(table(phylo_obj_f@sam_data$Sample))
-  
+
   #Remove contaminates
   phylo_obj_f <- subset_taxa(phylo_obj_f, !(Genus %in% Contam_g)) 
   phylo_obj_f <- subset_taxa(phylo_obj_f, !(Family %in% Contam_f)) 
@@ -2021,182 +2024,241 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
 
 
 
-#LDA model function
+#LDA model functions
 
-### Iteratively find thresholds
-#threshold_iterations <-  seq(.5, 1, by = .05)
-#result_table <- find_thresholds_iteratively(ps_obj_ped_fs, "Genus", threshold_iterations)
-
-find_thresholds_iteratively <- function(psobj, rank, required_percent_taxa_seq) {
+#This function helps you optimize the number of topics (k) and also the scaling factor by which you multiply your input your data (essentially the threshold). 
+iterate_scaling_factors <- function(phy_obj, 
+                                    taxa_level, 
+                                    scale_factors, #A list of data scaling factors. The higher the values the longer this will take.
+                                    k_values, #A list of topic numbers to use. You need this regardless of setting auto_chose_k to TRUE or FALSE
+                                    auto_chose_k = TRUE, #Set this to TRUE if you want to automatically chose the number of topics (k). If you want to iterate over k_values and then have the model computed for each one, then chose FALSE.
+                                    type_column, 
+                                    method = "Gibbs") {
+  results_list <- list()
   
-  # Initialize an empty data frame to store results
-  results <- data.frame(
-    required_percent_taxa = numeric(),
-    number_of_numeric_columns = integer(),
-    threshold = numeric(),
-    stringsAsFactors = FALSE
-  )
-
-  # Agglomerate at rank
-  core_ps <- tax_glom(psobj, taxrank = rank)
-  core_ps <- norm_tss(core_ps)
-    
-  # Extract otu matrix and other data (some of which aren't necessary for below, but I'm keeping for future use)
-  otu_mat <- as.matrix(otu_table(core_ps))
-  total_ASVs <- length(rowSums(otu_mat))
-  non_zero_ASVs <- sum(rowSums(otu_mat) > 0)
-    
-  # Find the minimum non-zero value in the entire OTU table
- min_value <- min(as.vector(otu_mat)[as.vector(otu_mat) > 0], na.rm = TRUE)
-    
-    # Prepare the taxa matrix for filtering
-  tax_mat <- psmelt(core_ps) %>%
-      dplyr::select(c("Sample", "Abundance", rank)) %>%
-      pivot_wider(names_from = rank, values_from = "Abundance")
+  library(cluster)
+  library(Matrix)
+  library(R.utils)
   
-  # Loop through each value of required_percent_taxa
-  for (required_percent_taxa in required_percent_taxa_seq) {
-
-    # Find columns that meet the criteria
-    filtered_df <- tax_mat[, colMeans(tax_mat >= min_value, na.rm = TRUE) >= required_percent_taxa]
-    
-    # Ensure the dataframe has stuff in it
-    if (ncol(filtered_df) > 1) {
-      
-        numeric_cols <- filtered_df[, sapply(filtered_df, is.numeric), drop = FALSE]
-        # Count the number of numeric columns
-        num_numeric_cols <- ncol(numeric_cols)
-        
-        # Find the new minimum non-zero value across all numeric columns
-        threshold <- min(numeric_cols[numeric_cols > 0], na.rm = TRUE)
-    } else {
-        # If no numeric columns, set values accordingly
-        num_numeric_cols <- 0
-        threshold <- NA
-    }
-    
-    # Add the result to the results data frame
-    results <- rbind(results, data.frame(
-      required_percent_taxa = required_percent_taxa,
-      number_of_numeric_columns = num_numeric_cols,
-      threshold = threshold,
-      stringsAsFactors = FALSE
-    ))
-  }
-  
-  print(results)
-  # Return the final results table
-  return(results)
-}
-
-
-
-### Find filtering threshold - set value
-
-#threshold <- find_threshold(ps_obj_ped_fs, "Genus", .95)
-
-
-find_threshold <- function(psobj, rank, required_percent_taxa){
-
-        #Agglomerate at rank
-        core_ps <- tax_glom(psobj, taxrank = rank)
-        core_ps <- norm_tss(core_ps)
-
-        #Extract otu matrix and other data (some of which aren't necessary for below, but I'm keeping for future use)
-        otu_mat <- as.matrix(otu_table(core_ps))
-        total_ASVs <- length(rowSums(otu_mat))
-        non_zero_ASVs <- sum(rowSums(otu_mat) > 0)
-        
-        #Find the minimum non-zero value in the entire OTU table, which is what we will pass to the filtering script
-        min_value <- min(as.vector(otu_mat)[as.vector(otu_mat) > 0], na.rm = TRUE)
-        
-        #Prepare the taxa matrix for filtering
-        tax_mat <- psmelt(core_ps) %>%
-            dplyr::select(c("Sample", "Abundance", rank)) %>%
-            pivot_wider(names_from = rank, values_from = "Abundance")
-        
-        # Find columns that meet the criteria: At least x% (defined in the function by user) of the samples have these taxa above a minimum threshold (calculated above)
-        filtered_df <- tax_mat[, colMeans(tax_mat >= min_value, na.rm = TRUE) >= required_percent_taxa]
-        
-        print(filtered_df)
-      if (ncol(filtered_df) > 1) {
-          # Select only numeric columns
-          numeric_cols <- filtered_df[sapply(filtered_df, is.numeric)]
-          
-          # Find the new minimum non-zero value across all numeric columns
-          threshold <- min(numeric_cols[numeric_cols > 0], na.rm = TRUE)
-      } else{
-        threshold = NA
-        print("No taxa retained at this filtering threshold!")
-      }
-        # Return that threshold for later use
-        return(threshold)
-}
-
- 
-
-
-
-### Prep and binarize input
-#This works for all topic modeling algorithms as a pre-processing step
-#results_threshold <- prep_data_binarize(ps_obj_ped_fs, "Genus", threshold)
-#meta_data <- results_threshold$meta_data
-#counts_data <- results_threshold$counts_data
-
-#Prepare data from phyloseq object and binarize at a certain threshold of relative abundance
-prep_data_binarize <- function(phy_obj, taxa_level, binarization_threshold, type_column){
   # Extract metadata
   meta_data <- phy_obj@sam_data %>% 
-    as.matrix() %>% as.data.frame() %>% 
-    dplyr::select(c(type_column, "Sample"))
-
-  #Create Relative Abundance Table
-  counts_data <- tax_glom(phy_obj, taxa_level) %>%
-    norm_tss(.) %>% 
-    psmelt(.)  %>%
-    dplyr::select(c("Sample", "Abundance", taxa_level)) %>%
-    pivot_wider(names_from = taxa_level, values_from = "Abundance") %>%
-    column_to_rownames(var="Sample") %>%
-    mutate(across(where(is.numeric), ~ ifelse(. >= binarization_threshold, 1, 0))) #Apply binarization threshold
-
-  # Extract row names
-  row_names <- rownames(counts_data)
+    as.matrix() %>% 
+    as.data.frame() %>% 
+    dplyr::select(all_of(c(type_column, "Sample")))
   
-  # Convert columns to integer
-  counts_data <- as.data.frame(lapply(counts_data, as.integer))
+  base_counts_data <- tax_glom(phy_obj, taxa_level) %>%
+    norm_tss() %>%
+    psmelt() %>%
+    dplyr::select(c("Sample", "Abundance", all_of(taxa_level))) %>%
+    pivot_wider(names_from = all_of(taxa_level), values_from = "Abundance") %>%
+    column_to_rownames(var = "Sample")
   
-  # Reassign row names
-  rownames(counts_data) <- row_names
+  for (scaling_factor in scale_factors) {
+    
+    # Create Relative Abundance Table
+    counts_data <- base_counts_data%>%
+      mutate(across(where(is.numeric), ~ round(. * scaling_factor)))
+    
+    # Store and reset rownames
+    row_names <- rownames(counts_data)
+    counts_data <- as.data.frame(lapply(counts_data, as.integer))
+    rownames(counts_data) <- row_names
+    
+    
+    # ------------ If we want to auto chose k, we are going to use the following code to automatically chose the best k-value and then feed that into the model
+    if (isTRUE(auto_chose_k))  {
+      
+      cat("Auo-chosing topics number using a scaling factor of", scaling_factor, "\n")
+      
+      withTimeout({
+        #Throw an error if the model takes way too long.
+        result <- FindTopicsNumber(
+          counts_data,
+          topics = k_values,
+          metrics = c("Griffiths2004", "CaoJuan2009", "Arun2010", "Deveaud2014"),
+          method = "Gibbs",
+          control = list(seed = 1234),
+          mc.cores = 2L,
+          verbose = TRUE
+        )}, timeout = 120, onTimeout = "error") 
+      
+      # Combine each metric into a named row of a data frame
+      topic_numbers <- result$topics
+      
+      df_metrics <- data.frame(
+        Metric = c("Griffiths2004", "CaoJuan2009", "Arun2010", "Deveaud2014"),
+        stringsAsFactors = FALSE
+      )
+      
+      # Extract each metric as a named row
+      df_metrics_values <- rbind(
+        setNames(as.data.frame(t(result$Griffiths2004)), paste0("k_", topic_numbers)),
+        setNames(as.data.frame(t(result$CaoJuan2009)), paste0("k_",topic_numbers)),
+        setNames(as.data.frame(t(result$Arun2010)), paste0("k_",topic_numbers)),
+        setNames(as.data.frame(t(result$Deveaud2014)), paste0("k_",topic_numbers))
+      )
+      
+      # Combine metric names and values
+      df_result <- cbind(df_metrics, df_metrics_values)
+      
+      #Find optimial topic number where:
+      ##Griffiths2004 and Deveaud2014 are maximized
+      ##CaoJuan2009 and Arun2010 are minimized
+      
+      #Transpose df_result to long format
+      df_long <- df_result %>%
+        pivot_longer(cols = starts_with("k"), names_to = "k", values_to = "score")
+      
+      df_long %>%
+        group_by(Metric) 
+      
+      # Normalize each metric (min-max scaling)
+      df_scaled <- df_long %>%
+        group_by(Metric) %>%
+        mutate(score_scaled = (score - min(score)) / (max(score) - min(score))) %>%
+        ungroup()
+      
+      # Flip scores for metrics to minimize
+      df_scaled <- df_scaled %>%
+        mutate(
+          score_final = case_when(
+            Metric %in% c("CaoJuan2009", "Arun2010") ~ 1 - score_scaled,
+            TRUE ~ score_scaled
+          )
+        )
+      
+      # Average score per k across all metrics
+      df_combined <- df_scaled %>%
+        group_by(k) %>%
+        dplyr::summarise(
+          combined_score = mean(score_final),
+          .groups = "drop"
+        ) %>%
+        arrange(dplyr::desc(combined_score))
+      
+      # Best topic number overall
+      best_k <- df_combined$k[1]
+      k_value <- as.numeric(gsub("k_", "", best_k))
+      
+      cat("And the best topic number is....", k_value, "!", "\n")
+      
+      # ------- Now that we've found the best k-number, we can do all the other fun stuff by plugging that into the model
+      # Create topic model
+      counts_mat <- as.matrix(counts_data)  # Convert to regular dense matrix
+      dtm <- as(counts_mat, "dgCMatrix")    # Convert to sparse matrix
+      withTimeout({
+        #Throw an error if the model takes way too long.
+        lda_model <- topicmodels::LDA(dtm, k = k_value, method = method, control = list(seed = 1234))
+      }, timeout = 120, onTimeout = "error")
+      
+      perplex <- topicmodels::perplexity(lda_model, newdata = as.matrix(counts_data))
+      
+      # Extract gamma matrix (topic proportions)
+      g_df <- data.frame(tidytext::tidy(lda_model, matrix = "gamma")) %>%
+        arrange(document, topic) %>%
+        pivot_wider(names_from = topic, values_from = gamma)
+      
+      # Merge topic proportions with metadata
+      res_with_annotations <- meta_data %>%
+        rownames_to_column(var="document") %>%
+        merge(g_df, by = "document")
+      
+      topic_matrix <- res_with_annotations %>%
+        dplyr::select(-all_of(type_column)) %>%
+        dplyr::select(-Sample) %>%
+        column_to_rownames("document")
+      
+      # Silhouette score calculation
+      dist_mat <- dist(topic_matrix)
+      cluster_labels <- factor(res_with_annotations[[type_column]])
+      sil <- silhouette(as.numeric(cluster_labels), dist_mat)
+      sil_df <- as.data.frame(sil)
+      sil_df$Type <- cluster_labels[as.numeric(rownames(sil_df))]
+      
+      # Median silhouette per Type
+      # Rename the silhouette width column properly
+      colnames(sil_df)[colnames(sil_df) == "sil_width" | colnames(sil_df) == "silhouette.width"] <- "silhouette"
+      
+      sil_medians <- sil_df %>%
+        dplyr::group_by(Type) %>%
+        dplyr::summarise(
+          median_silhouette = median(silhouette, na.rm = TRUE),
+          .groups = "drop") %>% 
+        tidyr::pivot_wider(names_from = Type, values_from = median_silhouette, names_prefix = "sil_median_") %>%
+        mutate(
+          k_value = k_value,
+          scaling_factor = scaling_factor,
+          perplexity = perplex
+        )
+      
+      cat("Model created, moving to next. \n")
+      
+      # Store results
+      results_list[[paste0("k", k_value, "_scale", scaling_factor)]] <- sil_medians
+      
+      # ------------ If you don't want to automatically chose K, this forces the model to build with each number in k-values
+    } else {
+      for (k_value in k_values) {
+        
+        cat("running model with ", k_value, " topics and scaling factor of ", scaling_factor, "\n")
+        
+        # Create topic model
+        counts_mat <- as.matrix(counts_data)  # Convert to regular dense matrix
+        dtm <- as(counts_mat, "dgCMatrix")    # Convert to sparse matrix
+        withTimeout({
+          #Throw an error if the model takes way too long.
+          lda_model <- topicmodels::LDA(dtm, k = k_value, method = method, control = list(seed = 1234))
+        }, timeout = 120, onTimeout = "error")
+        
+        perplex <- topicmodels::perplexity(lda_model, newdata = as.matrix(counts_data))
+        
+        # Extract gamma matrix (topic proportions)
+        g_df <- data.frame(tidytext::tidy(lda_model, matrix = "gamma")) %>%
+          arrange(document, topic) %>%
+          pivot_wider(names_from = topic, values_from = gamma)
+        
+        # Merge topic proportions with metadata
+        res_with_annotations <- meta_data %>%
+          rownames_to_column(var="document") %>%
+          merge(g_df, by = "document")
+        
+        topic_matrix <- res_with_annotations %>%
+          dplyr::select(-all_of(type_column)) %>%
+          dplyr::select(-Sample) %>%
+          column_to_rownames("document")
+        
+        # Silhouette score calculation
+        dist_mat <- dist(topic_matrix)
+        cluster_labels <- factor(res_with_annotations[[type_column]])
+        sil <- silhouette(as.numeric(cluster_labels), dist_mat)
+        sil_df <- as.data.frame(sil)
+        sil_df$Type <- cluster_labels[as.numeric(rownames(sil_df))]
+        
+        # Median silhouette per Type
+        # Rename the silhouette width column properly
+        colnames(sil_df)[colnames(sil_df) == "sil_width" | colnames(sil_df) == "silhouette.width"] <- "silhouette"
+        
+        sil_medians <- sil_df %>%
+          dplyr::group_by(Type) %>%
+          dplyr::summarise(
+            median_silhouette = median(silhouette, na.rm = TRUE),
+            .groups = "drop") %>% 
+          tidyr::pivot_wider(names_from = Type, values_from = median_silhouette, names_prefix = "sil_median_") %>%
+          mutate(
+            k_value = k_value,
+            scaling_factor = scaling_factor,
+            perplexity = perplex
+          )
+        
+        # Store results
+        results_list[[paste0("k", k_value, "_scale", scaling_factor)]] <- sil_medians
+      }
+    } 
+  }
   
-
-  #Reformat data into long format
-  counts_data_long <- counts_data %>%
-    pivot_longer(
-      cols = everything(), 
-      names_to = "taxa", 
-      values_to = "Count"
-    )
-  
-  #Create a histogram
-  p <- ggplot(counts_data_long, aes(x = Count)) +
-    geom_histogram(binwidth = 0.5, fill = "blue", color = "black", alpha = 0.7) +
-    labs(title = "Histogram of Values", x = "Value", y = "Frequency") +
-    stat_bin(
-        binwidth = 0.5,
-        aes(label = after_stat(count)),
-        geom = "text",
-        vjust = -0.5, # Adjust the vertical position of the text
-        color = "black",
-        size = 3
-    ) +
-    theme_bw()
-  
-  print(p)
-  
-  
-  # Return metadata and counts data as a named list
-  return(list(meta_data = meta_data, counts_data = counts_data))
-  
+  # Combine all results
+  final_df <- bind_rows(results_list)
+  return(list(results = final_df))
 }
 
 
@@ -2263,7 +2325,7 @@ prep_data_scale <- function(phy_obj, taxa_level, scaling_factor, type_column){
 
 
 ### Use FindTopicsNumber() 
-#alculates different metrics to estimate the most preferable number of topics for LDA model.
+#Calculates different metrics to estimate the most preferable number of topics for LDA model.
 #CaoJuan2009: https://www.sciencedirect.com/science/article/pii/S092523120800372X
 #Arun2010: https://link.springer.com/chapter/10.1007/978-3-642-13657-3_43
 
@@ -2272,15 +2334,77 @@ prep_data_scale <- function(phy_obj, taxa_level, scaling_factor, type_column){
 
 RunFindTopicsNumber <- function(counts_data, topics, method){ 
   result <- FindTopicsNumber(
-      counts_data,
-      topics = topics,
-      metrics = c("Griffiths2004", "CaoJuan2009", "Arun2010", "Deveaud2014"),
-      method = method,
-      control = list(seed = 1234),
-      mc.cores = 2L,
-      verbose = TRUE
-    ) 
+    counts_data,
+    topics = topics,
+    metrics = c("Griffiths2004", "CaoJuan2009", "Arun2010", "Deveaud2014"),
+    method = "Gibbs",
+    control = list(seed = 1234),
+    mc.cores = 2L,
+    verbose = TRUE
+  ) 
+  
   FindTopicsNumber_plot(result)
+
+  # Combine each metric into a named row of a data frame
+  topic_numbers <- result$topics
+  
+  df_metrics <- data.frame(
+    Metric = c("Griffiths2004", "CaoJuan2009", "Arun2010", "Deveaud2014"),
+    stringsAsFactors = FALSE
+  )
+  
+  # Extract each metric as a named row
+  df_metrics_values <- rbind(
+    setNames(as.data.frame(t(result$Griffiths2004)), paste0("k_", topic_numbers)),
+    setNames(as.data.frame(t(result$CaoJuan2009)), paste0("k_",topic_numbers)),
+    setNames(as.data.frame(t(result$Arun2010)), paste0("k_",topic_numbers)),
+    setNames(as.data.frame(t(result$Deveaud2014)), paste0("k_",topic_numbers))
+  )
+  
+  # Combine metric names and values
+  df_result <- cbind(df_metrics, df_metrics_values)
+  
+  #Find optimial topic number where:
+  ##Griffiths2004 and Deveaud2014 are maximized
+  ##CaoJuan2009 and Arun2010 are minimized
+  
+  #Transpose df_result to long format
+  df_long <- df_result %>%
+    pivot_longer(cols = starts_with("k"), names_to = "k", values_to = "score")
+  
+  df_long %>%
+    group_by(Metric) 
+  
+  # Normalize each metric (min-max scaling)
+  df_scaled <- df_long %>%
+    group_by(Metric) %>%
+    mutate(score_scaled = (score - min(score)) / (max(score) - min(score))) %>%
+    ungroup()
+  
+  # Flip scores for metrics to minimize
+  df_scaled <- df_scaled %>%
+    mutate(
+      score_final = case_when(
+        Metric %in% c("CaoJuan2009", "Arun2010") ~ 1 - score_scaled,
+        TRUE ~ score_scaled
+      )
+    )
+  
+  # Average score per k across all metrics
+  df_combined <- df_scaled %>%
+    group_by(k) %>%
+    dplyr::summarise(
+      combined_score = mean(score_final),
+      .groups = "drop"
+    ) %>%
+    arrange(dplyr::desc(combined_score))
+  
+  # Best topic number overall
+  best_k <- df_combined$k[1]
+  cat("Best number of topics (overall balance):", best_k, "\n")
+  k_number <- as.numeric(gsub("k", "", best_k))
+  
+  return(list(full_results = result, metrics_df = df_combined, best_k_number = k_number))
 }
 
 

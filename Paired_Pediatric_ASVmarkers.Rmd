@@ -1,0 +1,206 @@
+---
+title: "Paired Pediatric ASV Markers"
+author: "Madeline Krieger"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    theme: "cosmo"
+    code_folding: "show"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE,
+                      warning = FALSE,
+                      error = FALSE,
+                      fig.path = "./figures/02/",
+                      fig.keep = "all",
+                      dev = c("png"),
+                      cache = FALSE,
+                      # Do not use lazy loading which fails for large objects
+                      cache.lazy = FALSE)
+```
+
+
+# 1.0 Load and Define
+
+## 1.1 Load packages and presets
+### 1.1.1 Packages
+```{r 1.1_load-packages}
+library("pacman")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "readxl", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "ldatuning", "cowplot", "MicrobiomeStat", "microbiomeMarker")
+
+here::i_am("03_ASVmarkers.Rmd")
+
+``` 
+
+
+### 1.1.2 My packages
+```{r}
+source("MK_Microbiome_Functions.R")
+```
+
+
+
+### 1.1.2 Colors and presents
+```{r}
+colors_all= c("Abscess" = "#FF495C", "Tumor"="#F0C808","Plaque"="#083D77", "AN"="#43AA8B" )
+plot_colors= c("Abscess" = "#FF495C", "Plaque"="#083D77","abscess" = "#FF495C", "plaque"="#083D77", 
+               "abnormal" = "#FF495C", "control"="#083D77",  "Abnormal" = "#FF495C", "Control"="#083D77"  )
+
+core_colors = c("#FAAA00", "#3399FF","#F76F8E","#083D77","#B8D4E3", "#FF495C","#477071", '#03CEA4',  "#5F00BA", "#BDAC9E", "white", "#FFD900")
+
+
+pal20 <- createPalette(22, c("#F76F8E","#03CEA4", "#083D77"), range = c(30, 80))
+pal20 <- unname(as.list(pal20))
+
+resolution <- c("Phylum", "Class", "Order", "Family", "Genus", "Species")
+
+set.seed(1234)
+date = Sys.Date()
+```
+
+
+## 1.2 Load data and process
+
+### 1.2.1 Load Data from 00
+```{r}
+library(janitor)
+
+# Load the saved Rds file
+loaded_objects <- readRDS("00data_Pediatric.rds")
+
+# Assign back the objects to the environment, if needed
+list2env(loaded_objects, .GlobalEnv)
+
+ps_sglom <- tax_glom(ps_fs, taxrank = "Species", NArm = TRUE)
+
+ps_sglom <- psmelt(ps_sglom)
+ 
+ps_sglom_df <- ps_sglom %>%
+    dplyr::select(c("Sample", "Abundance", "Species")) %>%
+    pivot_wider(names_from = "Species", values_from = "Abundance") %>% t() %>% as.data.frame() %>%
+  row_to_names(row_number = 1) %>%
+  mutate_all(., function(x) as.numeric(as.character(x)))
+```
+
+
+```{r}
+otu_table <- ps_fs@otu_table %>% as.matrix() %>% as.data.frame()
+
+mark_overlapping_asvs <- function(otu_table) {
+  # Ensure ASV IDs are row names
+  if (!"ASV0001" %in% rownames(otu_table)) {
+    stop("ASV IDs must be row names")
+  }
+  
+  # Get sample names
+  sample_names <- colnames(otu_table)
+  
+  # Identify paired sample IDs (e.g., "100" from "100-A" and "100-P")
+  paired_ids <- unique(gsub("(-A)|(-P)", "", sample_names))
+  
+  # Create a new data frame to store overlap (same dimensions as original)
+  overlap_matrix <- matrix(0, nrow = nrow(otu_table), ncol = length(paired_ids))
+  rownames(overlap_matrix) <- rownames(otu_table)
+  colnames(overlap_matrix) <- paste0(paired_ids, "_overlap")
+
+  for (id in paired_ids) {
+    a_sample <- paste0(id, "-A")
+    p_sample <- paste0(id, "-P")
+
+    if (a_sample %in% sample_names && p_sample %in% sample_names) {
+      # Check where ASVs are present in both A and P (non-zero in both)
+      overlap_matrix[, paste0(id, "_overlap")] <- as.integer(
+        otu_table[, a_sample] > 0 & otu_table[, p_sample] > 0
+      )
+    } else {
+      warning(paste("Missing pair for ID:", id))
+    }
+  }
+  # Convert to data frame and add sum column
+  overlap_df <- as.data.frame(overlap_matrix)
+  overlap_df$sum_overlap <- rowSums(overlap_df)  
+  overlap_df <- overlap_df %>% rownames_to_column(var="ASV") %>% arrange(dplyr::desc(sum_overlap)) %>% column_to_rownames(var="ASV")
+
+  return(overlap_df)
+}
+
+overlap_df <- mark_overlapping_asvs(otu_table) %>% filter(sum_overlap > 12 )
+print(overlap_df)
+
+# Get top 10 ASV names from the OTU table
+top_asvs <- rownames(overlap_df)
+
+# Extract the tax_table (convert to data.frame for easier handling)
+tax_df <- as.data.frame(tax_table(ps_fs))
+
+# Make sure ASV names match
+if (!all(top_asvs %in% rownames(tax_df))) {
+  stop("Some ASVs in the OTU table are not found in the phyloseq tax_table.")
+}
+
+# Subset to just the top ASVs and select Genus and Species
+top_asv_tax <- tax_df[top_asvs, c("Genus", "Species")]
+
+# Optional: Add ASV as a column (not just rownames)
+top_asv_tax$ASV <- rownames(top_asv_tax)
+top_asv_tax <- top_asv_tax[, c("ASV", "Genus", "Species")]
+
+# View result
+top_overlap_info <- overlap_df %>%
+  rownames_to_column("ASV") %>%
+  filter(ASV %in% top_asvs) %>%
+  dplyr::select(ASV, sum_overlap)
+
+top_combined <- dplyr::left_join(top_asv_tax, top_overlap_info, by = "ASV")
+
+print(top_combined)
+```
+
+```{r, fig.width=6, fig.height=1.5}
+# Transform to relative abundance
+ps_rel <- transform_sample_counts(ps_fs, function(x) x / sum(x))
+
+# Melt into long format
+ps_df <- psmelt(ps_rel)
+
+# Filter for only the target ASVs
+ps_df_filtered <- ps_df %>% 
+  filter(OTU %in% top_combined$ASV)
+
+# Extract sample ID (remove -A / -P) to group by sample pairs
+ps_df_filtered <- ps_df_filtered %>%
+  mutate(SamplePair = gsub("(-A)|(-P)", "", Sample),
+         Compartment = ifelse(grepl("-A", Sample), "Abscess", "Plaque"))
+
+# Pivot wider to get one row per ASV per sample pair, with separate Abscess and Plaque columns
+ps_wide <- ps_df_filtered %>%
+  select(OTU, SamplePair, Compartment, Abundance) %>%
+  pivot_wider(names_from = Compartment, values_from = Abundance) %>%
+  mutate(ratio = Plaque / Abscess,
+         log2_ratio = log2(ratio))%>%
+  mutate(direction = case_when(
+    is.infinite(log2_ratio) | is.nan(log2_ratio) ~ 0,
+    log2_ratio > 0 ~ 1,
+    log2_ratio < 0 ~ -1,
+    TRUE ~ 0  # fallback for log2_ratio == 0
+  ))
+
+# Plot heatmap
+ggplot(ps_wide, aes(x = SamplePair, y = OTU, fill = direction)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#4C2C69", high = "#ABFAA9", mid = "white", 
+                       midpoint = 0, na.value = "grey90",
+                       name = "log2(Abscess / Plaque)") +
+  theme_bw() +
+  labs(title = "ASV Enrichment: Plaque vs. Abscess",
+       x = "Sample Pair",
+       y = "") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
