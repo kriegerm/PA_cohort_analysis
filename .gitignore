@@ -11,7 +11,9 @@
 # Ignore R workspace files
 *.RData
 *.rda
+*.rds
 *.rdata
 *.Rhistory
 .Rproj.user
 saved_analysis_files/
+*html
