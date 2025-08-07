@@ -85,40 +85,13 @@ process_phyloseq(ps_fs)
 ```
 
 
-# Quick code for heatmap
-```{r}
-ps_genus <- tax_glom(ps_fs, taxrank = "Genus")
-
-# Extract count matrix and convert to matrix
-otu_mat <- as(otu_table(ps_genus), "matrix")
-
-# Transpose if samples are rows (optional, depending on orientation)
-if(taxa_are_rows(ps_genus)) {
-  otu_mat <- t(otu_mat)
-}
-
-# Extract Genus names
-taxa_names <- as.data.frame(tax_table(ps_genus))$Genus
-
-# Plot heatmap
-pheatmap(log(otu_mat + .0000001),
-         scale = "none",        # keep raw counts
-         clustering_distance_rows = "euclidean",
-         clustering_distance_cols = "euclidean",
-         clustering_method = "complete",
-         fontsize_row = 8,
-         fontsize_col = 8,
-         show_rownames = TRUE,
-         show_colnames = TRUE)
-```
-
 
 # 2.0 Ordinations
 
 # Ordination parameter sweep
 ```{r}
 result_df <- compare_ordination_methods(
-  phyloseq_obj = ps_fs,
+  phyloseq_obj = ps_f,
   rank_transformations = c("Phylum", "Genus"),          
   trans_types = c("identity", "clr", "log", "relab"),           
   dist_cal_types = c("euclidean", "bray", "jaccard"), 
@@ -127,8 +100,7 @@ result_df <- compare_ordination_methods(
   variance_threshold = 0.80  # Set variance threshold 
 )
 
-
-result_df
+result_df <- result_df$results_df
 ```
 
 
@@ -159,7 +131,7 @@ df_sorted <- df_sorted %>%
   mutate(rho_rank = row_number(rho_abs_sum)) %>%
   ungroup()
 
-df_sorted %>% filter(rho_rank == 1 | rho_rank == 2 )
+df_sorted %>% filter(rho_rank == 1 | rho_rank == 2 ) %>% kable()
 ```
 
 
@@ -522,26 +494,38 @@ top_df %>%
 
 ### 4.2.0 Phylum TSS Dot
 ```{r, fig.width=15, fig.height=15}
-plot_all_taxa(ps_fs, "TSS", "Type", "Phylum", "dot", colors_all)
+Phylum_TSS <- plot_all_taxa(ps_fs, "TSS", "Type", "Phylum", "dot", colors_all)
+Phylum_TSS$plot
 ```
 
 
 ### 4.2.1 Genus TSS Dot
 ```{r, fig.width=15, fig.height=50}
-plot_all_taxa(ps_fs, "TSS", "Type", "Genus", "dot", colors_all)
+genus_TSS <- plot_all_taxa(ps_fs, "TSS", "Type", "Genus", "dot", colors_all)
+genus_TSS$plot
 ```
 
 
 ### 4.2.1 Genus CSS Dot
 ```{r, fig.width=15, fig.height=50}
-plot_all_taxa(ps_fs, "CLR", "Type", "Genus", "dot", colors_all)
+genus_CSS <- plot_all_taxa(ps_fs, "CLR", "Type", "Genus", "dot", colors_all)
+genus_CSS$plot
 ```
 
 
 ### 4.2.2 Selected Species Plot
 ```{r, fig.width=5, fig.height=4}
-source("MK_Microbiome_Functions.R")
+plot_all_taxa(ps_obj = ps_fs,
+              transformation = "TSS",
+              group = "Type",
+              taxa_level = "Species",
+              plot_type = "dot",
+              plot_colors = colors_all,
+              taxa_filter = c("g__Fusobacterium_s__nucleatum", "g__Fusobacterium_s__periodonticum"))
+```
 
+### 4.2.3 Fusobacterium
+```{r, fig.width=4, fig.height=3}
 plot_all_taxa(ps_obj = ps_fs,
               transformation = "TSS",
               group = "Type",
@@ -552,42 +536,65 @@ plot_all_taxa(ps_obj = ps_fs,
 ```
 
 
+## 4.3 Heatmap
+### 4.3.1 Genus
+```{r}
+ps_genus <- tax_glom(ps_fs, taxrank = "Genus")
+
+# Extract count matrix and convert to matrix
+otu_mat <- as(otu_table(ps_genus), "matrix")
+
+# Transpose if samples are rows (optional, depending on orientation)
+if(taxa_are_rows(ps_genus)) {
+  otu_mat <- t(otu_mat)
+}
+
+# Extract Genus names
+taxa_names <- as.data.frame(tax_table(ps_genus))$Genus
+
+# Plot heatmap
+pheatmap(log(otu_mat + .0000001),
+         scale = "none",        # keep raw counts
+         clustering_distance_rows = "euclidean",
+         clustering_distance_cols = "euclidean",
+         clustering_method = "complete",
+         fontsize_row = 8,
+         fontsize_col = 8,
+         show_rownames = TRUE,
+         show_colnames = TRUE)
+```
 
 # Differential Abundance
 ## 6.1 ANCOMBC2
 
 ### 6.1.1 Phylum
 ```{r, fig.height=7, fig.width=10}
-runANCOM(ps_fs, 
+ANCOM_ph <- runANCOM(ps_fs, 
          tax_level = "Phylum", 
          group = "Type", 
-         name_of_saved_results = "saved_analysis_files/ancombc_results_phy", 
+         name_of_saved_results = "../saved_analysis_files/ancombc_results_phy", 
          plot_type = "dot",
          Log2FC_cutoff = 0.5,
-         plot_heights = c(1,2), 
          plot_colors = colors_all)
 ```
 
 ### 6.1.2 Genus
-```{r, fig.height=30, fig.width=10}
-runANCOM(ps_fs, 
+```{r, fig.height=10, fig.width=10}
+ANCOM_genus <- runANCOM(ps_fs, 
          tax_level = "Genus", 
          group = "Type", 
-         name_of_saved_results = "saved_analysis_files/ancombc_results_gen", 
+         name_of_saved_results = "../saved_analysis_files/ancombc_results_gen", 
          plot_type = "dot",
-         plot_heights = c(1, 8), 
          plot_colors = colors_all )
 ```
 
 ### 6.1.3 Species
 ```{r, fig.height=45, fig.width=10}
-runANCOM(ps_fs, 
+ANCOME_species <- runANCOM(ps_fs, 
          tax_level = "Species", 
          group = "Type", 
-         name_of_saved_results = "saved_analysis_files/ancombc_results_sp", 
+         name_of_saved_results = "../saved_analysis_files/ancombc_results_sp", 
          plot_type = "dot",
-         #Log2FC_cutoff = 0.5,
-         plot_heights = c(1, 8),
          plot_colors = colors_all )
 ```
 
@@ -602,15 +609,15 @@ iterate_maaslin2(ps_obj = ps_fs,
                  resolutions = resolutions,
                  group = "Type",
                  qval_threshold = .25, 
-                 colors_all = maaslin2_colors, 
-                 percentage = TRUE)
+                 percentage = TRUE, 
+                 plot_colors = colors_all)
 ```
 
 ### 6.2.2 Run Maaslin2
 
 #### Phylum
 ```{r, fig.width=10, fig.height=30}
-run_Maaslin2(ps_obj = ps_fs, 
+MaaslinPhylum <- run_Maaslin2(ps_obj = ps_fs, 
                                  taxa_level = "Phylum", 
                                  group = "Type",
                                  analysis_method = "LM", 
@@ -618,14 +625,14 @@ run_Maaslin2(ps_obj = ps_fs,
                                  transform = "LOG", 
                                  plot_colors = colors_all,
                                  plot_type = "dot", 
-                                 qval_threshold= 0.25, 
-                                 plot_heights = c(1, 9))
+                                 qval_threshold= 0.25)
+MaaslinPhylum$results
 ```
 
 
 #### Genus
 ```{r, fig.width=10, fig.height=65}
-run_Maaslin2(ps_obj = ps_fs, 
+MaaslinGenus <- run_Maaslin2(ps_obj = ps_fs, 
                                  taxa_level = "Genus", 
                                  group = "Type",
                                  analysis_method = "LM", 
@@ -633,13 +640,14 @@ run_Maaslin2(ps_obj = ps_fs,
                                  transform = "LOG", 
                                  plot_colors = colors_all,
                                  plot_type = "dot", 
-                                 qval_threshold= 0.25, 
-                                 plot_heights = c(1, 9))
+                                 qval_threshold= 0.25)
+
+MaaslinGenus$results
 ```
 
 #### Species
 ```{r, fig.width=15, fig.height=15}
-run_Maaslin2(ps_obj = ps_fs, 
+Maaslin2sp <- run_Maaslin2(ps_obj = ps_fs, 
                                  taxa_level = "Species", 
                                  group = "Type",
                                  analysis_method = "LM", 
@@ -647,8 +655,9 @@ run_Maaslin2(ps_obj = ps_fs,
                                  transform = "LOG", 
                                  plot_colors = colors_all,
                                  plot_type = "dot", 
-                                 qval_threshold= 0.25, 
-                                 plot_heights = c(1, 9))
+                                 qval_threshold= 0.25)
+
+Maaslin2sp$results
 ```
 
 ## 6.3 AlDEX2
@@ -662,7 +671,6 @@ ALDEx2 uses by default the centred log-ratio (clr) transformation which is scale
 
 ```{r, eval=FALSE,  fig.width=20, fig.height=12}
 resolutions <- c("Species", "Genus", "Phylum")
-
  
 iterate_aldex2(ps_obj = ps_fs, 
                  iterative_methods = iterative_methods,
@@ -678,80 +686,68 @@ aldex2_iterative_summary_table %>%
   filter(transform == "log10") %>%
   dplyr::arrange(desc(significant_features)) %>%
   filter(significant_features > 0)
-
 ```
 
 ### 6.3.2 Run Aldex2
 
 #### Phylum
 ```{r, fig.width=10, fig.height=3}
-run_aldex2(ps_fs, 
+ALDEX_ph <- run_aldex2(ps_fs, 
                   "Type", 
                   "Phylum",
                   method = "wilcox.test",
                   transform = "log10",
                   normalization = "CSS", 
                  plot_colors = colors_all)
+ALDEX_ph$results
 ```
 
 
 #### Genus
 ```{r, fig.width=7, fig.height=5}
-run_aldex2(ps_fs, 
+ALDEX_genus <- run_aldex2(ps_fs, 
                   "Type", 
                   "Genus",
                   method = "wilcox.test",
                   transform = "log10",
                   normalization = "CSS", 
                  plot_colors = colors_all)
+ALDEX_genus$result
 ```
 
 #### Species
 ```{r, fig.width=12}
-run_aldex2(ps_fs, 
+ALDEX_species <- run_aldex2(ps_fs, 
                   "Type", 
                   "Species",
                   method = "wilcox.test",
                   transform = "log10",
                   normalization = "CSS", 
             plot_colors = colors_all)
+ALDEX_species$result
 ```
 
 
 ## 6.4 Combine results
 
-
 ### Phylum
 ```{r, fig.height=10, fig.width=7}
-DA_results_df_Phylum <- combine_DA(maaslin2_results_Phylum, ancombc2_results_df_Phylum, aldex2_res_Phylum, "Type", "Phylum", c(1,4), plot_colors=colors_all)
+DA_results_df_Phylum <- combine_DA(maaslin2_results_Phylum, ancombc2_results_df_Phylum, aldex2_res_Phylum, "Type", "Phylum", plot_colors=colors_all)
 ```
 
 
 ### Genus
 ```{r, fig.height=6, fig.width=5}
-DA_results_df_genus <- combine_DA(maaslin2_results_Genus, ancombc2_results_df_Genus, aldex2_res_Genus, "Type", "Genus", c(1,3), plot_colors=colors_all)
+DA_results_df_genus <- combine_DA(maaslin2_results_Genus, ancombc2_results_df_Genus, aldex2_res_Genus, "Type", "Genus", plot_colors=colors_all)
 ```
 
 ### Species
 ```{r, fig.height=10, fig.width=7}
-DA_results_df <- combine_DA(maaslin2_results_Species, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species", c(1,4), plot_colors=colors_all)
+DA_results_df <- combine_DA(maaslin2_results_Species, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species",plot_colors=colors_all)
 ```
-
-```{r, fig.width=4, fig.height=3}
-plot_all_taxa(ps_obj = ps_fs,
-              transformation = "TSS",
-              group = "Type",
-              taxa_level = "Species",
-              plot_type = "dot",
-              plot_colors = colors_all,
-              taxa_filter = c("g__Fusobacterium_s__nucleatum", "g__Fusobacterium_s__periodonticum"))
-```
-
 
 # 7.0 Random Forest
 ```{r}
-library(randomForest)
-library(caret)
 set.seed(1234)
 
 df <- ps_fs_genus_csv %>% column_to_rownames(var="Sample")
@@ -848,8 +844,6 @@ kable(top_features, format = "html") %>%
 # 8.0 Core microbiome
 ## Core Microbiome
 ```{r}
-library(microbiome)
-
 core_ps <- ps_fs
 core_ps_n <- transform_sample_counts(core_ps, function(x) (x) / sum(x))
 
@@ -1018,7 +1012,6 @@ heatmap_gamma(result, "Type", result$g_df)
 
 ## UMAP of gamma scores
 ```{r fig.height=6, fig.width=6}
-library(umap)
 type_colors <- c("Abscess" = "red", "Plaque" = "blue")
 plot_gamma_umap(results, "Type", type_colors, result$g_df)
 ```
@@ -1062,6 +1055,10 @@ pheatmap(log(topics_terms),
 
 
 
+# Session Info
+```{r}
+sessionInfo()
+```
 
 
 

@@ -1,11 +1,7 @@
- 
-library("pacman")
-pacman::p_load("tidyverse")
-
+# ---- Setup ----
 set.seed(1234)
 date = Sys.Date()
  
-
 #Make output directory for data saved from functions
 # Specify the directory path
 dir_path <- "../saved_analysis_files"
@@ -21,7 +17,7 @@ if (!dir.exists(dir_path)) {
 
 
 
-# Data Processing
+# ---- Preprocessing Functions ----
 
 ## Construct phyloseq function
 
@@ -30,9 +26,7 @@ if (!dir.exists(dir_path)) {
 #biom_location <- "PRJNA822685_OSCC/Qiime2/blast/Files_For_Phyloseq/feature_table_w_taxonomy.biom"
 #tree_location <- "PRJNA822685_OSCC/Qiime2/Tree/Unfiltered_Rooted_tree_for_phyloseq/tree.nwk"
 #sampledata_location <- "PRJNA822685_OSCC/Qiime2/Files_For_Phyloseq/metadata_phyloseq.tsv"
-
 #construct_phyloseq("phy_obj_oscc", biom_location, tree_location, sampledata_location)
-
 
 construct_phyloseq <- function(phyloseq_object_name, biom_location, tree_location, sampledata_location) {
   # Validate inputs
@@ -79,9 +73,10 @@ construct_phyloseq <- function(phyloseq_object_name, biom_location, tree_locatio
   assign(phyloseq_object_name, phylo_obj, envir = .GlobalEnv)
 }
 
+## ---- Filter Unmatched----
+#The metadata in the Pediatric and Adult Abscess study differ slightly, so I just made two different functions to retain ONLY samples with 1 plaque and 1 abscess each.
 
-## Pediatric: Filter for unmatched samples
-
+## Pediatric Study: Filter for unmatched samples
 #This function is used inside the function filter_phyloseq
 filter_unmatched_samples_Pediatric <- function(phyloseq_obj) {
   # Extract the sample data
@@ -121,14 +116,12 @@ filter_unmatched_samples_Pediatric <- function(phyloseq_obj) {
 }
 
 
-## Filter for unmatched samples
+## Filter for unmatched samples - non-Pediatric study
 #This function is used inside the function filter_phyloseq
 filter_unmatched_samples <- function(phyloseq_obj) {
   
   #Make sure only Plaque and Abscess samples are retained
   phyloseq_obj <- subset_samples(phyloseq_obj, Type %in% c("Abscess", "Plaque"))
-  
-  print(phyloseq_obj@sam_data)
   
   # Extract sample data with sample_names as a column
   sample_data_df <- as(sample_data(phyloseq_obj), "data.frame")
@@ -166,8 +159,7 @@ filter_unmatched_samples <- function(phyloseq_obj) {
 
 
 
-
-## Filter phyloseq function
+## ---- Filter Phyloseq ----
 #Example:
 #filter_phyloseq(phy_obj_oscc, "OSCC", Contam_g, Contam_f, Contam_s)
 
@@ -216,10 +208,9 @@ filter_phyloseq <- function(phylo_obj, study, Contam_g, Contam_f, Contam_s) {
 }
 
 
+## ---- Process Phyloseq ----
 
 
-
-## Process Phyloseq
 process_phyloseq <- function(phylo_obj_fs) {
   
   # Capture the name of the input variable
@@ -257,13 +248,9 @@ process_phyloseq <- function(phylo_obj_fs) {
   assign(paste0(phylo_name, "_genus_csv"), genus_csv, envir = .GlobalEnv)
 }
 
+# ---- Basic Taxa Plots ----
 
-#Basic Taxa Plots
-
-## Plot all taxa
-#Example: 
 #plot_all_taxa(ps_obj_ped_fs, "TSS", "condition", "Genus", "dot", plot_colors)
-
 plot_all_taxa <- function(ps_obj,
                           transformation = "TSS",
                           group,
@@ -348,26 +335,22 @@ plot_all_taxa <- function(ps_obj,
   } else {
       stop("Invalid plot type. Please specify 'box', 'violin', 'density' or 'dot'.")
   }
-  print(plot)
+  return(list(plot = plot))
 }
 
+# ---- Ordinations ----
 
-
-# Oridinations 
-## Plot PCA
+## ---- Ordinations with Microviz ----
 
 #Example (to iterate through a list of ranks):
 #resolution <- c("Phylum", "Class", "Order", "Family", "Genus", "Species")
-
 #plots <- lapply(resolution, function(rank) {
 #  plot_pca(phyloseq_obj = merged_phylo_obj_f, 
 #           rank_transformation = rank, 
 #           variable = "Study", 
 #           colors_list = colors_study)})
-
 #combined_plot <- wrap_plots(plots, ncol = 2) & theme(legend.position = "bottom") 
 
-# Function to create plots
 plot_pca_microviz <- function(phyloseq_obj, rank_transformation, variable, colors_list=NULL) {
   # Transform and calculate distance
   phylo_trans <- phyloseq_obj %>% tax_fix() %>% tax_transform(rank = rank_transformation, trans = "identity")
@@ -396,9 +379,6 @@ plot_pca_microviz <- function(phyloseq_obj, rank_transformation, variable, color
 }
 
 
-
-## Plot PCoA
-
 #Example (to iterate through a list of ranks):
 #resolution <- c("Phylum", "Class", "Order", "Family", "Genus", "Species")
 #plots <- lapply(resolution, function(rank) {
@@ -409,10 +389,8 @@ plot_pca_microviz <- function(phyloseq_obj, rank_transformation, variable, color
 #    ord_calc_method = "NMDS",
 #    variable = "Study", 
 #    colors_list = colors_study)})
-    
 #combined_plot <- wrap_plots(plots, ncol = 2) & theme(legend.position = "bottom") 
 
-# Function to create plots
 plot_PCoA_microviz <- function(phyloseq_obj, rank_transformation, trans_type, dist_cal_type, ord_calc_method, variable, colors_list=NULL) {
   # Transform and calculate distance
   phylo_trans <- phyloseq_obj %>% tax_fix() %>%
@@ -443,6 +421,8 @@ plot_PCoA_microviz <- function(phyloseq_obj, rank_transformation, trans_type, di
 
 }
 
+## ---- Compare methods ----
+
 #BIG function to compare different ordination methods 
 compare_ordination_methods <- function(phyloseq_obj,
                                        rank_transformations = c("Species", "Genus", "Phylum"),
@@ -462,6 +442,7 @@ compare_ordination_methods <- function(phyloseq_obj,
   
   #Create a parameter hash so that you can just load results if they've already been run in an identical way
   param_hash <- digest(list(
+    study = cfg$study,
     phyloseq_obj = phyloseq_obj,
     rank_transformations = rank_transformations,
     trans_types = trans_types,
@@ -471,11 +452,13 @@ compare_ordination_methods <- function(phyloseq_obj,
     variance_threshold = variance_threshold  # Include in hash for reproducibility
   ))
   
-  result_file <- file.path("saved_analysis_files/", paste0("ordination_parameter_sweep_result_", param_hash, ".rds"))
+  result_file <- file.path("../saved_analysis_files/", paste0("ordination_parameter_sweep_result_", param_hash, ".rds"))
   
   if (file.exists(result_file)) {
     message("Analysis already run. Loading results...")
-    return(readRDS(result_file))
+    results_df <- readRDS(result_file)
+    return(list(results_df = results_df))
+    
   } else {
     message("Running analysis...")
   }
@@ -702,9 +685,11 @@ compare_ordination_methods <- function(phyloseq_obj,
     mutate(across(-c(rank_transformation, trans_type, dist_cal_type, ord_calc_method), as.numeric))
   
   saveRDS(results_df, result_file)
-  return(results_df)
+  
+  return(list(results_df=results_df))
 }
 
+## ---- Run Ordination ----
 
 #Comprehensive ordination plot
 run_ordination_with_validation <- function(phyloseq_obj,
@@ -730,7 +715,7 @@ run_ordination_with_validation <- function(phyloseq_obj,
     trans_type <- tolower(trans_type)
     dist_type <- tolower(dist_type)
     
-    # ----- Strict incompatibilities -----
+    # Warnings
     
     # CLR requires Euclidean
     if (trans_type == "clr" && dist_type != "euclidean") {
@@ -746,8 +731,6 @@ run_ordination_with_validation <- function(phyloseq_obj,
     if (ord_method == "NMDS" && trans_type == "clr") {
       stop("NMDS is not compatible with CLR-transformed data.")
     }
-    
-    # ----- Warnings for discouraged combos -----
     
     # Identity (raw counts) with Bray is discouraged
     if (trans_type == "identity" && dist_type == "bray") {
@@ -935,6 +918,7 @@ run_ordination_with_validation <- function(phyloseq_obj,
   ))
 }
 
+## ---- Analyze Sil Score ----
 
 # Analyze Silhouette score using "Type" as cluster label and return plot
 analyze_type_clustering_on_pca <- function(scores_df,
@@ -983,181 +967,10 @@ analyze_type_clustering_on_pca <- function(scores_df,
 }
 
 
-# DA Analyses
 
-## Maaslin2
+# ---- DA Analysis ----
 
-### Run Maaslin2
-#Example:
-#run_Maaslin2(ps_obj = ps_obj_ped_fs, 
-#                                 taxa_level = "Genus", 
-#                                 group = "condition",
-#                                 analysis_method = "NEGBIN", 
-#                                 normalization = "TMM",
-#                                 transform = "NONE", 
-#                                 plot_colors = plot_colors,
-#                                 plot_type = "box", 
-#                                 qval_threshold= 0.1, 
-#                                 plot_heights = c(2, 9))
-
-run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold, plot_heights){
-  
-  # Create a unique hash for the parameters
-  param_hash <- digest(list(ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold))
-  # File path for the analysis results
-  result_file <- file.path("saved_analysis_files/", paste0("maaslin2_result_", param_hash, ".rds"))
-
-  if (file.exists(result_file)) {
-      message("Analysis already run. Loading results...")
-      maaslin2_results <- readRDS(result_file)
-    } else {
-      message("Running analysis...")
-  
-  counts_input <- ps_obj %>% tax_glom(., taxa_level) %>% psmelt() %>%
-        dplyr::select(c("Sample", "Abundance",taxa_level, group)) %>%
-        pivot_wider(names_from=taxa_level, values_from="Abundance") %>%
-        dplyr::select(-c(group)) %>% 
-        column_to_rownames(var="Sample") 
-  
-  metadata_input <- sample_data(ps_obj) %>% as.matrix() %>% as.data.frame()
-  
-  maaslin2_results <- Maaslin2(counts_input , metadata_input, 
-                     fixed_effects = group, 
-                     plot_heatmap = F, 
-                     plot_scatter = F,
-                     output = paste0("saved_analysis_files/", date, "maaslin2_output"), 
-                     analysis_method = analysis_method,
-                     normalization = normalization, 
-                     transform  = transform)
-      # Save the results
-      saveRDS(maaslin2_results, result_file)
-    }
-  
-  # Assign the results df to the global environment to output
-  assign(paste0("maaslin2_results_", taxa_level),maaslin2_results$results, envir = .GlobalEnv)
-
-  #PLOT EVERYTHING
-  
-    maaslin_res_filt <- maaslin2_results$results %>% as.data.frame() %>% filter(qval <= qval_threshold) %>%
-        dplyr::mutate(Enrichment = ifelse(coef > 0, "Plaque", "Abscess"))
-  
-  if (nrow(maaslin_res_filt) == 0) {
-    stop("There are no results to display.")
-    }
-
-  df_fig <- maaslin_res_filt %>%
-      mutate(feature = gsub("g__", "", feature)) %>%
-      mutate(cols=ifelse(coef > 0, "CNTRL_enriched", "ABNORM_enriched")) %>%
-      arrange(Enrichment, abs(coef)) %>% 
-      mutate(feature_order = factor(feature, levels = unique(feature)))
-
-  #Barplot
-    bar_plot <- df_fig %>%
-      ggplot(aes(x = feature_order, y = abs(coef), fill = Enrichment)) +
-          geom_bar(stat = "identity", color="black") +
-          scale_fill_manual(values = plot_colors) +
-          coord_flip() +
-          labs(title = "Maaslin2 Results", x=NA, y = "coef") +
-          theme_bw()+
-          theme(axis.text.x = element_text(angle = 0, hjust = 1), 
-                axis.text.y = element_text(face="italic"))
-    
-    dot_plot <- df_fig %>%
-      ggplot(aes(x = abs(coef), y = feature_order)) +
-        geom_point(aes(size = -log10(pval), color = Enrichment, fill = Enrichment)) + # Map size and color
-        scale_color_manual(values = plot_colors) +
-        scale_fill_manual(values = plot_colors) +
-        scale_size(range = c(1, 5), name = "-log10(P-value)") + # Adjust dot size and legend label
-        labs(title = NULL, x="Log fold change", y = NULL, color = "Enrichment") +
-        theme_bw() +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1), # Rotate x-axis labels
-          plot.title = element_text(hjust = 0.5),  # Center the title
-          axis.text.y = element_text(hjust = 1)) 
-      
-
-    #CREATE PLOTS OF COUNTS, TSS, and CLR
-  physeq_glom_df_counts <- tax_glom(ps_obj, taxa_level) %>% psmelt(.)  %>%
-    dplyr::select(c("Sample", "Abundance", taxa_level, group)) %>%
-    mutate(Count_Type = "Count")
-
-  #Create Relative Abundance Table
-  physeq_glom_df_relab <- tax_glom(ps_obj, taxa_level) %>%
-    transform_sample_counts(., function(x) (x + 0.000001 - min(x))) %>%
-    transform_sample_counts(., function(x) (x) / sum(x)) %>% psmelt(.)  %>%
-    dplyr::select(c("Sample", "Abundance", taxa_level, group)) %>%
-    mutate(Count_Type = "RelAb")
-
-  #Create CLR table
-  physeq_glom_df_clr<- tax_glom(ps_obj, taxa_level) %>%
-    microbiome::transform(., transform = "clr", target="sample") %>% psmelt(.)  %>%
-    dplyr::select(c("Sample", "Abundance", taxa_level, group)) %>%
-    mutate(Count_Type = "CLR")    
-
-  merged <- rbind(physeq_glom_df_counts, physeq_glom_df_relab, physeq_glom_df_clr)
-
-  # Filter for taxa in Maaslin2 results
-  filtered_data <- merged %>%
-    dplyr::filter(!!sym(taxa_level) %in% maaslin_res_filt$feature) %>%
-    mutate(Count_Type = factor(Count_Type, levels = c("Count", "RelAb", "CLR"))) # Reorder levels
-  
-   # Create dot plot
-  if (plot_type == "dot") {
-  plot <- filtered_data %>%
-    ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
-    geom_point(position = position_jitter(seed = 1, width = 0.2)) +
-    facet_wrap(vars(!!sym(taxa_level), Count_Type), ncol=3, scales = "free") + # Use facet_wrap with free scales
-    theme_bw(base_size = 10) +
-    scale_color_manual(values = plot_colors) +
-    theme(
-      strip.background = element_blank(),
-      strip.placement = "outside",
-      strip.text = element_text(face = "bold")
-    )
-  
-   #Box plot
-  }else if (plot_type == "box") {
-    plot <- filtered_data %>%
-      ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
-      geom_boxplot(alpha = 0.5, outlier.shape = 8) + # Add boxplot
-      #geom_jitter(width = 0.2, alpha = 0.7, size = 1.5) + # Add jittered points
-      facet_wrap(vars(!!sym(taxa_level), Count_Type), ncol = 3, scales = "free") + # Facet
-      theme_bw(base_size = 10) +
-      scale_color_manual(values = plot_colors) +
-      scale_fill_manual(values = plot_colors) +
-      theme(
-        strip.background = element_blank(),
-        strip.placement = "outside",
-        strip.text = element_text(face = "bold")
-      )
-    
-  #Violin
-  }else if (plot_type == "violin") {
-    plot <- filtered_data %>%
-        ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
-        geom_violin(alpha = 0.5, scale = "width") + # Add violin plot with partial transparency
-        geom_jitter(position = position_jitter(seed = 1, width = 0.2), size = 1.5, alpha = 0.7) + # Add jittered points
-        facet_wrap(vars(!!sym(taxa_level), Count_Type), ncol = 3, scales = "free") + # Facet
-        theme_bw(base_size = 10) +
-        scale_color_manual(values = plot_colors) +
-        scale_fill_manual(values = plot_colors) +
-        theme(
-          strip.background = element_blank(),
-          strip.placement = "outside",
-          strip.text = element_text(face = "bold")
-        )
-  } else {
-      stop("Invalid plot type. Please specify 'box', 'violin', 'density' or 'dot'.")
-    }
-    
-  
-    #Plot EVERYTHING and return
-    layout <- (bar_plot | dot_plot) / plot + 
-    plot_layout(heights = plot_heights) 
-    print(layout)
-    
-  }
-
+## ---- Maaslin2 ----
 
 ### Iterate Maaslin2 Params
 #Example:
@@ -1170,7 +983,7 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
 #                 plot_colors = maaslin2_colors,
 #                 percentage=TRUE)
 
-iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval_threshold, plot_colors, percentage) {
+iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval_threshold, percentage, plot_colors) {
   
   # Define the options for each parameter
   analysis_methods <- c("LM", "CPLM", "ZINB", "NEGBIN")
@@ -1193,14 +1006,14 @@ iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval
   # Create a unique hash for the parameters
   param_hash <- digest(list(ps_obj, resolutions, group, qval_threshold))
   # File path for the analysis results
-  result_file <- file.path("saved_analysis_files/", paste0("iterative_maaslin2_result_", param_hash, ".rds"))
-
+  result_file <- file.path("..saved_analysis_files/", paste0("iterative_maaslin2_result_", param_hash, ".rds"))
+  
   if (file.exists(result_file)) {
     message("Analysis already run. Loading results...")
     summary_table <- readRDS(result_file)
   } else {
     message("Running analysis...")
-  
+    
     # Initialize an empty data frame to store results
     summary_table <- data.frame(
       analysis_method = character(),
@@ -1214,18 +1027,18 @@ iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval
     # Loop through each resolution (taxa_level)
     for (taxa_level in resolutions) {
       print(taxa_level)
-        
+      
       # Prepare counts and metadata input
-        counts_input <- ps_obj %>% 
-          tax_glom(taxa_level) %>% 
-          psmelt() %>%
-          dplyr::select(c("Sample", "Abundance", taxa_level, group)) %>%
-          pivot_wider(names_from = taxa_level, values_from = "Abundance") %>%
-          dplyr::select(-group) %>% 
-          column_to_rownames(var = "Sample")
-        
-        metadata_input <- sample_data(ps_obj) %>% as.matrix() %>% as.data.frame()
-        
+      counts_input <- ps_obj %>% 
+        tax_glom(taxa_level) %>% 
+        psmelt() %>%
+        dplyr::select(c("Sample", "Abundance", taxa_level, group)) %>%
+        pivot_wider(names_from = taxa_level, values_from = "Abundance") %>%
+        dplyr::select(-group) %>% 
+        column_to_rownames(var = "Sample")
+      
+      metadata_input <- sample_data(ps_obj) %>% as.matrix() %>% as.data.frame()
+      
       # Loop through each combination of parameters
       for (params in iterative_methods) {
         
@@ -1242,7 +1055,7 @@ iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval
             fixed_effects = group,
             plot_heatmap = FALSE,
             plot_scatter = FALSE,
-            output = "maaslin_iterations",
+            output = "../saved_analysis_files/maaslin_iterations",
             analysis_method = analysis_method,
             normalization = normalization,
             transform = transform
@@ -1257,7 +1070,7 @@ iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval
           significant_count <- length(unique(maaslin_res_filt$feature))
           features_list <- unique(maaslin_res_filt$feature)
           features_list_str <- paste(features_list, collapse = ", ")
-
+          
           
           # Append results to the summary table
           summary_table <- rbind(summary_table, data.frame(
@@ -1279,90 +1092,268 @@ iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval
           message("Error details:", e$message)
         })
         
-
+        
       }
     }
-      # Save the results after each iteration
-      saveRDS(summary_table, result_file)
+    # Save the results after each iteration
+    saveRDS(summary_table, result_file)
   }
-
+  
   # Return the summary table
   summary_table_features_list <- summary_table %>%
     mutate(method = paste(resolution, analysis_method, normalization, transform, sep = "_")) %>%
     select(c("resolution", "method", "features_list"))
   
   summary_table <- summary_table %>% select(-c("features_list"))
-
+  
   summary_table$resolution = factor(summary_table$resolution, 
-                               levels = resolutions)
+                                    levels = resolutions)
   
   
   if (percentage == TRUE) {
     
-  #Get the number of unique taxa for the proportion calc
-  total_sp <- length(unique(tax_table(ps_obj)[, "Species"]))
-  print(paste0("Total species: ", total_sp))
-  total_gn <- length(unique(tax_table(ps_obj)[, "Genus"]))
-  print(paste0("Total genera: ", total_gn))
-  total_phy <- length(unique(tax_table(ps_obj)[, "Phylum"]))
-  print(paste0("Total phyla: ", total_phy))
-
-  summary_table  <- summary_table %>%
-    mutate(normalization_transform = paste(normalization, transform, sep = "_")) %>%
-    mutate(percent_significant_features = case_when(
-                resolution == "Phylum" ~ round(((significant_features/total_phy)*100), 0),
-                resolution == "Genus" ~ round(((significant_features/total_gn)*100), 0),
-                resolution == "Species" ~ round(((significant_features/total_sp)*100), 0))) 
-
+    #Get the number of unique taxa for the proportion calc
+    total_sp <- length(unique(tax_table(ps_obj)[, "Species"]))
+    print(paste0("Total species: ", total_sp))
+    total_gn <- length(unique(tax_table(ps_obj)[, "Genus"]))
+    print(paste0("Total genera: ", total_gn))
+    total_phy <- length(unique(tax_table(ps_obj)[, "Phylum"]))
+    print(paste0("Total phyla: ", total_phy))
+    
+    summary_table  <- summary_table %>%
+      mutate(normalization_transform = paste(normalization, transform, sep = "_")) %>%
+      mutate(percent_significant_features = case_when(
+        resolution == "Phylum" ~ round(((significant_features/total_phy)*100), 0),
+        resolution == "Genus" ~ round(((significant_features/total_gn)*100), 0),
+        resolution == "Species" ~ round(((significant_features/total_sp)*100), 0))) 
+    
     p <- summary_table %>%
-    ggplot(., aes(x = analysis_method, y = percent_significant_features, fill = normalization_transform)) +
+      ggplot(., aes(x = analysis_method, y = percent_significant_features, fill = normalization_transform)) +
       geom_col(position = position_dodge(width = .8), width = 0.5, color="black") +
-    geom_text(aes(label = percent_significant_features), 
-              position = position_dodge(width = 0.8), 
-              vjust = -0.5, size = 2) +  # Ensure labels match bar positions      theme_bw(base_size = 14) +
-    facet_wrap(~resolution, scales = "free", ncol=1) +
-    theme_bw(base_size = 14) +
-    theme(strip.text.x = element_text(size = 16))+
-    labs(
+      geom_text(aes(label = percent_significant_features), 
+                position = position_dodge(width = 0.8), 
+                vjust = -0.5, size = 2) +  # Ensure labels match bar positions      theme_bw(base_size = 14) +
+      facet_wrap(~resolution, scales = "free", ncol=1) +
+      theme_bw(base_size = 14) +
+      theme(strip.text.x = element_text(size = 16))+
+      labs(
         title = "Significant Features by Analysis Method, Resolution, and Normalization",
         x = "Analysis Method",
         y = "% of Total Features Found Signficiant"
       ) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-    scale_fill_manual(values = plot_colors) + 
-    ylim(0, 100) 
-  
+      scale_fill_manual(values = plot_colors) + 
+      ylim(0, 100) 
+    
   }else if (percentage == FALSE) {
-  
-  p <- summary_table %>%
-    mutate(normalization_transform = paste(normalization, transform, sep = "_")) %>%
-    ggplot(., aes(x = analysis_method, y = significant_features, fill = normalization_transform)) +
+    
+    p <- summary_table %>%
+      mutate(normalization_transform = paste(normalization, transform, sep = "_")) %>%
+      ggplot(., aes(x = analysis_method, y = significant_features, fill = normalization_transform)) +
       geom_col(position = position_dodge(width = .8), width = 0.5, color="black") +
-    geom_text(aes(label = significant_features), 
-              position = position_dodge(width = 0.8), 
-              vjust = -0.5, size = 2) +  # Ensure labels match bar positions
+      geom_text(aes(label = significant_features), 
+                position = position_dodge(width = 0.8), 
+                vjust = -0.5, size = 2) +  # Ensure labels match bar positions
       facet_wrap(~resolution, scales = "free", ncol=1) +
-     theme(strip.text.x = element_text(size = 16))+
-     theme_bw(base_size = 14) +
+      theme(strip.text.x = element_text(size = 16))+
+      theme_bw(base_size = 14) +
       labs(
         title = "Significant Features by Analysis Method, Resolution, and Normalization",
         x = "Analysis Method",
         y = "Significant Features"
       ) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-    scale_fill_manual(values = plot_colors)
+      scale_fill_manual(values = plot_colors)
   }
-    print(p)
-    
+  return(list(plot = p, results = summary_table))  
 }
 
 
 
 
+### Run Maaslin2
+#Example:
+#run_Maaslin2(ps_obj = ps_obj_ped_fs, 
+#                                 taxa_level = "Genus", 
+#                                 group = "condition",
+#                                 analysis_method = "NEGBIN", 
+#                                 normalization = "TMM",
+#                                 transform = "NONE", 
+#                                 plot_colors = plot_colors,
+#                                 plot_type = "box", 
+#                                 qval_threshold= 0.1, 
+#                                 plot_heights = c(2, 9))
 
+run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold){
+  
+  # Create a unique hash for the parameters
+  param_hash <- digest(list(ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold))
+  # File path for the analysis results
+  result_file <- file.path("../saved_analysis_files/", paste0("maaslin2_result_", param_hash, ".rds"))
+  
+  if (file.exists(result_file)) {
+    message("Analysis already run. Loading results...")
+    maaslin2_results <- readRDS(result_file)
+  } else {
+    message("Running analysis...")
+    
+    counts_input <- ps_obj %>% tax_glom(., taxa_level) %>% psmelt() %>%
+      dplyr::select(c("Sample", "Abundance",taxa_level, group)) %>%
+      pivot_wider(names_from=taxa_level, values_from="Abundance") %>%
+      dplyr::select(-c(group)) %>% 
+      column_to_rownames(var="Sample") 
+    
+    metadata_input <- sample_data(ps_obj) %>% as.matrix() %>% as.data.frame()
+    
+    maaslin2_results <- tryCatch({
+      Maaslin2(
+        input_data = counts_input,
+        input_metadata = metadata_input,
+        fixed_effects = group,
+        plot_heatmap = FALSE,
+        plot_scatter = FALSE,
+        output = paste0("../saved_analysis_files/", Sys.Date(), "_maaslin2_output"),
+        analysis_method = analysis_method,
+        normalization = normalization,
+        transform = transform
+      )
+    }, error = function(e) {
+      message("Maaslin2 failed: ", e$message)
+      return(NULL)
+    })
+    
+    # If run failed
+    if (is.null(maaslin2_results)) {
+      return(invisible(NULL))
+    }
+    
+    # Save the results
+    saveRDS(maaslin2_results, result_file)
+  }
+  
+  # Assign the results df to the global environment to output
+  assign(paste0("maaslin2_results_", taxa_level),maaslin2_results$results, envir = .GlobalEnv)
+  
+  #PLOT EVERYTHING
+  
+  maaslin_res_filt <- maaslin2_results$results %>% as.data.frame() %>% filter(qval <= qval_threshold) %>%
+    dplyr::mutate(Enrichment = ifelse(coef > 0, "Plaque", "Abscess"))
+  
+  if (nrow(maaslin_res_filt) == 0) {
+    stop("There are no results to display.")
+  }
+  
+  df_fig <- maaslin_res_filt %>%
+    mutate(feature = gsub("g__", "", feature)) %>%
+    mutate(cols=ifelse(coef > 0, "CNTRL_enriched", "ABNORM_enriched")) %>%
+    arrange(Enrichment, abs(coef)) %>% 
+    mutate(feature_order = factor(feature, levels = unique(feature)))
+  
+  #Barplot
+  bar_plot <- df_fig %>%
+    ggplot(aes(x = feature_order, y = abs(coef), fill = Enrichment)) +
+    geom_bar(stat = "identity", color="black") +
+    scale_fill_manual(values = plot_colors) +
+    coord_flip() +
+    labs(title = "Maaslin2 Results", x=NA, y = "coef") +
+    theme_bw()+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1), 
+          axis.text.y = element_text(face="italic"))
+  
+  dot_plot <- df_fig %>%
+    ggplot(aes(x = abs(coef), y = feature_order)) +
+    geom_point(aes(size = -log10(pval), color = Enrichment, fill = Enrichment)) + # Map size and color
+    scale_color_manual(values = plot_colors) +
+    scale_fill_manual(values = plot_colors) +
+    scale_size(range = c(1, 5), name = "-log10(P-value)") + # Adjust dot size and legend label
+    labs(title = NULL, x="Log fold change", y = NULL, color = "Enrichment") +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1), # Rotate x-axis labels
+      plot.title = element_text(hjust = 0.5),  # Center the title
+      axis.text.y = element_text(hjust = 1)) 
+  
+  
+  #CREATE PLOTS OF COUNTS, TSS, and CLR
+  physeq_glom_df_counts <- tax_glom(ps_obj, taxa_level) %>% psmelt(.)  %>%
+    dplyr::select(c("Sample", "Abundance", taxa_level, group)) %>%
+    mutate(Count_Type = "Count")
+  
+  #Create Relative Abundance Table
+  physeq_glom_df_relab <- tax_glom(ps_obj, taxa_level) %>%
+    transform_sample_counts(., function(x) (x + 0.000001 - min(x))) %>%
+    transform_sample_counts(., function(x) (x) / sum(x)) %>% psmelt(.)  %>%
+    dplyr::select(c("Sample", "Abundance", taxa_level, group)) %>%
+    mutate(Count_Type = "RelAb")
+  
+  #Create CLR table
+  physeq_glom_df_clr<- tax_glom(ps_obj, taxa_level) %>%
+    microbiome::transform(., transform = "clr", target="sample") %>% psmelt(.)  %>%
+    dplyr::select(c("Sample", "Abundance", taxa_level, group)) %>%
+    mutate(Count_Type = "CLR")    
+  
+  merged <- rbind(physeq_glom_df_counts, physeq_glom_df_relab, physeq_glom_df_clr)
+  
+  # Filter for taxa in Maaslin2 results
+  filtered_data <- merged %>%
+    dplyr::filter(!!sym(taxa_level) %in% maaslin_res_filt$feature) %>%
+    mutate(Count_Type = factor(Count_Type, levels = c("Count", "RelAb", "CLR"))) # Reorder levels
+  
+  # Create dot plot
+  if (plot_type == "dot") {
+    plot <- filtered_data %>%
+      ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
+      geom_point(position = position_jitter(seed = 1, width = 0.2)) +
+      facet_wrap(vars(!!sym(taxa_level), Count_Type), ncol=3, scales = "free") + # Use facet_wrap with free scales
+      theme_bw(base_size = 10) +
+      scale_color_manual(values = plot_colors) +
+      theme(
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text = element_text(face = "bold")
+      )
+    
+    #Box plot
+  }else if (plot_type == "box") {
+    plot <- filtered_data %>%
+      ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
+      geom_boxplot(alpha = 0.5, outlier.shape = 8) + # Add boxplot
+      #geom_jitter(width = 0.2, alpha = 0.7, size = 1.5) + # Add jittered points
+      facet_wrap(vars(!!sym(taxa_level), Count_Type), ncol = 3, scales = "free") + # Facet
+      theme_bw(base_size = 10) +
+      scale_color_manual(values = plot_colors) +
+      scale_fill_manual(values = plot_colors) +
+      theme(
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text = element_text(face = "bold")
+      )
+    
+    #Violin
+  }else if (plot_type == "violin") {
+    plot <- filtered_data %>%
+      ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
+      geom_violin(alpha = 0.5, scale = "width") + # Add violin plot with partial transparency
+      geom_jitter(position = position_jitter(seed = 1, width = 0.2), size = 1.5, alpha = 0.7) + # Add jittered points
+      facet_wrap(vars(!!sym(taxa_level), Count_Type), ncol = 3, scales = "free") + # Facet
+      theme_bw(base_size = 10) +
+      scale_color_manual(values = plot_colors) +
+      scale_fill_manual(values = plot_colors) +
+      theme(
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text = element_text(face = "bold")
+      )
+  } else {
+    stop("Invalid plot type. Please specify 'box', 'violin', 'density' or 'dot'.")
+  }
+  
+  
+  return(list(results = df_fig, bar_plot = bar_plot, dot_plot = dot_plot))
+  
+}
 
-
-## ANCOM
+## ---- ANCOM ----
 
 ### Run ANCOM
 #Example:
@@ -1375,120 +1366,117 @@ iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval
 #         plot_type = "dot", 
 #         plot_heights = c(1, 8))
 
-runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved_results=NULL, plot_type, plot_heights, plot_colors){
+runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved_results=NULL, plot_type, plot_colors){
   
-    # Create a unique hash for the parameters
+  # Create a unique hash for the parameters
   param_hash <- digest(list(ps_obj, tax_level, group, Log2FC_cutoff=NULL))
   # File path for the analysis results
-  result_file <- file.path("saved_analysis_files/", paste0("ancombc2_result_", param_hash, ".rds"))
-
+  result_file <- file.path("../saved_analysis_files/", paste0("ancombc2_result_", param_hash, ".rds"))
+  
   if (file.exists(result_file)) {
-      message("Analysis already run. Loading results...")
-      ancombc2_results <- readRDS(result_file)
-    } else {
-      message("Running analysis...")
-
-  # Run ANCOMBC2
-  ancombc2_results <- ancombc2(
-    data = ps_obj,
-    assay_name = "counts",   # Default name for the abundance matrix in phyloseq
-    tax_level = tax_level,   # Taxonomic level
-    fix_formula = group,     # Fixed effect formula (e.g., "condition")
-    p_adj_method = "holm",   # Adjust p-values (e.g., Holm method)
-    group = group,           # Grouping variable
-    struc_zero = TRUE,       # Detect structural zeros
-    neg_lb = TRUE,           # Detect sampling zeros
-    alpha = 0.05,            # Significance level
-    n_cl = 1                 # Number of cores for parallelization
-  )
+    message("Analysis already run. Loading results...")
+    ancombc2_results <- readRDS(result_file)
+  } else {
+    message("Running analysis...")
+    
+    # Run ANCOMBC2
+    ancombc2_results <- tryCatch({
+      res <- ancombc2(
+        data = ps_obj,
+        assay_name = "counts",
+        tax_level = tax_level,
+        fix_formula = group,
+        p_adj_method = "holm",
+        group = group,
+        struc_zero = TRUE,
+        neg_lb = TRUE,
+        alpha = 0.05,
+        n_cl = 1
+      )
+      saveRDS(res, result_file)
+      res
+    }, error = function(e) {
+      message("ANCOMBC2 failed: ", e$message)
+      return(NULL)
+    })
   
-  # Save the results
-  saveRDS(ancombc2_results, result_file)
-    }
-  
-      
+  }
   df_fig <- ancombc2_results$res
   
-
+  
   #Save the column names to reference below
   #This seems really complicated but it's not, it just makes the function flexible to whatever group you are comparing.
   
-      #DFF column
-      dff_col_name <- grep(paste0("^diff_", group), colnames(df_fig), value = TRUE)
-      # If you want to check and store it
-      if (length(dff_col_name) > 0) {
-        # Save the first matching column name (if multiple matches)
-        dff_col_name <- dff_col_name[1]
-        print(paste("Column found:", dff_col_name))
-      } else {
-        print("No matching column found.")
-      }
-      
-      #LFC column
-      lfc_col_name <- grep(paste0("^lfc_", group), colnames(df_fig), value = TRUE)
-      # If you want to check and store it
-      if (length(lfc_col_name) > 0) {
-        # Save the first matching column name (if multiple matches)
-        lfc_col_name <- lfc_col_name[1]
-        print(paste("Column found:", lfc_col_name))
-      } else {
-        print("No matching column found.")
-      }
-      
-      #SS condition column
-      ss_col_name <- grep(paste0("^passed_ss_", group), colnames(df_fig), value = TRUE)
-      # If you want to check and store it
-      if (length(ss_col_name) > 0) {
-        # Save the first matching column name (if multiple matches)
-        ss_col_name <- ss_col_name[1]
-        print(paste("Column found:", ss_col_name))
-      } else {
-        print("No matching column found.")
-      }
-      
-      #SE condition column
-      se_col_name <- grep(paste0("^se_", group), colnames(df_fig), value = TRUE)
-      # If you want to check and store it
-      if (length(se_col_name) > 0) {
-        # Save the first matching column name (if multiple matches)
-        se_col_name <- se_col_name[1]
-        print(paste("Column found:", se_col_name))
-      } else {
-        print("No matching column found.")
-      }
-      
-      #P-val condition column
-      p_col_name <- grep(paste0("^p_", group), colnames(df_fig), value = TRUE)
-      # If you want to check and store it
-      if (length(p_col_name) > 0) {
-        # Save the first matching column name (if multiple matches)
-        p_col_name <- p_col_name[1]
-        print(paste("Column found:", p_col_name))
-      } else {
-        print("No matching column found.")
-      }
-
-    #Create a dataframe for results
+  #DFF column
+  dff_col_name <- grep(paste0("^diff_", group), colnames(df_fig), value = TRUE)
+  # If you want to check and store it
+  if (length(dff_col_name) > 0) {
+    # Save the first matching column name (if multiple matches)
+    dff_col_name <- dff_col_name[1]
+  } else {
+    print("No matching column found.")
+  }
+  
+  #LFC column
+  lfc_col_name <- grep(paste0("^lfc_", group), colnames(df_fig), value = TRUE)
+  # If you want to check and store it
+  if (length(lfc_col_name) > 0) {
+    # Save the first matching column name (if multiple matches)
+    lfc_col_name <- lfc_col_name[1]
+  } else {
+    print("No matching column found.")
+  }
+  
+  #SS condition column
+  ss_col_name <- grep(paste0("^passed_ss_", group), colnames(df_fig), value = TRUE)
+  # If you want to check and store it
+  if (length(ss_col_name) > 0) {
+    # Save the first matching column name (if multiple matches)
+    ss_col_name <- ss_col_name[1]
+  } else {
+    print("No matching column found.")
+  }
+  
+  #SE condition column
+  se_col_name <- grep(paste0("^se_", group), colnames(df_fig), value = TRUE)
+  # If you want to check and store it
+  if (length(se_col_name) > 0) {
+    # Save the first matching column name (if multiple matches)
+    se_col_name <- se_col_name[1]
+  } else {
+    print("No matching column found.")
+  }
+  
+  #P-val condition column
+  p_col_name <- grep(paste0("^p_", group), colnames(df_fig), value = TRUE)
+  # If you want to check and store it
+  if (length(p_col_name) > 0) {
+    # Save the first matching column name (if multiple matches)
+    p_col_name <- p_col_name[1]
+  } else {
+    print("No matching column found.")
+  }
+  
+  #Create a dataframe for results
   df_fig <- ancombc2_results$res %>%
     dplyr::filter(!!sym(dff_col_name) == TRUE) %>% 
     dplyr::arrange(desc(!!sym(lfc_col_name))) %>%
     dplyr::mutate(Enrichment = ifelse(!!sym(lfc_col_name) > 0, "Plaque", "Abscess"),
                   color = ifelse(!!sym(ss_col_name) == 1, "aquamarine3", "black"))  # Color text based on ss condition
-    
-    df_fig$taxon = factor(df_fig$taxon, levels = df_fig$taxon)
-    df_fig$Enrichment = factor(df_fig$Enrichment, 
-                               levels = c("Plaque", "Abscess"))
   
-    # Assign the results df to the global environment to output
+  df_fig$taxon = factor(df_fig$taxon, levels = df_fig$taxon)
+  df_fig$Enrichment = factor(df_fig$Enrichment, 
+                             levels = c("Plaque", "Abscess"))
+  
+  # Assign the results df to the global environment to output
   assign(paste0("ancombc2_results_df_", tax_level),df_fig, envir = .GlobalEnv)
-    
-    # Check if the dataframe is empty
+  
+  # Check if the dataframe is empty
   if (nrow(df_fig) == 0) {
-    print(ancombc2_results$res)
-    stop("There are no results to display.")
+    message("ANCOMBC2 ran successfully but found no significant taxa.")
+    return(invisible(NULL))  # Don't error, just end the function quietly
   }
   
-  print(df_fig)
 
   #DOT PLOT
   # Conditionally filter the data based on Log2FC_cutoff
@@ -1507,12 +1495,12 @@ runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved
       axis.text.x = element_text(angle = 45, hjust = 1), # Rotate x-axis labels
       plot.title = element_text(hjust = 0.5),  # Center the title
       axis.text.y = element_text(hjust = 1, color = df_fig$color)) 
-
+  
   
   #Bar plot
   df_fig$taxon = factor(df_fig$taxon, levels = df_fig$taxon)
   df_fig$Enrichment = factor(df_fig$Enrichment, 
-                           levels = c("Plaque", "Abscess"))
+                             levels = c("Plaque", "Abscess"))
   
   bar_plot <- df_fig %>%
     ggplot(aes(x = taxon, y = abs(!!sym(lfc_col_name)), fill = Enrichment)) + 
@@ -1525,57 +1513,57 @@ runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved
     scale_fill_manual(values = plot_colors) +
     theme_bw() + 
     theme(plot.title = element_text(hjust = 0.5),
-        panel.grid.minor.y = element_blank(),
-        axis.text.y = element_text(hjust = 1, color = df_fig$color)) +
+          panel.grid.minor.y = element_blank(),
+          axis.text.y = element_text(hjust = 1, color = df_fig$color)) +
     coord_flip()
   
   
-   if (!is.null(name_of_saved_results)) {
-      assign(name_of_saved_results, df_fig, envir = .GlobalEnv)
-   }
+  if (!is.null(name_of_saved_results)) {
+    assign(name_of_saved_results, df_fig, envir = .GlobalEnv)
+  }
   
   
   #CREATE PLOTS OF COUNTS, TSS, and CLR
   physeq_glom_df_counts <- tax_glom(ps_obj, tax_level) %>% psmelt(.)  %>%
     dplyr::select(c("Sample", "Abundance", tax_level, group)) %>%
     mutate(Count_Type = "Count")
-
+  
   #Create Relative Abundance Table
   physeq_glom_df_relab <- tax_glom(ps_obj, tax_level) %>%
     transform_sample_counts(., function(x) (x + 0.000001 - min(x))) %>%
     transform_sample_counts(., function(x) (x) / sum(x)) %>% psmelt(.)  %>%
     dplyr::select(c("Sample", "Abundance", tax_level, group)) %>%
     mutate(Count_Type = "RelAb")
-
-
+  
+  
   #Create CLR table
   physeq_glom_df_clr<- tax_glom(ps_obj, tax_level) %>%
     microbiome::transform(., transform = "clr", target="sample") %>% psmelt(.)  %>%
     dplyr::select(c("Sample", "Abundance", tax_level, group)) %>%
     mutate(Count_Type = "CLR")    
-
+  
   merged <- rbind(physeq_glom_df_counts, physeq_glom_df_relab, physeq_glom_df_clr)
-
+  
   # Filter for taxa in ANCOM results
   filtered_data <- merged %>%
     filter(!!sym(tax_level) %in% df_fig$taxon) %>%
     mutate(Count_Type = factor(Count_Type, levels = c("Count", "RelAb", "CLR"))) # Reorder levels
-
+  
   # Create dot plot
   if (plot_type == "dot") {
-  plot <- filtered_data %>%
-    ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
-    geom_point(position = position_jitter(seed = 1, width = 0.2)) +
-    facet_wrap(vars(!!sym(tax_level), Count_Type), ncol=3, scales = "free") + # Use facet_wrap with free scales
-    theme_bw(base_size = 10) +
-    scale_color_manual(values = plot_colors) +
-    theme(
-      strip.background = element_blank(),
-      strip.placement = "outside",
-      strip.text = element_text(face = "bold")
-    )
-  
-  #Box plot
+    plot <- filtered_data %>%
+      ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
+      geom_point(position = position_jitter(seed = 1, width = 0.2)) +
+      facet_wrap(vars(!!sym(tax_level), Count_Type), ncol=3, scales = "free") + # Use facet_wrap with free scales
+      theme_bw(base_size = 10) +
+      scale_color_manual(values = plot_colors) +
+      theme(
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text = element_text(face = "bold")
+      )
+    
+    #Box plot
   }else if (plot_type == "box") {
     plot <- filtered_data %>%
       ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
@@ -1591,51 +1579,50 @@ runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved
         strip.text = element_text(face = "bold")
       )
     
-  #Violin
+    #Violin
   }else if (plot_type == "violin") {
     plot <- filtered_data %>%
-        ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
-        geom_violin(alpha = 0.5, scale = "width") + # Add violin plot with partial transparency
-        geom_jitter(position = position_jitter(seed = 1, width = 0.2), size = 1.5, alpha = 0.7) + # Add jittered points
-        facet_wrap(vars(!!sym(tax_level), Count_Type), ncol = 3, scales = "free") + # Facet
-        theme_bw(base_size = 10) +
-        scale_color_manual(values = plot_colors) +
-        scale_fill_manual(values = plot_colors) +
-        theme(
-          strip.background = element_blank(),
-          strip.placement = "outside",
-          strip.text = element_text(face = "bold")
-        )
-  
-  #Density
+      ggplot(aes(x = !!sym(group), y = Abundance, color = !!sym(group), fill = !!sym(group))) + 
+      geom_violin(alpha = 0.5, scale = "width") + # Add violin plot with partial transparency
+      geom_jitter(position = position_jitter(seed = 1, width = 0.2), size = 1.5, alpha = 0.7) + # Add jittered points
+      facet_wrap(vars(!!sym(tax_level), Count_Type), ncol = 3, scales = "free") + # Facet
+      theme_bw(base_size = 10) +
+      scale_color_manual(values = plot_colors) +
+      scale_fill_manual(values = plot_colors) +
+      theme(
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text = element_text(face = "bold")
+      )
+    
+    #Density
   }else if (plot_type == "density") {
     plot <- filtered_data %>%
-          ggplot(aes(x = Abundance, color = !!sym(group), fill = !!sym(group))) + 
-          geom_density(alpha = 0.5) + # Add density plot with partial transparency
-          facet_wrap(vars(!!sym(tax_level), Count_Type), ncol = 3, scales = "free") + # Facet
-          theme_bw(base_size = 10) +
-          scale_color_manual(values = plot_colors) +
-          scale_fill_manual(values = plot_colors) +
-          theme(
-            strip.background = element_blank(),
-            strip.placement = "outside",
-            strip.text = element_text(face = "bold")
-          )
-  
-
+      ggplot(aes(x = Abundance, color = !!sym(group), fill = !!sym(group))) + 
+      geom_density(alpha = 0.5) + # Add density plot with partial transparency
+      facet_wrap(vars(!!sym(tax_level), Count_Type), ncol = 3, scales = "free") + # Facet
+      theme_bw(base_size = 10) +
+      scale_color_manual(values = plot_colors) +
+      scale_fill_manual(values = plot_colors) +
+      theme(
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text = element_text(face = "bold")
+      )
+    
+    
   } else {
     stop("Invalid plot type. Please specify 'box', 'violin', 'density' or 'dot'.")
   }
   
+  return(list(bar_plot = bar_plot, dot_plot = dot_plot, full_results = ancombc2_results$res, filtered_res = df_fig))
 
-  #Plot EVERYTHING and return
-  layout <- (bar_plot | dot_plot) / plot + 
-  plot_layout(heights = plot_heights) 
-  layout
+
 }
 
 
-## ALDEX2
+## ---- Aldex2 ----
+
 
 ### Iterate ALDEX
 iterate_aldex2 <- function(ps_obj, iterative_methods, resolutions, group, plot_colors, percentage) {
@@ -1669,7 +1656,7 @@ iterate_aldex2 <- function(ps_obj, iterative_methods, resolutions, group, plot_c
   # Create a unique hash for the parameters
   param_hash <- digest(list(ps_obj, resolutions, group))
   # File path for the analysis results
-  result_file <- file.path("saved_analysis_files/", paste0("iterative_aldex2_result_", param_hash, ".rds"))
+  result_file <- file.path("../saved_analysis_files/", paste0("iterative_aldex2_result_", param_hash, ".rds"))
 
   if (file.exists(result_file)) {
     message("Analysis already run. Loading results...")
@@ -1761,7 +1748,6 @@ iterate_aldex2 <- function(ps_obj, iterative_methods, resolutions, group, plot_c
       saveRDS(summary_table, result_file)
   }
   
-  print(summary_table)
     #Output
   assign("aldex2_iterative_summary_table", summary_table, envir = .GlobalEnv)
   
@@ -1836,77 +1822,111 @@ iterate_aldex2 <- function(ps_obj, iterative_methods, resolutions, group, plot_c
       theme(axis.text.x = element_text(angle = 45, hjust = 1))
    # scale_fill_manual(values = plot_colors)
   }
-    print(p)
-  
+
+  return(list(results = summary_table, plot = p))
 }
 
 
 
 ### Run Aldex
 
-
-run_aldex2 <- function(ps_obj, group, tax_rank, method, transform, normalization, plot_colors){
-
-  aldex2_results <- microbiomeMarker::run_aldex(
-                      ps_obj,
-                      group,
-                      method = method,
-                      norm = normalization,
-                      transform = transform,
-                      taxa_rank = tax_rank,
-                      pvalue_cutoff = 0.05,
-                      denom = "all",
-                      paired = FALSE
-                    )
+run_aldex2 <- function(ps_obj, group, tax_rank, method, transform, normalization, plot_colors) {
+  library(dplyr)
+  library(ggplot2)
+  library(microbiomeMarker)
+  library(patchwork)
   
+  message("Running ALDEx2...")
+  
+  # Try running ALDEx2
+  aldex2_results <- tryCatch({
+    microbiomeMarker::run_aldex(
+      ps_obj,
+      group,
+      method = method,
+      norm = normalization,
+      transform = transform,
+      taxa_rank = tax_rank,
+      pvalue_cutoff = 0.05,
+      denom = "all",
+      paired = FALSE
+    )
+  }, error = function(e) {
+    message("ALDEx2 failed: ", e$message)
+    return(NULL)
+  })
+  
+  # Exit if it failed
+  if (is.null(aldex2_results)) {
+    return(invisible(NULL))
+  }
+  
+  # Extract results
+  if (!"marker_table" %in% slotNames(aldex2_results) || nrow(aldex2_results@marker_table) == 0) {
+    message("ALDEx2 returned no marker results.")
+    return(invisible(NULL))
+  }
+  
+  # Convert and assign result table
   aldex2_res <- aldex2_results@marker_table %>% as.matrix() %>% as.data.frame()
   assign(paste0("aldex2_res_", tax_rank), aldex2_res, envir = .GlobalEnv)
-
-  #The output of Aldex2 here is kind of confusing, so I am going to make a new column to specify the enrichment
-  df_fig <- aldex2_res %>% 
-      mutate(ef_aldex = as.numeric(ef_aldex)) %>%
-      mutate(padj = as.numeric(padj)) %>%
-      dplyr::mutate(Enrichment = ifelse(ef_aldex > 0, "Plaque", "Abscess"))
-
-  df_fig$feature = factor(df_fig$feature, levels = df_fig$feature)
-  df_fig$Enrichment = factor(df_fig$Enrichment, 
-                           levels = c("Plaque", "Abscess"))
-
-    #DOT PLOT
+  
+  # Ensure required columns exist
+  if (!all(c("ef_aldex", "padj", "feature") %in% colnames(aldex2_res))) {
+    message("Missing expected columns in ALDEx2 result.")
+    return(invisible(NULL))
+  }
+  
+  # Prepare results for plotting
+  df_fig <- aldex2_res %>%
+    mutate(
+      ef_aldex = as.numeric(ef_aldex),
+      padj = as.numeric(padj),
+      Enrichment = ifelse(ef_aldex > 0, "Plaque", "Abscess")
+    )
+  
+  if (nrow(df_fig) == 0) {
+    message("No significant taxa found in ALDEx2 results.")
+    return(invisible(NULL))
+  }
+  
+  df_fig$feature <- factor(df_fig$feature, levels = df_fig$feature)
+  df_fig$Enrichment <- factor(df_fig$Enrichment, levels = c("Plaque", "Abscess"))
+  
+  # Dot plot
   dot_plot <- df_fig %>%
     ggplot(aes(x = abs(ef_aldex), y = feature)) +
-    geom_point(aes(size = -log10(padj), color = Enrichment)) + # Map size and color
+    geom_point(aes(size = -log10(padj), color = Enrichment)) +
     scale_color_manual(values = plot_colors) +
-    scale_size(range = c(1, 5), name = "-log10(P-value)") + # Adjust dot size and legend label
-    labs(title = NULL, x="EF Aldex", y = NULL, color = "Enrichment") +
+    scale_size(range = c(1, 5), name = "-log10(P-value)") +
+    labs(title = NULL, x = "EF Aldex", y = NULL, color = "Enrichment") +
     theme_bw() +
     theme(
-      axis.text.x = element_text(angle = 45, hjust = 1), # Rotate x-axis labels
-      plot.title = element_text(hjust = 0.5))  # Center the title
-
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5)
+    )
   
-  #Bar plot
+  # Bar plot
   bar_plot <- df_fig %>%
-    ggplot(aes(x = feature, y = abs(ef_aldex), fill = Enrichment)) + 
-    geom_bar(stat = "identity", width = 0.7, color = "black", 
-             position = position_dodge(width = 0.4))+
-    labs(x = NULL, y = "EF Aldex", 
-         title = NULL) + 
+    ggplot(aes(x = feature, y = abs(ef_aldex), fill = Enrichment)) +
+    geom_bar(stat = "identity", width = 0.7, color = "black") +
+    coord_flip() +
+    labs(x = NULL, y = "EF Aldex", title = NULL) +
     scale_fill_manual(values = plot_colors) +
-    theme_bw() + 
-    theme(plot.title = element_text(hjust = 0.5),
-        panel.grid.minor.y = element_blank()) +
-    coord_flip()
+    theme_bw() +
+    theme(
+      plot.title = element_text(hjust = 0.5),
+      panel.grid.minor.y = element_blank()
+    )
   
-  layout <- (bar_plot | dot_plot) 
-  layout
-  
+  #Return
+  return(list(results = df_fig, bar_plot = bar_plot, dot_plot = dot_plot))
 }
 
 
-## Combine DA Methods
+## ---- Combine DA Methods----
 
-combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group, tax_level, plot_heights, plot_colors){
+combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group, tax_level, plot_colors){
 
     # Prepare the two dataframes for merging
   #MAASLIN2
@@ -1962,10 +1982,7 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
     DA_results_df$taxon <- gsub("g(?=[A-Z])", "", DA_results_df$taxon, perl = TRUE)
     DA_results_df$taxon <- gsub("SS", " ", DA_results_df$taxon, perl = TRUE)
     
-    # View the resulting dataframe
-    print(DA_results_df)
-    return(DA_results_df)
-    
+
     assign(paste0("DA_results_", tax_level), DA_results_df, envir = .GlobalEnv)
     
     #Create a barplot of Maaslin2 results based on confidence
@@ -2017,14 +2034,11 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
         scale_fill_manual(values = plot_colors) +
         theme(strip.text = element_text(size = 12), strip.background = element_rect(fill = "lightgrey"))
     
-    layout <- bar_plot_high / bar_plot_med + 
-    plot_layout(heights = plot_heights) 
-    print(layout)
+    return(list(results = DA_results_df, bar_plot_high_confidence = bar_plot_high, bar_plot_med_confidence = bar_plot_med))
 }
 
 
-
-#LDA model functions
+# ---- Topic Modeling ----
 
 #This function helps you optimize the number of topics (k) and also the scaling factor by which you multiply your input your data (essentially the threshold). 
 iterate_scaling_factors <- function(phy_obj, 
@@ -2262,9 +2276,7 @@ iterate_scaling_factors <- function(phy_obj,
 }
 
 
-
 ##Prep data and convert to whole number by factor
-
 #Prepare data from phyloseq object and binarize at a certain threshold of relative abundance
 prep_data_scale <- function(phy_obj, taxa_level, scaling_factor, type_column){
   # Extract metadata
@@ -2320,8 +2332,6 @@ prep_data_scale <- function(phy_obj, taxa_level, scaling_factor, type_column){
   return(list(meta_data = meta_data, counts_data = counts_data))
   
 }
-
-
 
 
 ### Use FindTopicsNumber() 
