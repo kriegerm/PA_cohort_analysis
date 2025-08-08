@@ -922,7 +922,7 @@ run_ordination_with_validation <- function(phyloseq_obj,
 
 # Analyze Silhouette score using "Type" as cluster label and return plot
 analyze_type_clustering_on_pca <- function(scores_df,
-                                           component_num = 3,
+                                           component_num = 2,
                                            colors_list = NULL) {
   library(ggplot2)
   library(dplyr)
@@ -949,7 +949,7 @@ analyze_type_clustering_on_pca <- function(scores_df,
     geom_boxplot(outlier.shape = NA, alpha = 0.9) +
     geom_jitter(width = 0.2, size = 1, alpha = 0.5) +
     stat_summary(fun = median, geom = "text", aes(label = round(..y.., 2)),
-                 vjust = -0.5, color = "white", fontface = "bold", size = 3.5) +
+                 vjust = .5, color = "white", fontface = "bold", size = 3.5) +
     labs(title = "Silhouette Scores by Type",
          x = "Type",
          y = "Silhouette Score") +
@@ -1187,7 +1187,7 @@ iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval
 run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold){
   
   # Create a unique hash for the parameters
-  param_hash <- digest(list(ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold))
+  param_hash <- digest(list(cfg$study, ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold))
   # File path for the analysis results
   result_file <- file.path("../saved_analysis_files/", paste0("maaslin2_result_", param_hash, ".rds"))
   
@@ -1369,7 +1369,7 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
 runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved_results=NULL, plot_type, plot_colors){
   
   # Create a unique hash for the parameters
-  param_hash <- digest(list(ps_obj, tax_level, group, Log2FC_cutoff=NULL))
+  param_hash <- digest(list(cfg$study, ps_obj, tax_level, group, Log2FC_cutoff=NULL))
   # File path for the analysis results
   result_file <- file.path("../saved_analysis_files/", paste0("ancombc2_result_", param_hash, ".rds"))
   
@@ -1654,7 +1654,7 @@ iterate_aldex2 <- function(ps_obj, iterative_methods, resolutions, group, plot_c
 
 
   # Create a unique hash for the parameters
-  param_hash <- digest(list(ps_obj, resolutions, group))
+  param_hash <- digest(list(cfg$study, ps_obj, resolutions, group))
   # File path for the analysis results
   result_file <- file.path("../saved_analysis_files/", paste0("iterative_aldex2_result_", param_hash, ".rds"))
 
@@ -2491,10 +2491,10 @@ heatmap_gamma <- function(lda_results, type_column, g_df){
        mutate(!!type_column := as.character(!!sym(type_column))) %>%  # Convert to character to ensure alphabetical sorting
           dplyr::arrange(!!sym(type_column)) 
 
-    annotations <- topics_wide_type %>%
-          select(c("document", type_column)) %>%
-          remove_rownames() %>%
-          column_to_rownames(var = "document")
+    #Set annotation colors
+    type_annot <- meta_data %>%
+          select(c(type_column))
+    ann_colors <- list(Type = c(Plaque = "#083D77", Abscess = "#FF495C"))
     
     data <- topics_wide_type %>% 
       select(-type_column) %>% 
@@ -2502,19 +2502,18 @@ heatmap_gamma <- function(lda_results, type_column, g_df){
     
     # Create the heatmap
     pheatmap(
-          data,
-          annotation_col = annotations,  # Add column annotations
-          scale = "row",               # Scale rows (optional)
-          cluster_rows = TRUE,         # Cluster rows
+          log(data),
+          annotation_col = type_annot,  # Add column annotations
+          scale = "none",               # Scale rows (optional)
+          cluster_rows = FALSE,         # Cluster rows
           cluster_cols = FALSE,         # Cluster columns
-          color = colorRampPalette(c("blue", "white", "red"))(50),  # Custom color palette
+          color = colorRampPalette(c( "#564592", "white", "#D7CF07"))(100),  # Custom color palette
           show_rownames = TRUE,        # Show row names
-          show_colnames = TRUE         # Show column names
+          show_colnames = FALSE,         # Show column names
+          annotation_colors = ann_colors,
+          gaps_row =  1:(nrow(data) - 1)
         )
 }
-
-
-
 
 
 ### UMAP of gamma scores
@@ -2545,12 +2544,45 @@ plot_gamma_umap <- function(lda_results, type_column, type_colors, g_df ){
     colors <- type_colors[annotations]  # Match colors to each sample
     
     # Plot UMAP
-    plot(umap_result$layout, 
+    umap_plot <- plot(umap_result$layout, 
          col = colors,
          pch = 19,           # Point type
          xlab = "UMAP 1", 
          ylab = "UMAP 2", 
          main = "UMAP Visualization")
+    
+    # Extract PCA axes
+    pca_matrix <- umap_result$layout
+    
+    # Ensure 'Type' is a factor
+    meta_data$Type <- factor(meta_data$Type)
+    
+    # Calculate distance matrix and silhouette scores using "Type" as cluster labels
+    dist_matrix <- dist(pca_matrix)
+    cluster_labels <- as.integer(meta_data$Type)  # silhouette() needs numeric cluster labels
+    
+    sil <- silhouette(cluster_labels, dist_matrix)
+    
+    sil_df <- as.data.frame(sil[, 1:3])
+    sil_df$Type <- meta_data$Type
+    colnames(sil_df) <- c("Cluster", "Neighbor", "Silhouette", "Type")
+    
+    # Boxplot of silhouette scores by Type
+    sil_plot <- ggplot(sil_df, aes(x = Type, y = Silhouette, fill = Type)) +
+      geom_boxplot(outlier.shape = NA, alpha = 0.9) +
+      geom_jitter(width = 0.2, size = 1, alpha = 0.5) +
+      stat_summary(fun = median, geom = "text", aes(label = round(..y.., 2)),
+                   vjust = .9, color = "white", fontface = "bold", size = 3.5) +
+      labs(title = "Silhouette Scores by Type",
+           x = "Type",
+           y = "Silhouette Score") +
+      theme_bw() 
+    
+    if (!is.null(type_colors)) {
+      sil_plot <- sil_plot + scale_fill_manual(values = type_colors)
+    }
+    
+    return(list(umap = umap_plot, sil_plot=sil_plot))
 }
 
 
@@ -2607,11 +2639,12 @@ relab_heatmap <- function(lda_results, psobj, rank, type_column, topic_no, n_top
           merge.data.frame(tax_mat, by="Sample")%>%
           mutate(!!type_column := as.character(!!sym(type_column))) %>%  # Convert to character to ensure alphabetical sorting
           dplyr::arrange(!!sym(type_column)) 
+
+    #Set annotation colors
+    type_annot <- meta_data %>%
+      select(c(type_column))
+    ann_colors <- list(Type = c(Plaque = "#083D77", Abscess = "#FF495C"))
     
-        annotations <- tax_mat_type %>%
-          select(c("Sample", type_column)) %>%
-          remove_rownames() %>%
-          column_to_rownames(var = "Sample")
             
     data <- tax_mat_type %>% 
       select(-type_column) %>% 
@@ -2622,15 +2655,17 @@ relab_heatmap <- function(lda_results, psobj, rank, type_column, topic_no, n_top
     }
     
     pheatmap(log10((100*data) + .00001),
-              annotation_col = annotations,  # Add column annotations
-              #scale = "row",               # Scale rows (optional)
-              cluster_rows = FALSE,         # Cluster rows
-              cluster_cols = FALSE,         # Cluster columns
-              color = colorRampPalette(c("blue", "white", "red"))(50),  # Custom color palette
-              show_rownames = TRUE,        # Show row names
-              show_colnames = FALSE,    
+             annotation_col = type_annot,  # Add column annotations
+             scale = "none",               # Scale rows (optional)
+             cluster_rows = FALSE,         # Cluster rows
+             cluster_cols = FALSE,         # Cluster columns
+             color = colorRampPalette(c("#564592",  "white", "#D7CF07"))(50),  # Custom color palette
+             show_rownames = TRUE,        # Show row names
+             show_colnames = FALSE,         # Show column names
+             annotation_colors = ann_colors,
              main = paste0("Topic ", topic_no)
     )  
+    
 }
 
 

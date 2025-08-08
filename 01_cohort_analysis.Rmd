@@ -39,7 +39,7 @@ knitr::opts_chunk$set(message = FALSE,
 ### 1.1.1 Packages
 ```{r 1.1_load-packages}
 library("pacman")
-pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "cowplot", "MicrobiomeStat", "randomForest", "caret", "mlbench", "MLmetrics", "mia", "here", "patchwork", "digest", "ANCOMBC", "Maaslin2", "microbiomeMarker", "fantaxtic", "topicmodels", "ldatuning", "umap", "tidytext", "cluster", "randomForest", "caret", "microbiome", "umap")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "cowplot", "MicrobiomeStat", "randomForest", "caret", "mlbench", "MLmetrics", "mia", "here", "patchwork", "digest", "ANCOMBC", "Maaslin2", "microbiomeMarker", "fantaxtic", "topicmodels", "ldatuning", "umap", "tidytext", "cluster", "randomForest", "caret", "microbiome", "umap", "viridis")
 
 here::i_am("01_cohort_analysis.Rmd")
 ``` 
@@ -407,7 +407,7 @@ top_df %>%
             panel.labs.background = list(color = NULL, fill = "white"),
             font.tickslab = 14,
             font.legend = c(10),
-           # palette = core_colors, 
+            palette = core_colors, 
             strip.position = "top",
             color = "black",
             x.text.angle = 45, 
@@ -544,30 +544,32 @@ plot_all_taxa(ps_obj = ps_fs,
 
 ## 4.3 Heatmap
 ### 4.3.1 Genus
-```{r}
-ps_genus <- tax_glom(ps_fs, taxrank = "Genus")
+```{r, fig.height=5, fig.width=6.5}
+df <- ps_fs_genus_csv %>% select(-Type) %>% column_to_rownames(var="Sample") %>% as.matrix %>% t()
+#df <- df[order(rowSums(df), decreasing = TRUE)[1:50], ] #select top 50
 
-# Extract count matrix and convert to matrix
-otu_mat <- as(otu_table(ps_genus), "matrix")
+# Extract Type information from sample_data
+type_annot <- data.frame(Type = ps_fs_genus_csv$Type, Sample = ps_fs_genus_csv$Sample) %>% column_to_rownames(var="Sample")
+rownames(type_annot) <- colnames(df)  # Ensure match to colnames of otu_mat
 
-# Transpose if samples are rows (optional, depending on orientation)
-if(taxa_are_rows(ps_genus)) {
-  otu_mat <- t(otu_mat)
-}
+# Manually define annotation colors
+ann_colors <- list(Type = c(Plaque = "#083D77", Abscess = "#FF495C"))
 
-# Extract Genus names
-taxa_names <- as.data.frame(tax_table(ps_genus))$Genus
+my_colors <- viridis(100, option = "inferno")
 
-# Plot heatmap
-pheatmap(log(otu_mat + .0000001),
-         scale = "none",        # keep raw counts
-         clustering_distance_rows = "euclidean",
-         clustering_distance_cols = "euclidean",
+# Plot heatmap with annotation
+pheatmap(log(df),
+         scale = "none",
+         clustering_distance_rows = "correlation",
+         clustering_distance_cols = "correlation",
          clustering_method = "complete",
          fontsize_row = 8,
          fontsize_col = 8,
-         show_rownames = TRUE,
-         show_colnames = TRUE)
+         show_rownames = FALSE,
+         show_colnames = FALSE,
+         annotation_col = type_annot,
+         annotation_colors = ann_colors,
+         color = my_colors)
 ```
 
 # Differential Abundance
@@ -737,20 +739,28 @@ ALDEX_species$result
 ## 6.4 Combine results
 
 ### Phylum
-```{r, fig.height=10, fig.width=7}
+```{r, fig.height=1, fig.width=3}
 DA_results_df_Phylum <- combine_DA(maaslin2_results_Phylum, ancombc2_results_df_Phylum, aldex2_res_Phylum, "Type", "Phylum", plot_colors=colors_all)
+
+DA_results_df_Phylum$bar_plot_high_confidence
 ```
 
+```{r, fig.height=1.5, fig.width=3.5}
+DA_results_df_Phylum$bar_plot_med_confidence
+```
 
 ### Genus
-```{r, fig.height=6, fig.width=5}
+```{r, fig.height=2, fig.width=4}
 DA_results_df_genus <- combine_DA(maaslin2_results_Genus, ancombc2_results_df_Genus, aldex2_res_Genus, "Type", "Genus", plot_colors=colors_all)
+
+DA_results_df_genus$bar_plot_high_confidence
 ```
 
-### Species
-```{r, fig.height=10, fig.width=7}
-DA_results_df <- combine_DA(maaslin2_results_Species, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species",plot_colors=colors_all)
+```{r, fig.height=4.5, fig.width=5}
+DA_results_df_genus$bar_plot_med_confidence
 ```
+
+
 
 # 7.0 Random Forest
 ```{r}
@@ -1002,7 +1012,7 @@ res$metrics_df
 ## LDA: Create the model
 You can use the info from the optimum topic numbers printed out in the above function, or adjust as needed.
 ```{r}
-result <- create_topic_model(counts_data, 2, TRUE, "Gibbs")
+result <- create_topic_model(counts_data, 3, TRUE, "Gibbs")
 model <- result$lda_model
 ```
 
@@ -1012,19 +1022,21 @@ plot_beta(result, 10, result$b_df)
 ```
 
 ## Heatmap of gamma scores 
-```{r, fig.height=2, fig.width=9}
+```{r, fig.height=1.5, fig.width=9}
 heatmap_gamma(result, "Type", result$g_df)
 ```
 
 ## UMAP of gamma scores
 ```{r fig.height=6, fig.width=6}
-type_colors <- c("Abscess" = "red", "Plaque" = "blue")
-plot_gamma_umap(results, "Type", type_colors, result$g_df)
+UMAP_res <- plot_gamma_umap(results, "Type", colors_all, result$g_df)
+```
+```{r, fig.width=2.5, fig.height=3}
+UMAP_res$sil_plot
 ```
 
 ##Membership of topic by Type
-```{r, fig.height=3.5, fig.width=4}
-topic_membership(result, "Type", type_colors, result$g_df)
+```{r, fig.height=2.5, fig.width=4}
+topic_membership(result, "Type", colors_all, result$g_df)
 ```
 
 
