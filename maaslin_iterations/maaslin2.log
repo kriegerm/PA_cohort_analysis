@@ -1,0 +1,16 @@
+2025-08-07 09:42:31.625305 INFO::Writing function arguments to log file
+2025-08-07 09:42:31.626034 DEBUG::Function arguments
+2025-08-07 09:42:31.626303 DEBUG::Output folder: maaslin_iterations
+2025-08-07 09:42:31.626548 DEBUG::Min Abundance: 0.000000
+2025-08-07 09:42:31.62678 DEBUG::Min Prevalence: 0.100000
+2025-08-07 09:42:31.627021 DEBUG::Normalization: CLR
+2025-08-07 09:42:31.627258 DEBUG::Transform: AST
+2025-08-07 09:42:31.627493 DEBUG::Analysis method: NEGBIN
+2025-08-07 09:42:31.627727 DEBUG::Max significance: 0.250000
+2025-08-07 09:42:31.627945 DEBUG::Random effects:
+2025-08-07 09:42:31.628179 DEBUG::Fixed effects: Type
+2025-08-07 09:42:31.628411 DEBUG::Correction method: BH
+2025-08-07 09:42:31.628729 DEBUG::Standardize: TRUE
+2025-08-07 09:42:31.628954 DEBUG::Cores: 1
+2025-08-07 09:42:31.629297 INFO::Verifying options selected are valid
+2025-08-07 09:42:31.630123 ERROR::This method can only be used with a subset of normalizations. Please select from the following list : CSS, NONE, TMM

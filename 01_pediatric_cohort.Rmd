@@ -1,5 +1,5 @@
 ---
-title: "01 Cohort Analysis"
+title: "01 Phyloseq Pediatric"
 author: "Madeline Krieger"
 date: "`r Sys.Date()`"
 output:
@@ -10,21 +10,13 @@ output:
       smooth_scroll: true
     theme: "cosmo"
     code_folding: "show"
-params:
-    output_suffix: NULL
-
 ---
 
 ```{r setup, include=FALSE}
-library(config)
-
-#CHANGE THIS CHUNK based on if you want to run Pediatric (default) or Adult Abscess (adult)
-cfg <- config::get(config = "default")
-
 knitr::opts_chunk$set(message = FALSE,
                       warning = FALSE,
                       error = FALSE,
-                      fig.path = cfg$figs,
+                      fig.path = "../figures/01_pediatric/",
                       fig.keep = "all",
                       dev = c("png"),
                       cache = FALSE,
@@ -39,9 +31,9 @@ knitr::opts_chunk$set(message = FALSE,
 ### 1.1.1 Packages
 ```{r 1.1_load-packages}
 library("pacman")
-pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "cowplot", "MicrobiomeStat", "randomForest", "caret", "mlbench", "MLmetrics", "mia", "here", "patchwork", "digest", "ANCOMBC", "Maaslin2", "microbiomeMarker", "fantaxtic", "topicmodels", "ldatuning", "umap", "tidytext", "cluster", "randomForest", "caret", "microbiome", "umap", "viridis")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "cowplot", "MicrobiomeStat", "randomForest", "caret", "mlbench", "MLmetrics", "mia", "here", "patchwork", "digest", "ANCOMBC", "Maaslin2", "microbiomeMarker", "fantaxtic", "topicmodels", "ldatuning", "umap", "tidytext", "cluster")
 
-here::i_am("01_cohort_analysis.Rmd")
+here::i_am("01_pediatric_cohort.Rmd")
 ``` 
 
 
@@ -55,6 +47,7 @@ source("MK_Microbiome_Functions.R")
 ### 1.1.2 Colors and presents
 ```{r}
 colors_all= c("Abscess" = "#FF495C", "Plaque"="#083D77")
+
 
 core_colors = c("#FAAA00", "#3399FF","#F76F8E","#083D77","#B8D4E3", "#FF495C","#477071", '#03CEA4',  "#5F00BA", "#BDAC9E", "white", "#FFD900")
 
@@ -79,7 +72,7 @@ date = Sys.Date()
 ### 1.2.1 Load Data from 00
 ```{r}
 # Load the saved Rds file
-loaded_objects <- readRDS(cfg$rds)
+loaded_objects <- readRDS("00data_Pediatric.rds")
 
 # Assign back the objects to the environment, if needed
 list2env(loaded_objects, .GlobalEnv)
@@ -90,6 +83,7 @@ list2env(loaded_objects, .GlobalEnv)
 ```{r}
 process_phyloseq(ps_fs)
 ```
+
 
 
 # 2.0 Ordinations
@@ -407,7 +401,7 @@ top_df %>%
             panel.labs.background = list(color = NULL, fill = "white"),
             font.tickslab = 14,
             font.legend = c(10),
-            palette = core_colors, 
+           # palette = core_colors, 
             strip.position = "top",
             color = "black",
             x.text.angle = 45, 
@@ -544,33 +538,30 @@ plot_all_taxa(ps_obj = ps_fs,
 
 ## 4.3 Heatmap
 ### 4.3.1 Genus
-```{r, fig.height=5, fig.width=6.5}
-df <- ps_fs_genus_csv %>% select(-Type) %>% column_to_rownames(var="Sample") %>% as.matrix %>% t()
-#df <- df[order(rowSums(df), decreasing = TRUE)[1:50], ] #select top 50
+```{r}
+ps_genus <- tax_glom(ps_fs, taxrank = "Genus")
 
-# Extract Type information from sample_data
-type_annot <- data.frame(Type = ps_fs_genus_csv$Type, Sample = ps_fs_genus_csv$Sample) %>% column_to_rownames(var="Sample")
-rownames(type_annot) <- colnames(df)  # Ensure match to colnames of otu_mat
+# Extract count matrix and convert to matrix
+otu_mat <- as(otu_table(ps_genus), "matrix")
 
-# Manually define annotation colors
-ann_colors <- list(Type = c(Plaque = "#083D77", Abscess = "#FF495C"))
+# Transpose if samples are rows (optional, depending on orientation)
+if(taxa_are_rows(ps_genus)) {
+  otu_mat <- t(otu_mat)
+}
 
-my_colors <- viridis(100, option = "inferno")
+# Extract Genus names
+taxa_names <- as.data.frame(tax_table(ps_genus))$Genus
 
-# Plot heatmap with annotation
-pheatmap(log(df),
-         scale = "none",
-         clustering_distance_rows = "correlation",
-         clustering_distance_cols = "correlation",
+# Plot heatmap
+pheatmap(log(otu_mat + .0000001),
+         scale = "none",        # keep raw counts
+         clustering_distance_rows = "euclidean",
+         clustering_distance_cols = "euclidean",
          clustering_method = "complete",
          fontsize_row = 8,
          fontsize_col = 8,
-         show_rownames = FALSE,
-         show_colnames = FALSE,
-         annotation_col = type_annot,
-         annotation_colors = ann_colors,
-         color = my_colors,
-         border_color = NA)
+         show_rownames = TRUE,
+         show_colnames = TRUE)
 ```
 
 # Differential Abundance
@@ -740,28 +731,20 @@ ALDEX_species$result
 ## 6.4 Combine results
 
 ### Phylum
-```{r, fig.height=1.2, fig.width=4}
+```{r, fig.height=10, fig.width=7}
 DA_results_df_Phylum <- combine_DA(maaslin2_results_Phylum, ancombc2_results_df_Phylum, aldex2_res_Phylum, "Type", "Phylum", plot_colors=colors_all)
-
-DA_results_df_Phylum$bar_plot_high_confidence
 ```
 
-```{r, fig.height=1.2, fig.width=4}
-DA_results_df_Phylum$bar_plot_med_confidence
-```
 
 ### Genus
-```{r, fig.height=2, fig.width=4}
+```{r, fig.height=6, fig.width=5}
 DA_results_df_genus <- combine_DA(maaslin2_results_Genus, ancombc2_results_df_Genus, aldex2_res_Genus, "Type", "Genus", plot_colors=colors_all)
-
-DA_results_df_genus$bar_plot_high_confidence
 ```
 
-```{r, fig.height=4.5, fig.width=5}
-DA_results_df_genus$bar_plot_med_confidence
+### Species
+```{r, fig.height=10, fig.width=7}
+DA_results_df <- combine_DA(maaslin2_results_Species, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species",plot_colors=colors_all)
 ```
-
-
 
 # 7.0 Random Forest
 ```{r}
@@ -800,107 +783,7 @@ model <- train(
   metric = "ROC"
 )
 
-
 ```
-
-
-### Rank features by fold and create heatmap
-```{r, fig.width=3.8, fig.height=4}
-rank_rf_feature_table <- function(df, folds, mtry = NULL, top_n = NULL, add_mean = TRUE) {
-  
-  if (!is.factor(df$Type)) df$Type <- factor(df$Type)
-  p <- ncol(df) - 1L
-  if (is.null(mtry)) mtry <- max(1L, floor(sqrt(p)))
-
-
-  get_fold_ranks <- function(train_idx, fold_id) {
-    fit <- caret::train(
-      Type ~ .,
-      data = df[train_idx, ],
-      method = "rf",
-      trControl = caret::trainControl(method = "none"),
-      tuneGrid = data.frame(mtry = mtry),
-      importance = TRUE
-    )
-    imp <- caret::varImp(fit)$importance %>%
-      rownames_to_column("Feature")
-
-    # collapse to a single score column named Score (usually "Overall" already)
-    score_cols <- setdiff(names(imp), "Feature")
-    if (length(score_cols) == 0) stop("No importance scores returned.")
-    if (length(score_cols) == 1) {
-      imp <- transmute(imp, Feature, Score = .data[[score_cols]])
-    } else {
-      imp <- imp %>% mutate(Score = rowMeans(across(all_of(score_cols)), na.rm = TRUE)) %>%
-        select(Feature, Score)
-    }
-
-    # rank (1 = most important)
-    imp <- imp[order(imp$Score, decreasing = TRUE), , drop = FALSE]
-    imp$Rank <- seq_len(nrow(imp))
-
-    # return Feature + FoldX rank column
-    fold_col <- paste0("Fold", fold_id)
-    out <- imp[, c("Feature", "Rank")]
-    names(out)[2] <- fold_col
-    out
-  }
-
-  fold_tables <- Map(function(idx, i) get_fold_ranks(idx, i), folds, seq_along(folds))
-
-  # Join by Feature (NOT by rank) so each taxon is one row
-  wide <- Reduce(function(x, y) merge(x, y, by = "Feature", all = TRUE), fold_tables)
-
-  # Optionally keep only taxa that are in top_n in at least one fold
-  if (!is.null(top_n)) {
-    rank_cols <- grep("^Fold\\d+$", names(wide), value = TRUE)
-    keep <- apply(wide[rank_cols], 1, function(v) any(!is.na(v) & v <= top_n))
-    wide <- wide[keep, , drop = FALSE]
-  }
-
-  # Mean rank across folds (lower is better)
-  if (add_mean) {
-    rank_cols <- grep("^Fold\\d+$", names(wide), value = TRUE)
-    wide$MeanRank <- rowMeans(wide[rank_cols], na.rm = TRUE)
-    wide <- wide[order(wide$MeanRank), , drop = FALSE]
-  }
-
-  rownames(wide) <- NULL
-  wide
-}
-
-set.seed(123)  # only if you want reproducible rankings
-rank_table <- rank_rf_feature_table(df, folds, top_n = 10, add_mean = TRUE)
-
-# Example: show the first few rows
-rank_table %>% kable()
-
-
-mat <- rank_table %>%
-  select(-Feature, -MeanRank) %>%
-  as.data.frame()
-rownames(mat) <- rank_table$Feature
-rownames(mat) <- sub("`","", rownames(mat)) #Need this here twice
-rownames(mat) <- sub("`","", rownames(mat))
-
-rownames(mat) <- sub("^g__","", rownames(mat))
-
-labs <- rownames(mat)
-
-# Make taxa labels italics
-labs_expr <- parse(text = sprintf("italic('%s')",
-                                  gsub("'", "\\\\'", labs, fixed = TRUE)))
-
-pheatmap(log(mat),
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         labels_row = labs_expr,
-         color = colorRampPalette(c("#7B8CDE", "white", "#C0E6DE"))(50),
-        display_numbers = round(as.matrix(mat), 1),  # 1 decimal place
-         main = "Feature Ranks per Fold")
-```
-
-
 
 ```{r, fig.width=4, fig.height=3}
 #Plot ROC Curve for each fold of the model
@@ -1113,35 +996,29 @@ res$metrics_df
 ## LDA: Create the model
 You can use the info from the optimum topic numbers printed out in the above function, or adjust as needed.
 ```{r}
-result <- create_topic_model(counts_data, 3, TRUE, "Gibbs")
+result <- create_topic_model(counts_data, 2, TRUE, "Gibbs")
 model <- result$lda_model
 ```
 
 ## Plot beta
 ```{r, fig.height=4, fig.width=10}
-source("MK_Microbiome_Functions.R")
-
-my_colors <- c("1" = "#083D77", "2" = "#FF495C", "3" = "grey")
-
-plot_beta(result, 10, result$b_df, fill_colors = my_colors)
+plot_beta(result, 10, result$b_df)
 ```
 
 ## Heatmap of gamma scores 
-```{r, fig.height=1.5, fig.width=9}
+```{r, fig.height=2, fig.width=9}
 heatmap_gamma(result, "Type", result$g_df)
 ```
 
 ## UMAP of gamma scores
 ```{r fig.height=6, fig.width=6}
-UMAP_res <- plot_gamma_umap(results, "Type", colors_all, result$g_df)
-```
-```{r, fig.width=2.5, fig.height=3}
-UMAP_res$sil_plot
+type_colors <- c("Abscess" = "red", "Plaque" = "blue")
+plot_gamma_umap(results, "Type", type_colors, result$g_df)
 ```
 
 ##Membership of topic by Type
-```{r, fig.height=2.5, fig.width=4}
-topic_membership(result, "Type", colors_all, result$g_df)
+```{r, fig.height=3.5, fig.width=4}
+topic_membership(result, "Type", type_colors, result$g_df)
 ```
 
 

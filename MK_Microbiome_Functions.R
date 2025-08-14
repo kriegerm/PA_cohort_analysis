@@ -1995,20 +1995,23 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
     
     bar_plot_med <- df_fig_med %>%
       ggplot(aes(x = feature_order, y = abs(Maaslin2_coef), fill = Enrichment)) +
-        geom_bar(stat = "identity", color="black") +
-        coord_flip() +
-        labs(title = "Medium Confidence", x="", y = "Maaslin2 coef") +
-        theme_bw() +
-        theme(
-          axis.text.x = element_text(angle = 0, hjust = 1),
-          axis.text.y = element_text(face="italic"),
-          strip.background = element_blank(),
-          strip.placement = "outside",
-          strip.text = element_text(face = "bold")
-        ) +
-        scale_y_discrete(expand = c(0, 0.5)) + # change additive expansion from default 0.6 to 0.5
-        scale_fill_manual(values = plot_colors) +
-        theme(strip.text = element_text(size = 12), strip.background = element_rect(fill = "lightgrey"))
+      geom_bar(stat = "identity", color="black") +
+      coord_flip() +
+      labs(title = "Medium Confidence", x = "", y = "Maaslin2 coef") +
+      theme_bw() +
+      theme(
+        axis.text.x = element_text(angle = 0, hjust = 1),  # This is the numeric axis after flip
+        axis.text.y = element_text(face="italic"),
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text = element_text(face = "bold")
+      ) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +  # for numeric axis
+      scale_fill_manual(values = plot_colors) +
+      theme(
+        strip.text = element_text(size = 12),
+        strip.background = element_rect(fill = "lightgrey")
+      )
   
     #HIGH
     df_fig_high <- DA_results_df %>%
@@ -2019,20 +2022,23 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
     
     bar_plot_high <- df_fig_high %>%
       ggplot(aes(x = feature_order, y = abs(Maaslin2_coef), fill = Enrichment)) +
-        geom_bar(stat = "identity", color="black") +
-        coord_flip() +
-        labs(title = "High Confidence", x="", y = "Maaslin2 coef") +
-        theme_bw() +
-        theme(
-          axis.text.x = element_text(angle = 0, hjust = 1),
-          axis.text.y = element_text(face="italic"),
-          strip.background = element_blank(),
-          strip.placement = "outside",
-          strip.text = element_text(face = "bold")
-        ) +
-        scale_y_discrete(expand = c(0, 0.5)) + # change additive expansion from default 0.6 to 0.5
-        scale_fill_manual(values = plot_colors) +
-        theme(strip.text = element_text(size = 12), strip.background = element_rect(fill = "lightgrey"))
+      geom_bar(stat = "identity", color="black") +
+      coord_flip() +
+      labs(title = "High Confidence", x = "", y = "Maaslin2 coef") +
+      theme_bw() +
+      theme(
+        axis.text.x = element_text(angle = 0, hjust = 1),  # This is the numeric axis after flip
+        axis.text.y = element_text(face="italic"),
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text = element_text(face = "bold")
+      ) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +  # for numeric axis
+      scale_fill_manual(values = plot_colors) +
+      theme(
+        strip.text = element_text(size = 12),
+        strip.background = element_rect(fill = "lightgrey")
+      )
     
     return(list(results = DA_results_df, bar_plot_high_confidence = bar_plot_high, bar_plot_med_confidence = bar_plot_med))
 }
@@ -2448,27 +2454,47 @@ create_topic_model <- function(counts_data, k_value, alpha, method){
 #plot_beta(result, 15)
 #Plot beta, or the numbers that are assigned to each word in a topic. If the beta score is higher, the word matters more in that topic.
 
-plot_beta <- function(lda_result, n_top_topics, b_df){
-    top_terms <- b_df %>% 
-      group_by(topic) %>% 
-      top_n(n_top_topics, beta) %>%
-      ungroup() 
-
-    top_terms %>% 
-      ggplot(aes(
-        x = tidytext::reorder_within(term, beta, topic),  # descending order
-        y = beta,
-        fill = factor(topic)
-      )) +
-      geom_bar(stat = 'identity', show.legend = FALSE) +
-      facet_wrap(~ topic, scales = "free") +
-      coord_flip() +
-      # scale_x_reordered(
-      #   labels = function(x) parse(text = paste0("italic('", x, "')"))
-      # ) +
-      theme_bw(base_size = 12) +
-      scale_fill_viridis_d() +
-      labs(x = NULL, y = "Beta")
+plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
+  library(dplyr)
+  library(ggplot2)
+  library(tidytext)
+  
+  top_terms <- b_df %>% 
+    group_by(topic) %>% 
+    top_n(n_top_topics, beta) %>%
+    ungroup()
+  
+  # ensure topic is a factor for consistent fill mapping
+  top_terms <- top_terms %>%
+    mutate(topic = factor(topic))
+  
+  p <- ggplot(top_terms, aes(
+    x = tidytext::reorder_within(term, beta, topic),
+    y = beta,
+    fill = topic
+  )) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    facet_wrap(
+      ~ topic,
+      scales = "free",
+      labeller = labeller(topic = ~ paste0("Topic ", .x))  # <-- single-arg labeller
+    ) +
+    coord_flip() +
+    theme_bw(base_size = 12) +
+    theme(
+      strip.background = element_rect(fill = "white", color = "black"),
+      strip.text = element_text(face = "bold", size = 14)  # adjust size here
+    )+
+    labs(x = NULL, y = "Beta")
+  
+  if (!is.null(fill_colors)) {
+    # names(fill_colors) should match levels(top_terms$topic)
+    p <- p + scale_fill_manual(values = fill_colors)
+  } else {
+    p <- p + scale_fill_viridis_d()
+  }
+  
+  p
 }
 
 
@@ -2509,7 +2535,7 @@ heatmap_gamma <- function(lda_results, type_column, g_df){
           cluster_cols = FALSE,         # Cluster columns
           color = colorRampPalette(c( "#564592", "white", "#D7CF07"))(100),  # Custom color palette
           show_rownames = TRUE,        # Show row names
-          show_colnames = FALSE,         # Show column names
+          show_colnames = TRUE,         # Show column names
           annotation_colors = ann_colors,
           gaps_row =  1:(nrow(data) - 1)
         )
