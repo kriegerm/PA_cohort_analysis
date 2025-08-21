@@ -1963,21 +1963,27 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
 
 
     # Perform a full join on the 'taxon' column
-    DA_results_df <- dplyr::full_join(maaslin2_results_clean, ancombc2_results_clean, aldex2_res_clean, by = "taxon") %>%
-      dplyr::full_join(aldex2_res_clean, by = "taxon") %>%
+    DA_results_df <- dplyr::full_join(maaslin2_results_clean, ancombc2_results_clean, by = "taxon") %>%
+      dplyr::full_join(., aldex2_res_clean, by = "taxon") %>%
       mutate(confidence = case_when(
         rowSums(is.na(select(., Maaslin2_coef, ANCOMBC2_LFC, Aldex2_EF))) == 2 ~ "Low",
         rowSums(is.na(select(., Maaslin2_coef, ANCOMBC2_LFC, Aldex2_EF))) == 1 ~ "Medium",
         rowSums(is.na(select(., Maaslin2_coef, ANCOMBC2_LFC, Aldex2_EF))) == 0 ~ "High"
-      )) %>% 
-      rowwise() %>%
-      mutate(all_positive_or_negative = all(na.omit(c_across(c(Maaslin2_coef, ANCOMBC2_LFC, Aldex2_EF))) > 0) | 
-                                        all(na.omit(c_across(c(Maaslin2_coef, ANCOMBC2_LFC, Aldex2_EF))) < 0)) %>%
+      )) 
+
+      DA_results_df <- DA_results_df %>% dplyr::rowwise() %>%
+      mutate(
+        all_positive_or_negative = {
+          vals <- dplyr::c_across(c(Maaslin2_coef, ANCOMBC2_LFC, Aldex2_EF))
+          vals <- vals[!is.na(vals)]
+          length(vals) > 0 && (all(vals > 0) || all(vals < 0))
+        }
+      ) %>%
       ungroup()
-    
-        if (any(DA_results_df$all_positive_or_negative == FALSE, na.rm = TRUE)) {
+  
+    if (any(DA_results_df$all_positive_or_negative == FALSE, na.rm = TRUE)) {
         warning("Some values in 'all_positive_or_negative' are FALSE!")}
-      
+
     #Remove the "g" and "s" that are followed by an uppercase (for genus and species)
     DA_results_df$taxon <- gsub("g(?=[A-Z])", "", DA_results_df$taxon, perl = TRUE)
     DA_results_df$taxon <- gsub("SS", " ", DA_results_df$taxon, perl = TRUE)
@@ -2462,8 +2468,15 @@ plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
   top_terms <- b_df %>% 
     group_by(topic) %>% 
     top_n(n_top_topics, beta) %>%
-    ungroup()
+    ungroup() %>%
+    mutate(
+      topic = factor(topic),
+      # remove leading g__ and trailing _1/_2/_3
+      term = gsub("^g__", "", term),
+      term = gsub("__(1|2|3)$", "", term)
+    )
   
+  print(top_terms)
   # ensure topic is a factor for consistent fill mapping
   top_terms <- top_terms %>%
     mutate(topic = factor(topic))
@@ -2473,28 +2486,27 @@ plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
     y = beta,
     fill = topic
   )) +
-    geom_bar(stat = "identity", show.legend = FALSE) +
+    geom_col(show.legend = FALSE) +
     facet_wrap(
-      ~ topic,
-      scales = "free",
-      labeller = labeller(topic = ~ paste0("Topic ", .x))  # <-- single-arg labeller
+      ~ topic, scales = "free",
+      labeller = labeller(topic = ~ paste0("Topic ", .x))
     ) +
+    scale_x_reordered() +              # strip the ___topic helper suffix
     coord_flip() +
     theme_bw(base_size = 12) +
     theme(
       strip.background = element_rect(fill = "white", color = "black"),
-      strip.text = element_text(face = "bold", size = 14)  # adjust size here
-    )+
+      strip.text = element_text(face = "bold", size = 14),
+      axis.text.y = element_text(face = "italic")             # italic genus labels
+    ) +
     labs(x = NULL, y = "Beta")
   
   if (!is.null(fill_colors)) {
-    # names(fill_colors) should match levels(top_terms$topic)
     p <- p + scale_fill_manual(values = fill_colors)
   } else {
     p <- p + scale_fill_viridis_d()
   }
-  
-  p
+  return(p)
 }
 
 
@@ -2616,25 +2628,35 @@ plot_gamma_umap <- function(lda_results, type_column, type_colors, g_df ){
 
 topic_membership <- function(lda_result, type_column, colors, g_df){
   
-      topics_wide <- g_df %>%
-            pivot_wider(names_from = topic,
-                        values_from = gamma)
-      
-      topics_long_type <- meta_data%>% select(type_column) %>% 
-            rownames_to_column(var="document") %>% 
-            merge.data.frame(topics_wide, by="document") %>%
-        pivot_longer(cols = -c(document, type_column), 
-                     names_to = "topic", 
-                     values_to = "gamma")
+    topics_wide <- g_df %>%
+      tidyr::pivot_wider(names_from = topic, values_from = gamma)  # columns "1","2",...
+    
+    topics_long_type <- meta_data %>%
+      dplyr::select(all_of(type_column)) %>%
+      tibble::rownames_to_column(var = "document") %>%
+      dplyr::left_join(topics_wide, by = "document") %>%
+      tidyr::pivot_longer(
+        cols = -c(document, all_of(type_column)),
+        names_to = "topic",
+        values_to = "gamma"
+      ) %>%
+      mutate(topic = factor(topic, levels = sort(unique(topic))))
 
-      topics_long_type %>%
-        ggplot(aes(type_column, gamma, fill=!!sym(type_column))) +
+      ggplot(topics_long_type, aes(x = !!sym(type_column), y = gamma, fill = !!sym(type_column))) +
         geom_boxplot() +
-        scale_fill_manual(values= colors) +
-        facet_wrap(~ topic) +
-        labs(x = "topic", y = expression(gamma)) +
-        theme_bw()
+        scale_fill_manual(values = colors) +
+        facet_wrap(
+          ~ topic,
+          labeller = labeller(topic = ~ paste0("Topic ", .x))  # "Topic 1", "Topic 2", ...
+        ) +
+        labs(x = type_column, y = expression(gamma)) +
+        theme_bw() +
+        theme(
+          strip.background = element_rect(fill = "white", color = "black"),  # white facet box
+          strip.text = element_text(face = "bold", size = 12),
+        )
 }
+
 
 
 

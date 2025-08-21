@@ -31,7 +31,7 @@ knitr::opts_chunk$set(message = FALSE,
 library("pacman")
 pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "microViz")
 
-here::i_am("00_process_adult_cohort.Rmd")
+here::i_am("00_process_pediatric_cohort.Rmd")
 
 ``` 
 
@@ -71,16 +71,14 @@ sampledata_location <- "../PRJNA547446_adult_abscess/Qiime2/Files_For_Phyloseq/m
 
 #Run pre-processing functions
 construct_phyloseq("ps", biom_location, tree_location, sampledata_location)
+test <- ps@sam_data
 ```
 
 
 # 2.2 Remove any ASVs that were in the blanks: Skip for Adult because we don't have blanks
-# 2.2 Instead, edit the metadata
 ```{r}
-#Rename one problematic column
-meta_df <- as.data.frame(sample_data(ps))
-colnames(meta_df)[colnames(meta_df) == "X.SampleID"] <- "SampleID"
-sample_data(ps) <- sample_data(meta_df)
+source("MK_Microbiome_Functions.R")
+
 ```
 
 # 2.3 Additional filtering

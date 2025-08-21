@@ -193,7 +193,7 @@ ps_wide <- ps_df_filtered %>%
 # Plot heatmap
 ggplot(ps_wide, aes(x = SamplePair, y = OTU, fill = direction)) +
   geom_tile(color = "white") +
-  scale_fill_gradient2(low = "#4C2C69", high = "#ABFAA9", mid = "#D0DDD7", 
+  scale_fill_gradient2(low = "#4C2C69", high = "#ABFAA9", mid = "white", 
                        midpoint = 0, na.value = "grey90",
                        name = "log2(Abscess / Plaque)") +
   theme_bw() +
