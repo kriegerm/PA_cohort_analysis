@@ -2050,6 +2050,71 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
 }
 
 
+# ---- Random Forest ----
+rank_rf_feature_table <- function(df, folds, mtry = NULL, top_n = NULL, add_mean = TRUE) {
+  
+  if (!is.factor(df$Type)) df$Type <- factor(df$Type)
+  p <- ncol(df) - 1L
+  if (is.null(mtry)) mtry <- max(1L, floor(sqrt(p)))
+  
+  
+  get_fold_ranks <- function(train_idx, fold_id) {
+    fit <- caret::train(
+      Type ~ .,
+      data = df[train_idx, ],
+      method = "rf",
+      trControl = caret::trainControl(method = "none"),
+      tuneGrid = data.frame(mtry = mtry),
+      importance = TRUE
+    )
+    imp <- caret::varImp(fit)$importance %>%
+      rownames_to_column("Feature")
+    
+    # collapse to a single score column named Score (usually "Overall" already)
+    score_cols <- setdiff(names(imp), "Feature")
+    if (length(score_cols) == 0) stop("No importance scores returned.")
+    if (length(score_cols) == 1) {
+      imp <- transmute(imp, Feature, Score = .data[[score_cols]])
+    } else {
+      imp <- imp %>% mutate(Score = rowMeans(across(all_of(score_cols)), na.rm = TRUE)) %>%
+        select(Feature, Score)
+    }
+    
+    # rank (1 = most important)
+    imp <- imp[order(imp$Score, decreasing = TRUE), , drop = FALSE]
+    imp$Rank <- seq_len(nrow(imp))
+    
+    # return Feature + FoldX rank column
+    fold_col <- paste0("Fold", fold_id)
+    out <- imp[, c("Feature", "Rank")]
+    names(out)[2] <- fold_col
+    out
+  }
+  
+  fold_tables <- Map(function(idx, i) get_fold_ranks(idx, i), folds, seq_along(folds))
+  
+  # Join by Feature (NOT by rank) so each taxon is one row
+  wide <- Reduce(function(x, y) merge(x, y, by = "Feature", all = TRUE), fold_tables)
+  
+  # Optionally keep only taxa that are in top_n in at least one fold
+  if (!is.null(top_n)) {
+    rank_cols <- grep("^Fold\\d+$", names(wide), value = TRUE)
+    keep <- apply(wide[rank_cols], 1, function(v) any(!is.na(v) & v <= top_n))
+    wide <- wide[keep, , drop = FALSE]
+  }
+  
+  # Mean rank across folds (lower is better)
+  if (add_mean) {
+    rank_cols <- grep("^Fold\\d+$", names(wide), value = TRUE)
+    wide$MeanRank <- rowMeans(wide[rank_cols], na.rm = TRUE)
+    wide <- wide[order(wide$MeanRank), , drop = FALSE]
+  }
+  
+  rownames(wide) <- NULL
+  wide
+}
+
+
 # ---- Topic Modeling ----
 
 #This function helps you optimize the number of topics (k) and also the scaling factor by which you multiply your input your data (essentially the threshold). 

@@ -1,5 +1,5 @@
 ---
-title: "01 Cohort Analysis"
+title: "01 Phyloseq Adult"
 author: "Madeline Krieger"
 date: "`r Sys.Date()`"
 output:
@@ -10,21 +10,13 @@ output:
       smooth_scroll: true
     theme: "cosmo"
     code_folding: "show"
-params:
-    output_suffix: NULL
-
 ---
 
 ```{r setup, include=FALSE}
-library(config)
-
-#CHANGE THIS CHUNK based on if you want to run Pediatric (default) or Adult Abscess (adult)
-cfg <- config::get(config = "default")
-
 knitr::opts_chunk$set(message = FALSE,
                       warning = FALSE,
                       error = FALSE,
-                      fig.path = cfg$figs,
+                      fig.path = "../figures/01_adult/",
                       fig.keep = "all",
                       dev = c("png"),
                       cache = FALSE,
@@ -39,9 +31,9 @@ knitr::opts_chunk$set(message = FALSE,
 ### 1.1.1 Packages
 ```{r 1.1_load-packages}
 library("pacman")
-pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "cowplot", "MicrobiomeStat", "randomForest", "caret", "mlbench", "MLmetrics", "mia", "here", "patchwork", "digest", "ANCOMBC", "Maaslin2", "microbiomeMarker", "fantaxtic", "topicmodels", "ldatuning", "umap", "tidytext", "cluster", "randomForest", "caret", "microbiome", "umap", "viridis")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "cowplot", "MicrobiomeStat", "randomForest", "caret", "mlbench", "MLmetrics", "mia", "here", "patchwork", "digest", "ANCOMBC", "Maaslin2", "microbiomeMarker", "fantaxtic", "topicmodels", "ldatuning", "umap", "tidytext", "cluster", "randomForest", "caret", "microbiome", "umap")
 
-here::i_am("01_cohort_analysis.Rmd")
+here::i_am("01_adult_cohort.Rmd")
 ``` 
 
 
@@ -79,7 +71,7 @@ date = Sys.Date()
 ### 1.2.1 Load Data from 00
 ```{r}
 # Load the saved Rds file
-loaded_objects <- readRDS(cfg$rds)
+loaded_objects <- readRDS("00data_AdultAbscess.rds")
 
 # Assign back the objects to the environment, if needed
 list2env(loaded_objects, .GlobalEnv)
@@ -184,7 +176,6 @@ Genus_PCoA_res <- run_ordination_with_validation(
 )
 
 Genus_PCoA_res$plot
-Genus_PCoA_res$lib_size_with_Axis1_corr
 ```
 
 ```{r, fig.width=3, fig.height=3}
@@ -270,7 +261,6 @@ Phylum_PCoA_res <- run_ordination_with_validation(
 )
 
 Phylum_PCoA_res$plot
-Phylum_PCoA_res$lib_size_with_Axis1_corr
 ```
 
 ```{r, fig.width=3, fig.height=3}
@@ -359,26 +349,22 @@ annotate_figure(plot, top = text_grob(paste0("Alpha Diversity"), color = "black"
 ## 4.1 Average Bar Plots
 
 ### 4.1.1 Phylum 
-```{r taxa_phylum, fig.height=4, fig.width=4.2}
+```{r taxa_phylum, fig.height=4, fig.width=4}
 
 top_df <- ps_fs_t_n %>%
   tax_glom(., "Phylum") %>%
   get_top_taxa(., 10, relative = TRUE, discard_other = TRUE) %>% psmelt(.)
-
-top_df <- top_df %>% 
-  mutate(Phylum = str_remove_all(Phylum, "p__")) %>%
-  mutate(Phylum = str_replace_all(Phylum, "_", " ")) %>%
-  mutate(Phylum = str_remove_all(Phylum, "\\[|\\]")) %>%
-  dplyr::group_by(Type,Phylum)%>%
-  dplyr::summarise(Average_Abundance = mean(Abundance)) 
+top_df$Phylum <- gsub("p__","",as.character(top_df$Phylum))
 
 top_df %>%
+  dplyr::group_by(Type,Phylum)%>%
+  dplyr::summarise(Average_Abundance = mean(Abundance))%>%
   ggbarplot(x= "Type", y="Average_Abundance",
             fill = "Phylum",
             panel.labs.font = list(size=12),
             panel.labs.background = list(color = NULL, fill = "white"),
             font.tickslab = 14,
-            font.legend = c(12),
+            font.legend = c(10),
             palette = core_colors, 
             strip.position = "top",
             color = "black",
@@ -393,11 +379,11 @@ top_df %>%
             ylab = "Average Relative Abundance",
             ggtheme = theme_bw()) + 
   font("title", face="bold") +
-  theme(plot.title=element_text(hjust=0.5), plot.subtitle=element_text(hjust=0.5), legend.text = element_text(face = "italic"))
+  theme(plot.title=element_text(hjust=0.5), plot.subtitle=element_text(hjust=0.5))
 ```
 
 ### 4.1.2 Genus 
-```{r taxa_genus, fig.height=4, fig.width=3.5}
+```{r taxa_genus, fig.height=4, fig.width=3}
 
 top_df <- ps_fs_t_n %>%
   tax_glom(., "Genus") %>%
@@ -412,8 +398,8 @@ top_df %>%
             panel.labs.font = list(size=12),
             panel.labs.background = list(color = NULL, fill = "white"),
             font.tickslab = 14,
-            font.legend = c(12),
-            palette = core_colors, 
+            font.legend = c(10),
+           # palette = core_colors, 
             strip.position = "top",
             color = "black",
             x.text.angle = 45, 
@@ -502,340 +488,81 @@ top_df %>%
 ```
 
 
-## 4.2 Heatmap
-### 4.2.1 Genus
-```{r, fig.height=5, fig.width=6.5}
-df <- ps_fs_genus_csv %>% select(-Type) %>% column_to_rownames(var="Sample") %>% as.matrix %>% t()
-#df <- df[order(rowSums(df), decreasing = TRUE)[1:50], ] #select top 50
+## 4.2 Per taxa plots
 
-# Extract Type information from sample_data
-type_annot <- data.frame(Type = ps_fs_genus_csv$Type, Sample = ps_fs_genus_csv$Sample) %>% column_to_rownames(var="Sample")
-rownames(type_annot) <- colnames(df)  # Ensure match to colnames of otu_mat
+### 4.2.0 Phylum TSS Dot
+```{r, fig.width=15, fig.height=15}
+Phylum_TSS <- plot_all_taxa(ps_fs, "TSS", "Type", "Phylum", "dot", colors_all)
+Phylum_TSS$plot
+```
 
-# Manually define annotation colors
-ann_colors <- list(Type = c(Plaque = "#083D77", Abscess = "#FF495C"))
 
-my_colors <- viridis(100, option = "inferno")
+### 4.2.1 Genus TSS Dot
+```{r, fig.width=15, fig.height=50}
+genus_TSS <- plot_all_taxa(ps_fs, "TSS", "Type", "Genus", "dot", colors_all)
+genus_TSS$plot
+```
 
-# Plot heatmap with annotation
-pheatmap(log(df),
-         scale = "none",
-         clustering_distance_rows = "correlation",
-         clustering_distance_cols = "correlation",
+
+### 4.2.1 Genus CSS Dot
+```{r, fig.width=15, fig.height=50}
+genus_CSS <- plot_all_taxa(ps_fs, "CLR", "Type", "Genus", "dot", colors_all)
+genus_CSS$plot
+```
+
+
+### 4.2.2 Selected Species Plot
+```{r, fig.width=5, fig.height=4}
+plot_all_taxa(ps_obj = ps_fs,
+              transformation = "TSS",
+              group = "Type",
+              taxa_level = "Species",
+              plot_type = "dot",
+              plot_colors = colors_all,
+              taxa_filter = c("g__Fusobacterium_s__nucleatum", "g__Fusobacterium_s__periodonticum"))
+```
+
+### 4.2.3 Fusobacterium
+```{r, fig.width=4, fig.height=3}
+plot_all_taxa(ps_obj = ps_fs,
+              transformation = "TSS",
+              group = "Type",
+              taxa_level = "Species",
+              plot_type = "dot",
+              plot_colors = colors_all,
+              taxa_filter = c("g__Fusobacterium_s__nucleatum", "g__Fusobacterium_s__periodonticum"))
+```
+
+
+## 4.3 Heatmap
+### 4.3.1 Genus
+```{r}
+ps_genus <- tax_glom(ps_fs, taxrank = "Genus")
+
+# Extract count matrix and convert to matrix
+otu_mat <- as(otu_table(ps_genus), "matrix")
+
+# Transpose if samples are rows (optional, depending on orientation)
+if(taxa_are_rows(ps_genus)) {
+  otu_mat <- t(otu_mat)
+}
+
+# Extract Genus names
+taxa_names <- as.data.frame(tax_table(ps_genus))$Genus
+
+# Plot heatmap
+pheatmap(log(otu_mat + .0000001),
+         scale = "none",        # keep raw counts
+         clustering_distance_rows = "euclidean",
+         clustering_distance_cols = "euclidean",
          clustering_method = "complete",
          fontsize_row = 8,
          fontsize_col = 8,
-         show_rownames = FALSE,
-         show_colnames = FALSE,
-         annotation_col = type_annot,
-         annotation_colors = ann_colors,
-         color = my_colors,
-         border_color = NA)
+         show_rownames = TRUE,
+         show_colnames = TRUE)
 ```
 
-
-# 5.0 Taxa trends
-
-## Genus
-```{r, fig.height=6, fig.width=4}
-
-df_avg <- ps_fs_genus_csv %>%
-  select(-Sample) %>%
-  dplyr::group_by(Type) %>%
-  dplyr::summarise(across(where(is.numeric), ~ median(.x, na.rm = TRUE)),
-                   .groups = "drop") %>% as.data.frame()
-dif_row <- df_avg %>%
-  dplyr::summarise(across(where(is.numeric),
-                   ~ .[Type == "Plaque"] - .[Type == "Abscess"])) %>%
-  mutate(Type = "dif") %>%
-  relocate(Type)
-
-# Bind to the original averages
-df_final <- bind_rows(df_avg, dif_row) %>% column_to_rownames(var="Type") %>% t() %>% as.data.frame() %>% dplyr::arrange(desc(abs(dif)))
-
-# Sort, take top X by absolute difference
-df_top <- df_final %>%
-  dplyr::arrange(desc(abs(dif))) %>%
-  slice_head(n = 20) %>%
-  mutate(Genus = rownames(.))   # keep g__ names for plotting
-
-# Remove "g__" from genus names
-df_top <- df_top %>%
-  mutate(Genus = str_remove(Genus, "^g__")) %>%
-  mutate(Genus = str_replace_all(Genus, "_", " ")) %>%
-  mutate(Genus = str_remove_all(Genus, "\\[|\\]"))
-
-# Make Genus a factor ordered by dif
-df_top <- df_top %>%
-  mutate(Genus = factor(Genus, levels = Genus[order(abs(dif), decreasing = FALSE)]))
-
-# Reshape to long format for ggplot
-df_long <- df_top %>%
-  select(Genus, Abscess, Plaque) %>%
-  pivot_longer(cols = c(Abscess, Plaque),
-               names_to = "Type",
-               values_to = "Value")
-# Bar plot
-ggplot(df_long, aes(x = Genus, y = Value, fill = Type)) +
-  geom_col(position = position_dodge(width = 0.9), width = 0.8) +
-  geom_vline(xintercept = seq(1.5, length(unique(df_long$Genus)) - 0.5, 1),
-             color = "black", size = 0.3) +
-  labs(x = NULL, y = "Median Relative Abundance", fill = "Type") +
-  theme_bw(base_size = 12) +
-  theme(
-    axis.text.y = element_text(hjust = 1, face = "italic", size = 13, color="black"),
-    axis.text.x = element_text(hjust = 1, angle=45, size = 13, color="black"),
-  panel.grid.major = element_blank(),
-  panel.grid.minor = element_blank() ) + 
-  scale_fill_manual(values = colors_all) +
-  coord_flip()
-
-```
-
-### Sample-specific patterns
-```{r, fig.height=6, fig.width=1}
-
-#Detatch plyr because it causes some issues
-if ("package:plyr" %in% search()) {
-  detach("package:plyr", unload = TRUE, character.only = TRUE)
-}
-
-taxa_pull <- df_long$Genus
-
-#A lot of code to determine the ratio of Abscess to plaque (+1 for more in abscess and -1 for more in plaque)
-data_pull <- ps_fs_genus_csv %>% 
-  pivot_longer(cols=starts_with("g_"),, names_to = "Genus", values_to = "relab") %>%
-  mutate(Genus = str_remove(Genus, "^g__")) %>%
-  mutate(Genus = str_replace_all(Genus, "_", " ")) %>%
-  mutate(Genus = str_remove_all(Genus, "\\[|\\]")) %>%
-  dplyr::filter(Genus %in% taxa_pull) %>%
-  mutate(Sample = str_replace_all(Sample, "-P", "")) %>%
-  mutate(Sample = str_replace_all(Sample, "-A", "")) %>%
-  pivot_wider(names_from = "Type", values_from = "relab") %>%
-  mutate(Ratio = Abscess / Plaque, RatioFlag = if_else(Ratio > 1, 1, -1))
-
-#Counting the number of samples for each taxa with plaque and abscess enrichment
-df_summary <- data_pull %>%
-  mutate(Genus = trimws(as.character(Genus))) %>%  # ensure clean text
-  dplyr::group_by(Genus) %>%
-  summarise(
-    Abscess_enriched  = sum(RatioFlag == 1, na.rm = TRUE),
-    Plaque_enriched = sum(RatioFlag == -1, na.rm = TRUE)
-  ) 
-
-df_summary <- df_summary[match(df_top$Genus, df_summary$Genus), ]
-df_summary <- df_summary %>% column_to_rownames(var="Genus")
-
-# Plot heatmap with annotation
-pheatmap(df_summary,
-         scale = "none",
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         clustering_method = "complete",
-         fontsize_row = 8,
-         fontsize_col = 12,
-         fontsize_number = 10,
-         show_rownames = FALSE,
-         show_colnames = TRUE,
-         border_color = "black",
-         display_numbers = round(as.matrix(df_summary), 1),  # 1 decimal place
-        color = colorRampPalette(c( "#AA7DCE", "white", "#28CCC7"))(100),  # Custom color palette
-)
-```
-### Break down Ab and Plaque heatmaps
-```{r, fig.width=.8, fig.height=5.5}
-
-ab_specific <- df_summary %>% select("Abscess_enriched")
-pl_specific <- df_summary %>% select("Plaque_enriched")
-
-pheatmap(ab_specific,
-         scale = "none",
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         clustering_method = "complete",
-         fontsize_row = 8,
-         fontsize_col = 12,
-         fontsize_number = 10,
-         show_rownames = FALSE,
-          number_color = "black",
-         show_colnames = FALSE,
-         border_color = "black",
-         display_numbers = round(as.matrix(ab_specific), 1),  # 1 decimal place
-        color = colorRampPalette(c( "white", "#FF495C"))(100),  # Custom color palette
-)
-
-
-
-pheatmap(pl_specific,
-         scale = "none",
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         clustering_method = "complete",
-         fontsize_row = 8,
-         fontsize_col = 12,
-         number_color = "white",
-         fontsize_number = 10,
-         show_rownames = FALSE,
-         show_colnames = FALSE,
-         border_color = "black",
-         display_numbers = round(as.matrix(pl_specific), 1),  # 1 decimal place
-        color = colorRampPalette(c( "white", "#083D77"))(100),  # Custom color palette
-)
-```
-
-
-## Species
-```{r, fig.height=6, fig.width=5}
-df_avg <- ps_fs_species_csv %>%
-  select(-Sample) %>%
-  dplyr::group_by(Type) %>%
-  dplyr::summarise(across(where(is.numeric), ~ median(.x, na.rm = TRUE)),
-                   .groups = "drop") %>% as.data.frame()
-dif_row <- df_avg %>%
-  dplyr::summarise(across(where(is.numeric),
-                   ~ .[Type == "Plaque"] - .[Type == "Abscess"])) %>%
-  mutate(Type = "dif") %>%
-  relocate(Type)
-
-# Bind to the original averages
-df_final <- bind_rows(df_avg, dif_row) %>% column_to_rownames(var="Type") %>% t() %>% as.data.frame() %>% dplyr::arrange(desc(abs(dif)))
-
-# Sort, take top X by absolute difference
-df_top <- df_final %>%
-  rownames_to_column(var="Species") %>%
-  filter(!grepl("Streptococcus", Species)) %>%
-  filter(!grepl("Actinomyces", Species)) %>%
-  dplyr::arrange(desc(abs(dif))) %>%
-  slice_head(n = 20) 
-
-# Remove "g__" from Species names
-df_top <- df_top %>%
-  mutate(Species = str_remove(Species, "^g__")) %>%
-  mutate(Species = str_remove(Species, "s__")) %>%
-  mutate(Species = str_replace_all(Species, "_", " ")) %>%
-  mutate(Species = str_remove_all(Species, "\\[|\\]"))
-
-# Make Species a factor ordered by dif
-df_top <- df_top %>%
-  mutate(Species = factor(Species, levels = Species[order(abs(dif), decreasing = FALSE)]))
-
-# Reshape to long format for ggplot
-df_long <- df_top %>%
-  select(Species, Abscess, Plaque) %>%
-  pivot_longer(cols = c(Abscess, Plaque),
-               names_to = "Type",
-               values_to = "Value")
-# Bar plot
-ggplot(df_long, aes(x = Species, y = Value, fill = Type)) +
-  geom_col(position = position_dodge(width = 0.9), width = 0.8) +
-  geom_vline(xintercept = seq(1.5, length(unique(df_long$Species)) - 0.5, 1),
-             color = "black", size = 0.3) +
-  labs(x = NULL, y = "Median Relative Abundance", fill = "Type") +
-  theme_bw(base_size = 12) +
-  theme(
-    axis.text.y = element_text(hjust = 1, face = "italic", size = 13, color="black"),
-    axis.text.x = element_text(hjust = 1, angle=45, size = 13, color="black"),
-  panel.grid.major = element_blank(),
-  panel.grid.minor = element_blank() ) + 
-  scale_fill_manual(values = colors_all) +
-  coord_flip()
-```
-
-### Sample-specific patterns
-```{r, fig.height=6, fig.width=1}
-
-taxa_pull <- df_long$Species
-
-#A lot of code to determine the ratio of Abscess to plaque (+1 for more in abscess and -1 for more in plaque)
-data_pull <- ps_fs_species_csv %>% 
-  pivot_longer(cols=starts_with("g_"),, names_to = "Species", values_to = "relab") %>%
-  mutate(Species = str_remove(Species, "^g__")) %>%
-  mutate(Species = str_remove(Species, "s__")) %>%
-  mutate(Species = str_replace_all(Species, "_", " ")) %>%
-  mutate(Species = str_remove_all(Species, "\\[|\\]")) %>%
-  dplyr::filter(Species %in% taxa_pull) %>%
-  mutate(Sample = str_replace_all(Sample, "-P", "")) %>%
-  mutate(Sample = str_replace_all(Sample, "-A", "")) %>%
-  pivot_wider(names_from = "Type", values_from = "relab") %>%
-  mutate(Ratio = Abscess / Plaque, RatioFlag = if_else(Ratio > 1, 1, -1))
-
-
-#Counting the number of samples for each taxa with plaque and abscess enrichment
-df_summary <- data_pull %>%
-  mutate(Species = trimws(as.character(Species))) %>%  # ensure clean text
-  dplyr::group_by(Species) %>%
-  summarise(
-    Abscess_enriched  = sum(RatioFlag == 1, na.rm = TRUE),
-    Plaque_enriched = sum(RatioFlag == -1, na.rm = TRUE)
-  ) 
-
-df_summary <- df_summary[match(df_top$Species, df_summary$Species), ]
-df_summary <- df_summary %>% column_to_rownames(var="Species")
-
-
-# Plot heatmap with annotation
-pheatmap(df_summary,
-         scale = "none",
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         clustering_method = "complete",
-         fontsize_row = 8,
-         fontsize_col = 12,
-         fontsize_number = 10,
-         show_rownames = FALSE,
-         show_colnames = TRUE,
-         border_color = "black",
-         display_numbers = round(as.matrix(df_summary), 1),  # 1 decimal place
-        color = colorRampPalette(c( "#AA7DCE", "white", "#28CCC7"))(100),  # Custom color palette
-)
-
-```
-
-
-
-### Break down Ab and Plaque heatmaps
-```{r, fig.width=.8, fig.height=5.5}
-
-ab_specific <- df_summary %>% select("Abscess_enriched")
-pl_specific <- df_summary %>% select("Plaque_enriched")
-
-pheatmap(ab_specific,
-         scale = "none",
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         clustering_method = "complete",
-         fontsize_row = 8,
-         fontsize_col = 12,
-         fontsize_number = 10,
-         show_rownames = FALSE,
-          number_color = "black",
-         show_colnames = FALSE,
-         border_color = "black",
-         display_numbers = round(as.matrix(ab_specific), 1),  # 1 decimal place
-        color = colorRampPalette(c( "white", "#FF495C"))(100),  # Custom color palette
-)
-
-
-
-pheatmap(pl_specific,
-         scale = "none",
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         clustering_method = "complete",
-         fontsize_row = 8,
-         fontsize_col = 12,
-         number_color = "white",
-         fontsize_number = 10,
-         show_rownames = FALSE,
-         show_colnames = FALSE,
-         border_color = "black",
-         display_numbers = round(as.matrix(pl_specific), 1),  # 1 decimal place
-        color = colorRampPalette(c( "white", "#083D77"))(100),  # Custom color palette
-)
-```
-
-
-# 6.0 Differential Abundance
+# Differential Abundance
 ## 6.1 ANCOMBC2
 
 ### 6.1.1 Phylum
@@ -859,9 +586,9 @@ ANCOM_genus <- runANCOM(ps_fs,
          plot_colors = colors_all )
 ```
 
-### 6.1.2 Species
-```{r, fig.height=10, fig.width=10}
-ANCOM_sp <- runANCOM(ps_fs, 
+### 6.1.3 Species
+```{r, fig.height=45, fig.width=10}
+ANCOME_species <- runANCOM(ps_fs, 
          tax_level = "Species", 
          group = "Type", 
          name_of_saved_results = "../saved_analysis_files/ancombc_results_sp", 
@@ -896,7 +623,7 @@ MaaslinPhylum <- run_Maaslin2(ps_obj = ps_fs,
                                  transform = "LOG", 
                                  plot_colors = colors_all,
                                  plot_type = "dot", 
-                                 qval_threshold= .25)
+                                 qval_threshold= 0.25)
 MaaslinPhylum$results
 ```
 
@@ -911,15 +638,14 @@ MaaslinGenus <- run_Maaslin2(ps_obj = ps_fs,
                                  transform = "LOG", 
                                  plot_colors = colors_all,
                                  plot_type = "dot", 
-                                 qval_threshold= .25)
+                                 qval_threshold= 0.25)
 
 MaaslinGenus$results
 ```
 
-
 #### Species
-```{r, fig.width=10, fig.height=65}
-Maaslinsp <- run_Maaslin2(ps_obj = ps_fs, 
+```{r, fig.width=15, fig.height=15}
+Maaslin2sp <- run_Maaslin2(ps_obj = ps_fs, 
                                  taxa_level = "Species", 
                                  group = "Type",
                                  analysis_method = "LM", 
@@ -927,11 +653,10 @@ Maaslinsp <- run_Maaslin2(ps_obj = ps_fs,
                                  transform = "LOG", 
                                  plot_colors = colors_all,
                                  plot_type = "dot", 
-                                 qval_threshold= .25)
+                                 qval_threshold= 0.25)
 
-Maaslinsp$results
+Maaslin2sp$results
 ```
-
 
 ## 6.3 AlDEX2
 
@@ -988,153 +713,36 @@ ALDEX_genus <- run_aldex2(ps_fs,
 ALDEX_genus$result
 ```
 
-
 #### Species
-```{r, fig.width=7, fig.height=5}
-ALDEX_sp <- run_aldex2(ps_fs, 
+```{r, fig.width=12}
+ALDEX_species <- run_aldex2(ps_fs, 
                   "Type", 
                   "Species",
                   method = "wilcox.test",
                   transform = "log10",
                   normalization = "CSS", 
-                 plot_colors = colors_all)
-ALDEX_sp$result
+            plot_colors = colors_all)
+ALDEX_species$result
 ```
 
 
 ## 6.4 Combine results
 
 ### Phylum
-```{r, fig.height=1.2, fig.width=4}
-
-source("MK_Microbiome_Functions.R")
-
+```{r, fig.height=10, fig.width=7}
 DA_results_df_Phylum <- combine_DA(maaslin2_results_Phylum, ancombc2_results_df_Phylum, aldex2_res_Phylum, "Type", "Phylum", plot_colors=colors_all)
-
-DA_results_df_Phylum$bar_plot_high_confidence
 ```
 
-```{r, fig.height=1.2, fig.width=4}
-DA_results_df_Phylum$bar_plot_med_confidence
-```
 
 ### Genus
-```{r, fig.height=2, fig.width=4}
+```{r, fig.height=6, fig.width=5}
 DA_results_df_genus <- combine_DA(maaslin2_results_Genus, ancombc2_results_df_Genus, aldex2_res_Genus, "Type", "Genus", plot_colors=colors_all)
-
-DA_results_df_genus$bar_plot_high_confidence
 ```
-
-```{r, fig.height=4.5, fig.width=5}
-DA_results_df_genus$bar_plot_med_confidence
-```
-
-
 
 ### Species
-```{r, fig.height=2, fig.width=4}
-DA_results_df_sp <- combine_DA(maaslin2_results_Species, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species", plot_colors=colors_all)
-
-DA_results_df_sp$bar_plot_high_confidence
+```{r, fig.height=10, fig.width=7}
+DA_results_df <- combine_DA(maaslin2_results_Species, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species",plot_colors=colors_all)
 ```
-
-```{r, fig.height=4.5, fig.width=5}
-DA_results_df_sp$bar_plot_med_confidence
-```
-
-
-
-## 6.5 Per taxa plots
-
-### Selected Phylum Plot
-```{r, fig.width=6, fig.height=2.8}
-plot_all_taxa(ps_obj = ps_fs,
-              transformation = "TSS",
-              group = "Type",
-              taxa_level = "Phylum",
-              plot_type = "dot",
-              plot_colors = colors_all,
-              taxa_filter = c("p__Proteobacteria", "p__Spirochaetes", "p__Saccharibacteria_(TM7)", "p__Synergistetes" ))
-```
-
-```{r, fig.width=2.5, fig.height=2.8}
-plot_all_taxa(ps_obj = ps_fs,
-              transformation = "TSS",
-              group = "Type",
-              taxa_level = "Phylum",
-              plot_type = "dot",
-              plot_colors = colors_all,
-              taxa_filter = c("p__Fusobacteria" ))
-```
-```{r, fig.width=2.5, fig.height=2.8}
-plot_all_taxa(ps_obj = ps_fs,
-              transformation = "CLR",
-              group = "Type",
-              taxa_level = "Phylum",
-              plot_type = "dot",
-              plot_colors = colors_all,
-              taxa_filter = c("p__Fusobacteria" ))
-```
-### Selected Genus Plot
-```{r, fig.width=8, fig.height=3}
-plot_all_taxa(ps_obj = ps_fs,
-              transformation = "TSS",
-              group = "Type",
-              taxa_level = "Genus",
-              plot_type = "dot",
-              plot_colors = colors_all,
-              taxa_filter = c("g__Leptotrichia", "g__Corynebacterium", "g__Actinomyces", "g__Treponema", "g__Dialister", "g__Veillonellaceae_[G-1]"))
-```
-
-```{r, fig.width=8, fig.height=3}
-plot_all_taxa(ps_obj = ps_fs,
-              transformation = "TSS",
-              group = "Type",
-              taxa_level = "Genus",
-              plot_type = "dot",
-              plot_colors = colors_all,
-              taxa_filter = c("g__Rothia", "g__Neisseria", "g__Lautropia", "g__Lancefieldella", "g__Solobacterium", "g__Oribacterium"))
-```
-
-```{r, fig.width=2.5, fig.height=3}
-plot_all_taxa(ps_obj = ps_fs,
-              transformation = "CLR",
-              group = "Type",
-              taxa_level = "Genus",
-              plot_type = "dot",
-              plot_colors = colors_all,
-              taxa_filter = c("g__Fusobacterium"))
-
-plot_all_taxa(ps_obj = ps_fs,
-              transformation = "TSS",
-              group = "Type",
-              taxa_level = "Genus",
-              plot_type = "dot",
-              plot_colors = colors_all,
-              taxa_filter = c("g__Fusobacterium"))
-```
-
-### Selected Species Plot
-```{r, fig.width=4, fig.height=3}
-plot_all_taxa(ps_obj = ps_fs,
-              transformation = "TSS",
-              group = "Type",
-              taxa_level = "Species",
-              plot_type = "dot",
-              plot_colors = colors_all,
-              taxa_filter = c("g__Fusobacterium_s__nucleatum", "g__Fusobacterium_s__periodonticum"))
-
-
-plot_all_taxa(ps_obj = ps_fs,
-              transformation = "CLR",
-              group = "Type",
-              taxa_level = "Species",
-              plot_type = "dot",
-              plot_colors = colors_all,
-              taxa_filter = c("g__Fusobacterium_s__nucleatum", "g__Fusobacterium_s__periodonticum"))
-```
-
-
 
 # 7.0 Random Forest
 ```{r}
@@ -1173,53 +781,7 @@ model <- train(
   metric = "ROC"
 )
 
-
 ```
-
-
-### Rank features by fold and create heatmap
-```{r, fig.width=3.8, fig.height=4}
-
-
-set.seed(123) 
-rank_table <- rank_rf_feature_table(df, folds, top_n = 10, add_mean = TRUE)%>%
-    mutate(Feature = str_remove_all(Feature, "g__")) %>%
-  mutate(Feature = str_replace_all(Feature, "_", " ")) %>%
-  mutate(Feature = str_remove_all(Feature, "\\[|\\]")) 
-
-
-# Example: show the first few rows
-rank_table %>% kable()
-
-
-mat <- rank_table %>%
-  select(-Feature, -MeanRank) %>%
-  as.data.frame() 
-
-
-rownames(mat) <- rank_table$Feature
-rownames(mat) <- sub("`","", rownames(mat)) #Need this here twice
-rownames(mat) <- sub("`","", rownames(mat)) 
-
-rownames(mat) <- sub("^g__","", rownames(mat))
-
-labs <- rownames(mat)
-
-# Make taxa labels italics
-labs_expr <- parse(text = sprintf("italic('%s')",
-                                  gsub("'", "\\\\'", labs, fixed = TRUE)))
-
-pheatmap(log(mat),
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         labels_row = labs_expr,
-         color = colorRampPalette(c("#7B8CDE", "white", "#C0E6DE"))(50),
-        display_numbers = round(as.matrix(mat), 1),  # 1 decimal place
-        fontsize_number = 10,
-         main = "Feature Ranks per Fold")
-```
-
-
 
 ```{r, fig.width=4, fig.height=3}
 #Plot ROC Curve for each fold of the model
@@ -1239,7 +801,7 @@ ggplot(lift_df) +
   geom_line(aes(x = 1 - Sp, y = Sn, color = fold)) +
   scale_color_manual(
     name = "Fold",
-    values = c("#DD1155", "#00CC99", "#F4B942", "#3399FF")
+    values = c("#FF495C", "#03CEA4", "#BBCC00", "#3399FF", "#5F00BA")
   ) +
   theme_bw()
 ```
@@ -1248,17 +810,11 @@ ggplot(lift_df) +
 
 ### Print AUC Values
 ```{r}
-library("plyr")
 AUC_score <-ddply(model$pred, "Resample", summarise,
       accuracy = Accuracy(pred, obs))
 
 AUC_score %>% kbl() %>%
   kable_minimal()
-
-
-if ("package:plyr" %in% search()) {
-  detach("package:plyr", unload = TRUE, character.only = TRUE)
-}
 ```
 
 
@@ -1330,7 +886,7 @@ core_genus_list <- list()
 
 # Loop through prevalence values 
 for (p in seq(0.5, 1, by = 0.05)) {
-  core.taxa <- core_members(core_ps_genus, detection = 1, prevalence = p)
+  core.taxa <- core_members(core_ps_genus, detection = 0.00001, prevalence = p)
   core_genus_list[[as.character(p)]] <- core.taxa
 }
 
@@ -1361,6 +917,7 @@ row_sums <- rowSums(core_matrix_genus)
 core_matrix_genus <- core_matrix_genus[order(row_sums, decreasing = TRUE), ]
 
 
+
 # Convert the data frame to row-wise format while keeping row names
 core_df_genus <- core_matrix_genus %>% as.data.frame() %>% rownames_to_column(var="Genera") %>%
   rowwise() %>%
@@ -1381,7 +938,6 @@ plot <- ggplot(core_df_genus, aes(x = prevalence, y = Genera, fill = value)) +
        x = "Prevalence Level",
        y = "Genera") +
   theme_minimal() +
-    scale_y_discrete(limits = rev) +  # <-- flip y-axis order
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.text.y = element_text(size = 8, face = "italic"),  # <-- italic here
@@ -1392,25 +948,6 @@ plot <- ggplot(core_df_genus, aes(x = prevalence, y = Genera, fill = value)) +
   )
 
 plot
-
-
-# Plot with reversed y-axis (so highest prevalence at top)
-plot <- ggplot(core_df_genus, aes(x = prevalence, y = Genera, fill = value)) +
-  geom_tile(color = "white") +
-  scale_fill_gradient(low = "white", high = "dodgerblue2", name = "Prevalence") +
-  labs(title = "Core Genera at Different Prevalence Levels",
-       x = "Prevalence Level",
-       y = "Genera") +
-  scale_y_discrete(limits = rev(levels(core_df_genus$Genera))) +  # flip order
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.text.y = element_text(size = 8, face = "italic"),
-    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
-    legend.position = "right",
-    legend.title = element_text(size = 10),
-    legend.text = element_text(size = 8)
-  )
 
 ```
 
@@ -1457,36 +994,29 @@ res$metrics_df
 ## LDA: Create the model
 You can use the info from the optimum topic numbers printed out in the above function, or adjust as needed.
 ```{r}
-result <- create_topic_model(counts_data, 3, TRUE, "Gibbs")
+result <- create_topic_model(counts_data, 2, TRUE, "Gibbs")
 model <- result$lda_model
 ```
 
 ## Plot beta
-```{r, fig.height=3, fig.width=9}
-
-my_colors <- c("1" = "#083D77", "2" = "#FF495C", "3" = "grey")
-p <- plot_beta(result, 10, result$b_df, fill_colors = my_colors)
-p
+```{r, fig.height=4, fig.width=10}
+plot_beta(result, 10, result$b_df)
 ```
 
 ## Heatmap of gamma scores 
-```{r, fig.height=1.5, fig.width=9}
+```{r, fig.height=2, fig.width=9}
 heatmap_gamma(result, "Type", result$g_df)
 ```
 
 ## UMAP of gamma scores
 ```{r fig.height=6, fig.width=6}
-UMAP_res <- plot_gamma_umap(results, "Type", colors_all, result$g_df)
-```
-```{r, fig.width=2.5, fig.height=3}
-UMAP_res$sil_plot
+type_colors <- c("Abscess" = "red", "Plaque" = "blue")
+plot_gamma_umap(results, "Type", type_colors, result$g_df)
 ```
 
 ##Membership of topic by Type
-```{r, fig.height=2.5, fig.width=4}
-source("MK_Microbiome_Functions.R")
-
-topic_membership(result, "Type", colors_all, result$g_df)
+```{r, fig.height=3.5, fig.width=4}
+topic_membership(result, "Type", type_colors, result$g_df)
 ```
 
 
@@ -1495,9 +1025,6 @@ topic_membership(result, "Type", colors_all, result$g_df)
 relab_heatmap(result, ps_fs, "Genus", "Type", topic_no=1, n_top_words=10, result$b_df)
 
 relab_heatmap(result, ps_fs, "Genus", "Type", topic_no=2, n_top_words=10, result$b_df)
-
-relab_heatmap(result, ps_fs, "Genus", "Type", topic_no=3, n_top_words=10, result$b_df)
-
 ```
 
 
