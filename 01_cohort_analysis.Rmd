@@ -434,7 +434,7 @@ top_df %>%
 ```
 
 ### 4.1.3 Microshades Genus MB
-```{r, fig.width=8, fig.height=4}
+```{r, eval=FASE, fig.width=8, fig.height=4}
 # Use microshades function prep_mdf to agglomerate, normalize, and melt the phyloseq object
 mdf_prep <- prep_mdf(ps_fs)
 
@@ -966,7 +966,7 @@ fitControl <- trainControl(
 
 # Train the random forest model
 set.seed(123)
-model <- train(
+model <- caret::train(
   Type ~ .,
   data = df,
   method = "rf",

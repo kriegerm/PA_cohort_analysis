@@ -1,0 +1,70 @@
+Veillonellaceae G1 bacterium HMT 150
+Alloprevotella tannerae
+Prevotella oris
+Oribacterium sp HMT 078
+Solobacterium moorei
+Prevotella sp HMT 292
+Treponema maltophilum
+Dialister pneumosintes
+Porphyromonas endodontalis
+Treponema socranskii
+Treponema lecithinolyticum
+Fretibacterium fastidiosum
+Treponema sp HMT 231
+Peptostreptococcaceae G1 Eubacterium infirmum
+Treponema denticola
+Peptococcus sp HMT 167
+Veillonellaceae G1 bacterium HMT 150
+Selenomonas sp HMT 134
+Alloprevotella sp HMT 914
+Lachnoanaerobaculum umeaense
+Saccharibacteria TM7 G6 bacterium HMT 870
+Leptotrichia sp HMT 498
+Leptotrichia sp HMT 215
+Arachnia propionica
+Actinomyces massiliensis
+Leptotrichia hofstadii
+Gemella morbillorum
+Leptotrichia buccalis
+Weeksellaceae G1 sp HMT 907
+Prevotella melaninogenica
+Streptococcus lactarius
+Riemerella sp HMT 322
+Neisseria elongata
+Granulicatella elegans
+Corynebacterium matruchotii
+Streptococcus oralis subsp dentisani clade 058
+Capnocytophaga granulosa
+Kingella oralis
+Corynebacterium durum
+Cardiobacterium hominis
+Capnocytophaga sputigena
+Alloprevotella sp HMT 473
+Porphyromonas pasteri
+Rothia aeria
+Actinomyces oris
+Rothia dentocariosa
+Streptococcus sanguinis
+Haemophilus parainfluenzae
+Lautropia mirabilis
+Abiotrophia defectiva
+Neisseria subflava
+Neisseria flava
+Fusobacterium periodonticum
+Streptococcus cristatus clade 578
+Fusobacterium nucleatum
+Selenomonas sputigena
+Lacticaseibacillus casei
+Bacteroidales G2 bacterium HMT 274
+Prevotella nigrescens
+Johnsonella ignava
+Porphyromonas catoniae
+Aggregatibacter sp HMT 458
+Alloprevotella sp HMT 912
+Actinomyces dentalis
+Fusobacterium hwasookii
+Leptotrichia shahii
+Peptidiphaga sp HMT 183
+Haemophilus sp HMT 036
+Neisseria cinerea
+Porphyromonas sp HMT 930
