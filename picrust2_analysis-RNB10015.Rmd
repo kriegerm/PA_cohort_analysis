@@ -1,0 +1,214 @@
+---
+title: "picrust2_analysis"
+author: "Madeline Krieger"
+date: "2025-09-05"
+output: html_document
+---
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+pkgs <- c("phyloseq", "ALDEx2", "SummarizedExperiment", "Biobase", "devtools",
+          "ComplexHeatmap", "BiocGenerics", "BiocManager", "metagenomeSeq",
+          "Maaslin2", "edgeR", "lefser", "limma", "KEGGREST", "DESeq2")
+
+for (pkg in pkgs) {
+  if (!requireNamespace(pkg, quietly = TRUE))
+    BiocManager::install(pkg)
+}
+```
+
+
+```{r 1.1_load-packages}
+library("pacman")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "phyloseq", "ALDEx2", "SummarizedExperiment", "Biobase", "devtools","ComplexHeatmap", "BiocGenerics", "BiocManager", "metagenomeSeq","Maaslin2", "edgeR", "lefser", "limma", "KEGGREST", "DESeq2", "ggpicrust2")
+
+here::i_am("picrust2_analysis.Rmd")
+``` 
+```{r}
+library(readr)
+library(ggpicrust2)
+library(tibble)
+library(tidyverse)
+library(ggprism)
+library(patchwork)
+```
+
+```{r}
+# Load necessary data: abundance data and metadata
+abundance_file <- "picrust2_pipeline_output/KO_metagenome_out/pred_metagenome_unstrat.tsv"
+
+
+
+metadata <- read_delim(
+    "../Pediatric_cohort/Qiime2/Files_For_Phyloseq/metadata_phyloseq.tsv",
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE
+)
+
+metadata <- metadata %>% as.data.frame() 
+
+
+abundance_file_read <- read_delim(
+    abundance_file,
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE
+    ) %>% as.data.frame() %>%
+  column_to_rownames(var="function") %>%
+    select(all_of(metadata$SampleID)) %>%
+  rownames_to_column(var="function")
+
+
+# Run ggpicrust2 with input file path
+results_file_input <- ggpicrust2(file = abundance_file,
+                                 metadata = metadata,
+                                 group = "Type", # For example dataset, group = "Environment"
+                                 pathway = "KO",
+                                 daa_method = "LinDA",
+                                 ko_to_kegg = FALSE,
+                                 order = "pathway_class",
+                                 p_values_bar = TRUE,
+                                 x_lab = "pathway_name")
+
+# Run ggpicrust2 with imported data.frame
+abundance_data <- read_delim(abundance_file, delim = "\t", col_names = TRUE, trim_ws = TRUE)
+
+# Run ggpicrust2 with input data
+results_data_input <- ggpicrust2(data = abundance_data,
+                                 metadata = metadata,
+                                 group = "your_group_column", # For example dataset, group = "Environment"
+                                 pathway = "KO",
+                                 daa_method = "LinDA",
+                                 ko_to_kegg = TRUE,
+                                 order = "pathway_class",
+                                 p_values_bar = TRUE,
+                                 x_lab = "pathway_name")
+
+# Access the plot and results dataframe for the first DA method
+example_plot <- results_file_input[[1]]$plot
+example_results <- results_file_input[[1]]$results
+
+# Use the example data in ggpicrust2 package
+data(ko_abundance)
+data(metadata)
+results_file_input <- ggpicrust2(data = ko_abundance,
+                                 metadata = metadata,
+                                 group = "Environment",
+                                 pathway = "KO",
+                                 daa_method = "LinDA",
+                                 ko_to_kegg = TRUE,
+                                 order = "pathway_class",
+                                 p_values_bar = TRUE,
+                                 x_lab = "pathway_name")
+
+# Analyze the EC or MetaCyc pathway
+data(metacyc_abundance)
+results_file_input <- ggpicrust2(data = metacyc_abundance,
+                                 metadata = metadata,
+                                 group = "Environment",
+                                 pathway = "MetaCyc",
+                                 daa_method = "LinDA",
+                                 ko_to_kegg = FALSE,
+                                 order = "group",
+                                 p_values_bar = TRUE,
+                                 x_lab = "description")
+results_file_input[[1]]$plot
+results_file_input[[1]]$results
+```
+```{r}
+
+
+kegg_abundance <- ko2kegg_abundance("picrust2_pipeline_output/KO_metagenome_out/pred_metagenome_unstrat.tsv")
+daa_results_df <- pathway_daa(abundance = kegg_abundance, 
+                              metadata = metadata, 
+                              group = "Type",
+                              daa_method = "ALDEx2", select = NULL, reference = NULL)
+
+```
+
+
+# Just doing this myself
+```{r}
+# Load necessary data: abundance data and metadata
+KO_file <- "picrust2_pipeline_output/KO_metagenome_out/pred_metagenome_unstrat_descrip.tsv"
+EC_file <- "picrust2_pipeline_output/EC_metagenome_out/pred_metagenome_unstrat_descrip.tsv"
+pathways_file <- "picrust2_pipeline_output/pathways_out/path_abun_unstrat_descrip.tsv"
+
+
+metadata <- read_delim(
+    "../Pediatric_cohort/Qiime2/Files_For_Phyloseq/metadata_phyloseq.tsv",
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE
+)
+
+metadata <- metadata %>% as.data.frame() %>% filter(Type %in% c("Plaque", "Abscess")) %>% column_to_rownames(var="SampleID")
+
+
+KO_file_read <- read_delim(
+    KO_file,
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE
+    ) %>% as.data.frame()  %>%
+    rename_with(~ ifelse(.x == "function", "func", .x)) %>%
+    mutate(funct = paste(func, description, sep = "_")) %>%
+    select(-description, -func)%>%
+    column_to_rownames(var="funct") %>%
+    select(all_of(metadata$SampleID)) %>%
+  rownames_to_column(var="funct")
+
+
+EC_file_read <- read_delim(
+    EC_file,
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE
+    ) %>% as.data.frame() %>%
+    rename_with(~ ifelse(.x == "function", "func", .x)) %>%
+    mutate(funct = paste(func, description, sep = "_")) %>%
+    select(-description, -func)%>%
+    column_to_rownames(var="funct") %>%
+    select(all_of(metadata$SampleID)) %>%
+  rownames_to_column(var="funct")
+
+pathway_file_read <- read_delim(
+    pathways_file,
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE
+    ) %>% as.data.frame()  %>%
+    mutate(funct = paste(pathway, description, sep = "_")) %>%
+    select(-description, -pathway)%>%
+    column_to_rownames(var="funct") %>%
+    select(all_of(metadata$SampleID)) 
+
+
+library(Maaslin2)
+maaslin2_pathway <- Maaslin2(input_data = pathway_file_read,
+                     input_metadata = metadata,
+                     fixed_effects = "Type",
+                     output = "test",
+                     normalization = "CLR",
+                     transform = "NONE")
+
+res <- fit_data$results %>% filter(qval < .05)
+
+#Aldex2
+library(ALDEx2)
+# Define grouping variable
+group <- metadata$Type
+
+# ALDEx2 analysis
+x <- aldex.clr(pathway_file_read, group, mc.samples = 128, denom = "all", verbose = TRUE)
+res <- aldex.ttest(x, paired.test = FALSE)
+effect <- aldex.effect(x)
+
+# Merge results
+final_results <- cbind(res, effect)
+
+```
+
+
