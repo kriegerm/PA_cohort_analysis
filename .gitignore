@@ -19,3 +19,7 @@ saved_analysis_files/
 *html
 picrust2_pipeline_output/
 .Rproj.user
+.DAspecies_anvio/dbs
+.DAspecies_anvio/genomes
+. DAspecies_anvio/ncbi_dataset.zip
+./test

@@ -1387,6 +1387,147 @@ iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval
 
 
 
+iterate_maaslin2_picrust2 <- function(counts_input, metadata, iterative_methods, group, qval_threshold, percentage, plot_colors) {
+  
+  # Define the options for each parameter
+  analysis_methods <- c("LM", "CPLM", "ZINB", "NEGBIN")
+  transforms <- c("NONE", "LOG", "LOGIT", "AST")
+  normalizations <- c("TSS", "TMM", "CSS", "CLR")
+  enriched_taxa <- list()
+  
+  # Generate all combinations using expand.grid
+  combinations <- expand.grid(analysis_method = analysis_methods,
+                              transform = transforms,
+                              normalization = normalizations)
+  
+  # Convert each row into a list and store in a list
+  iterative_methods <- apply(combinations, 1, function(x) {
+    list(analysis_method = x["analysis_method"],
+         transform = x["transform"],
+         normalization = x["normalization"])
+  })
+  
+  # Create a unique hash for the parameters
+  param_hash <- digest(list(counts_input, group, qval_threshold))
+  # File path for the analysis results
+  result_file <- file.path("..saved_analysis_files/", paste0("iterative_maaslin2_picrust2_result_", param_hash, ".rds"))
+  
+  
+  # Initialize an empty data frame to store results
+  summary_table <- data.frame(
+    analysis_method = character(),
+    transform = character(),
+    normalization = character(),
+    significant_features = integer(),
+    stringsAsFactors = FALSE
+  )
+  
+  
+  # Loop through each combination of parameters
+  for (params in iterative_methods) {
+    
+    # Extract parameters for the current iteration
+    analysis_method <- params$analysis_method
+    transform <- params$transform
+    normalization <- params$normalization
+    
+    # Run Maaslin2 with current parameters inside tryCatch
+    tryCatch({
+      maaslin2_results <- Maaslin2(
+        counts_input,
+        metadata,
+        fixed_effects = group,
+        plot_heatmap = FALSE,
+        plot_scatter = FALSE,
+        output = "../saved_analysis_files/maaslin_iterations",
+        analysis_method = analysis_method,
+        normalization = normalization,
+        transform = transform
+      )
+      
+      # Filter results based on q-value threshold
+      maaslin_res_filt <- maaslin2_results$results %>% 
+        as.data.frame() %>%
+        filter(qval <= qval_threshold)
+      
+      # Count unique significant features
+      significant_count <- length(unique(maaslin_res_filt$feature))
+      features_list <- unique(maaslin_res_filt$feature)
+      features_list_str <- paste(features_list, collapse = ", ")
+      
+      
+      # Append results to the summary table
+      summary_table <- rbind(summary_table, data.frame(
+        analysis_method = analysis_method,
+        transform = transform,
+        normalization = normalization,
+        significant_features = significant_count,
+        features_list = features_list_str,
+        stringsAsFactors = FALSE
+      ))
+      
+    }, error = function(e) {
+      # Print an error message and skip to the next iteration
+      message(paste("Error in Maaslin2 for parameters:",
+                    "analysis_method =", analysis_method,
+                    "transform =", transform,
+                    "normalization =", normalization))
+      message("Error details:", e$message)
+    })
+    
+    
+  }
+  
+  
+  if (percentage == TRUE) {
+    
+    #Get the number of unique taxa for the proportion calc
+    total_path <- nrow(counts_input)
+    print(paste0("Total pathways: ", total_path))
+    
+    summary_table  <- summary_table %>%
+      mutate(normalization_transform = paste(normalization, transform, sep = "_")) %>%
+      mutate(percent_significant_features = round(((significant_features/total_path)*100), 0)) 
+    
+    p <- summary_table %>%
+      ggplot(., aes(x = analysis_method, y = percent_significant_features, fill = normalization_transform)) +
+      geom_col(position = position_dodge(width = .8), width = 0.5, color="black") +
+      geom_text(aes(label = percent_significant_features), 
+                position = position_dodge(width = 0.8), 
+                vjust = -0.5, size = 2) +  # Ensure labels match bar positions      theme_bw(base_size = 14) +
+      theme_bw(base_size = 14) +
+      theme(strip.text.x = element_text(size = 16))+
+      labs(
+        title = "Significant Features by Analysis Method, Resolution, and Normalization",
+        x = "Analysis Method",
+        y = "% of Total Features Found Signficiant"
+      ) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+      scale_fill_manual(values = plot_colors) + 
+      ylim(0, 100) 
+    
+  }else if (percentage == FALSE) {
+    
+    p <- summary_table %>%
+      mutate(normalization_transform = paste(normalization, transform, sep = "_")) %>%
+      ggplot(., aes(x = analysis_method, y = significant_features, fill = normalization_transform)) +
+      geom_col(position = position_dodge(width = .8), width = 0.5, color="black") +
+      geom_text(aes(label = significant_features), 
+                position = position_dodge(width = 0.8), 
+                vjust = -0.5, size = 2) +  # Ensure labels match bar positions
+      theme(strip.text.x = element_text(size = 16))+
+      theme_bw(base_size = 14) +
+      labs(
+        title = "Significant Features by Analysis Method, Resolution, and Normalization",
+        x = "Analysis Method",
+        y = "Significant Features"
+      ) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+      scale_fill_manual(values = plot_colors)
+  }
+  return(list(plot = p, results = summary_table))  
+}
+
 
 ### Run Maaslin2
 #Example:
