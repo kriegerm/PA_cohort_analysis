@@ -15,12 +15,7 @@ here::i_am("picrust2_analysis.Rmd")
 
 
 
-
-
-
-
-# Just doing this myself
-
+# Load data
 ```{r}
 # Load necessary data: abundance data and metadata
 KO_file <- "picrust2_pipeline_output/KO_metagenome_out/pred_metagenome_unstrat_descrip.tsv"
@@ -100,7 +95,6 @@ maaslin2_pathway <- Maaslin2(input_data = pathway_file_read,
 maaslin2_pathway_res <- maaslin2_pathway$results %>% filter(qval < .05)
 write_csv(maaslin2_pathway_res, "picrust2_pipeline_output/maaslin2_pathway_res.csv")
 ```
-
 
 
 # EC

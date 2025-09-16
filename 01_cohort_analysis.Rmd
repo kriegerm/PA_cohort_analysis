@@ -1333,43 +1333,8 @@ pheatmap(log(topics_terms),
 
 
 
-
-
-
-
-
-
-# 10.0 Correlations
-
-
-## Genus
-```{r, fig.height=30, fig.width=30}
-source("MK_Microbiome_Functions.R")
-
-Genus_corr_res <- correlations(taxa_csv = ps_fs_genus_csv)
-
-Genus_corr_res$bubble_plot
-```
-
-
 # Session Info
 ```{r}
 sessionInfo()
-```
-
-
-
-```{r}
-  # Taxonomic agglomeration at different levels
-  genus_glom <- tax_glom(ps_fs, taxrank = "Genus", NArm = TRUE) 
-
-  # Convert to data.frame
-genus_glom_df <- psmelt(genus_glom) 
-
-  # Prepare for CSV export
-  genus_glom_csv <- genus_glom_df %>%
-    dplyr::select(c("Sample", "Abundance", "Genus", "Type")) %>%
-    pivot_wider(names_from = "Genus", values_from = "Abundance")
-  
 ```
 
