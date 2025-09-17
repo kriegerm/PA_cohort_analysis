@@ -1260,6 +1260,8 @@ res$metrics_df
 
 ## LDA: Create the model
 You can use the info from the optimum topic numbers printed out in the above function, or adjust as needed.
+
+I chose 3 for interprebility and because of the metrics.
 ```{r}
 result <- create_topic_model(counts_data, 3, TRUE, "Gibbs")
 model <- result$lda_model

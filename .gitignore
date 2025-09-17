@@ -19,7 +19,10 @@ saved_analysis_files/
 *html
 picrust2_pipeline_output/
 .Rproj.user
-.DAspecies_anvio/dbs
-.DAspecies_anvio/genomes
-. DAspecies_anvio/ncbi_dataset.zip
-./test
+DAspecies_anvio/dbs/
+DAspecies_anvio/genomes/
+DAspecies_anvio/ncbi_dataset.zip
+DAspecies_anvio/ncbi_dataset/
+DAspecies_anvio/Function_enrichment_results.xlsx
+DAspecies_anvio/PA_PANGENOME_summary*
+test/

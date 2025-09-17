@@ -3319,19 +3319,32 @@ topic_membership <- function(lda_result, type_column, colors, g_df){
       ) %>%
       mutate(topic = factor(topic, levels = sort(unique(topic))))
 
-      ggplot(topics_long_type, aes(x = !!sym(type_column), y = gamma, fill = !!sym(type_column))) +
-        geom_boxplot() +
-        scale_fill_manual(values = colors) +
-        facet_wrap(
-          ~ topic,
-          labeller = labeller(topic = ~ paste0("Topic ", .x))  # "Topic 1", "Topic 2", ...
-        ) +
-        labs(x = type_column, y = expression(gamma)) +
-        theme_bw() +
-        theme(
-          strip.background = element_rect(fill = "white", color = "black"),  # white facet box
-          strip.text = element_text(face = "bold", size = 12),
-        )
+    # Run Wilcoxon test (default) or t.test
+    pvals <- topics_long_type %>%
+      dplyr::group_by(topic) %>%
+      dplyr::summarise(
+        p_value = wilcox.test(gamma ~ Type)$p.value,
+        .groups = "drop"
+      ) %>%
+      mutate(p_adj = p.adjust(p_value, method = "fdr"))  # adjust for multiple testing
+    
+    
+    ggplot(topics_long_type, aes(x = Type, y = gamma, fill = Type)) +
+      geom_boxplot() +
+      scale_fill_manual(values = colors) +
+      facet_wrap(~ topic, labeller = labeller(topic = ~ paste0("Topic ", .x))) +
+      labs(x = "Type", y = expression(gamma)) +
+      theme_bw() +
+      theme(
+        strip.background = element_rect(fill = "white", color = "black"),
+        strip.text = element_text(face = "bold", size = 12)
+      ) +
+      stat_compare_means(
+        aes(label = paste0("p=", ..p.format..)),
+        method = "wilcox.test",
+        label.y = 0.6   # move lower on the y-axis
+        
+      )
 }
 
 
