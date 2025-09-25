@@ -77,7 +77,7 @@ construct_phyloseq <- function(phyloseq_object_name, biom_location, tree_locatio
 #The metadata in the Pediatric and Adult Abscess study differ slightly, so I just made two different functions to retain ONLY samples with 1 plaque and 1 abscess each.
 
 ## Pediatric Study: Filter for unmatched samples
-#This function is used inside the function filter_phyloseq
+# This function is used inside the function filter_phyloseq
 filter_unmatched_samples_Pediatric <- function(phyloseq_obj) {
   # Extract the sample data
   sample_data_df <- sample_data(phyloseq_obj) %>% as.matrix() %>%
@@ -118,6 +118,7 @@ filter_unmatched_samples_Pediatric <- function(phyloseq_obj) {
 
 ## Filter for unmatched samples - non-Pediatric study
 #This function is used inside the function filter_phyloseq
+# For the manuscript I only use the pediatric study, but I'm keeping this here in case we ever want to use it on other studies
 filter_unmatched_samples <- function(phyloseq_obj) {
   
   #Make sure only Plaque and Abscess samples are retained
@@ -161,7 +162,7 @@ filter_unmatched_samples <- function(phyloseq_obj) {
 
 ## ---- Filter Phyloseq ----
 #Example:
-#filter_phyloseq(phy_obj_oscc, "OSCC", Contam_g, Contam_f, Contam_s)
+#filter_phyloseq(phy_obj_oscc, "Pediatric", Contam_g, Contam_f, Contam_s)
 
 filter_phyloseq <- function(phylo_obj, study, Contam_g, Contam_f, Contam_s) {
   # Capture the name of the input variable
@@ -239,13 +240,20 @@ process_phyloseq <- function(phylo_obj_fs) {
     dplyr::select(c("Sample", "Abundance", "Genus", "Type")) %>%
     pivot_wider(names_from = "Genus", values_from = "Abundance")
   
-  # Step 7: Dynamically name and assign outputs
+  phylum_csv <- phylo_obj_fs_t_n_pglom_df %>%
+    dplyr::select(c("Sample", "Abundance", "Phylum", "Type")) %>%
+    pivot_wider(names_from = "Phylum", values_from = "Abundance")
+  
+  
+  # Dynamically name and assign outputs
   assign(paste0(phylo_name, "_t_n"), phylo_obj_fs_t_n, envir = .GlobalEnv)
   assign(paste0(phylo_name, "_t_n_pglom_df"), phylo_obj_fs_t_n_pglom_df, envir = .GlobalEnv)
   assign(paste0(phylo_name, "_t_n_gglom_df"), phylo_obj_fs_t_n_gglom_df, envir = .GlobalEnv)
   assign(paste0(phylo_name, "_t_n_sglom_df"), phylo_obj_fs_t_n_sglom_df, envir = .GlobalEnv)
   assign(paste0(phylo_name, "_species_csv"), species_csv, envir = .GlobalEnv)
   assign(paste0(phylo_name, "_genus_csv"), genus_csv, envir = .GlobalEnv)
+  assign(paste0(phylo_name, "_phylum_csv"), phylum_csv, envir = .GlobalEnv)
+  
 }
 
 # ---- Basic Taxa Plots ----
@@ -342,7 +350,8 @@ plot_all_taxa <- function(ps_obj,
 
 # ---- Taxa Trends ----
 
-plot_taxa_shifts <- function(top_number = 10,
+# This is an old function I wrote - it works just as well as the new one, but produces a heatmap kind of thing of counts, and I opted for a bubble plot. That function is defined below this one.
+plot_taxa_shifts_count_plots <- function(top_number = 10,
                              input_df = ps_fs_genus_csv){
   
   # --- This function probably isn't that flexible...it does exactly what I want for this very specific use case.
@@ -555,6 +564,241 @@ plot_taxa_shifts <- function(top_number = 10,
   
 }
 
+# This is the one I actually used! 
+# The new function that plots the taxa trends with bubbles
+plot_taxa_shifts <- function(top_number = 10,
+                             input_df = ps_fs_genus_csv,
+                             bubble_max_size = 10,
+                             count_max = 25) {
+  
+  
+  # --------- Long form + per-taxon stats
+  df_long <- input_df %>%
+    dplyr::select(-Sample) %>%
+    tidyr::pivot_longer(-Type, names_to = "Taxa", values_to = "Abundance")
+  
+  stopifnot(all(c("Type","Taxa","Abundance") %in% names(df_long)))
+  
+  summ <- df_long %>%
+    dplyr::group_by(Taxa) %>%
+    dplyr::summarise(
+      n_plaque      = sum(Type == "Plaque"),
+      n_abscess     = sum(Type == "Abscess"),
+      median_plaque = median(Abundance[Type == "Plaque"],  na.rm = TRUE),
+      median_abscess= median(Abundance[Type == "Abscess"], na.rm = TRUE),
+      mean_plaque   = mean(Abundance[Type == "Plaque"],    na.rm = TRUE),
+      mean_abscess  = mean(Abundance[Type == "Abscess"],   na.rm = TRUE),
+      p = tryCatch(
+        wilcox.test(Abundance[Type == "Plaque"], Abundance[Type == "Abscess"],
+                    exact = FALSE)$p.value,
+        error = function(e) NA_real_
+      ),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      diff_median = median_plaque - median_abscess,
+      diff_mean   = mean_plaque   - mean_abscess,
+      direction   = dplyr::case_when(
+        diff_median >  0 ~ "Plaque",
+        diff_median <  0 ~ "Abscess",
+        TRUE             ~ "Tie"
+      ),
+      padj = p.adjust(p, method = "BH")
+    )
+  
+  # ----- Pick top N per direction + clean taxon labels
+  p_to_stars <- function(p) {
+    ifelse(is.na(p), "",
+           ifelse(p < 0.001, "***",
+                  ifelse(p < 0.01, "**",
+                         ifelse(p < 0.05, "*", ""))))
+  }
+  
+  topN <- summ %>%
+    dplyr::filter(padj <= .05, direction %in% c("Plaque","Abscess")) %>%
+    dplyr::group_by(direction) %>%
+    dplyr::slice_max(order_by = abs(diff_median), n = top_number, with_ties = FALSE) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(
+      Taxa_clean = Taxa %>%
+        stringr::str_remove("^g__") %>%
+        stringr::str_remove_all("s__") %>%
+        stringr::str_replace_all("_", " ") %>%
+        stringr::str_replace_all("G ", "G") %>%
+        stringr::str_remove_all("\\[|\\]"),
+      signed_effect = diff_median,
+      star = p_to_stars(padj)
+    )
+  
+  # y order (smallest signed_effect at bottom, largest at top after coord_flip)
+  y_levels <- topN %>%
+    dplyr::arrange(signed_effect) %>%
+    dplyr::pull(Taxa_clean)
+  y_levels_plot <- rev(y_levels)  # this is the visual top→bottom
+  
+  # offset for star positioning
+  offset <- 0.1 * max(abs(topN$signed_effect), na.rm = TRUE)
+  topN <- topN %>%
+    dplyr::mutate(
+      Taxa_clean = factor(Taxa_clean, levels = y_levels),   # base order
+      label_y = signed_effect + ifelse(signed_effect >= 0, offset, -offset)
+    )
+  
+  # ------ Bar plot (left). Uses y_levels_plot for axis.
+  # define palette for bars
+  colors_all <- c(Plaque = "#3185FC", Abscess = "#FF495C", Tie = "grey70")
+  
+  bar_plot <- ggplot(
+    topN,
+    aes(x = Taxa_clean, y = signed_effect, fill = direction)
+  ) +
+    geom_col(color = "black") +
+    geom_text(aes(y = label_y, label = star), size = 5, vjust = .8) +
+    coord_flip() +
+    # vertical gridlines across categories (optional aesthetic)
+    geom_vline(xintercept = seq(1.5, length(y_levels) - 0.5, 1),
+               color = "black", size = 0.3) +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    scale_x_discrete(limits = y_levels_plot) +  # enforce exact shown order
+    labs(x = NULL, y = "", fill = "Enriched in") +
+    theme_bw(base_size = 12) +
+    theme(
+      axis.text.y = element_text(face = "italic", color="black", size=14),
+      axis.text.x = element_text(angle = 45, color="black", size=11, hjust=1),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      legend.position = "none"
+    ) +
+    scale_fill_manual(values = colors_all)
+  
+  # ---------- Build bubble counts (A vs P) with SAME y
+  tax_pull <- topN %>% dplyr::pull(Taxa)
+  
+  data_pull <- input_df %>%
+    tidyr::pivot_longer(cols = starts_with("g_"), names_to = "Taxa", values_to = "relab") %>%
+    dplyr::filter(Taxa %in% tax_pull) %>%
+    dplyr::mutate(
+      Taxa_clean = Taxa %>%
+        stringr::str_remove("^g__") %>%
+        stringr::str_remove_all("s__") %>%
+        stringr::str_replace_all("_", " ") %>%
+        stringr::str_remove_all("\\[|\\]"),
+      Sample = stringr::str_replace_all(Sample, "-P|-[Aa]", "")
+    ) %>%
+    tidyr::pivot_wider(names_from = "Type", values_from = "relab") %>%
+    dplyr::mutate(
+      Ratio     = Abscess / Plaque,
+      RatioFlag = dplyr::if_else(Ratio > 1, 1, -1, missing = NA_integer_)
+    )
+  
+  df_summary <- data_pull %>%
+    dplyr::group_by(Taxa_clean) %>%
+    dplyr::summarise(
+      Abscess_enriched = sum(RatioFlag == 1,  na.rm = TRUE),
+      Plaque_enriched  = sum(RatioFlag == -1, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  # keep topN order only (and ensure exact order)
+  df_summary <- df_summary %>%
+    dplyr::slice(match(y_levels, Taxa_clean))
+  
+  # long for plotting
+  bubble_df <- df_summary %>%
+    tidyr::pivot_longer(
+      cols = c(Abscess_enriched, Plaque_enriched),
+      names_to = "group2", values_to = "count"
+    ) %>%
+    dplyr::mutate(
+      group2     = dplyr::recode(group2, "Abscess_enriched" = "A", "Plaque_enriched" = "P"),
+      Taxa_clean = factor(Taxa_clean, levels = y_levels) # same base order
+    )
+  
+  # scaffold to guarantee both A and P exist for every taxon (keeps row heights identical)
+  scaffold <- expand.grid(
+    Taxa_clean = factor(y_levels, levels = y_levels),
+    group2     = c("A","P"),
+    KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE
+  )
+  
+  bubble_df_full <- scaffold %>%
+    dplyr::left_join(bubble_df, by = c("Taxa_clean","group2")) %>%
+    dplyr::mutate(count = tidyr::replace_na(count, 0L))
+  
+  bubble_A <- bubble_df_full %>% dplyr::filter(group2 == "A")
+  bubble_P <- bubble_df_full %>% dplyr::filter(group2 == "P")
+  
+  # -------- Bubble plot (right) with the SAME y order
+  bubble_plot <- ggplot() +
+    # Abscess (red)
+    geom_point(
+      data = bubble_A,
+      aes(x = group2, y = Taxa_clean, size = count, fill = count),
+      shape = 21, alpha = 0.9, stroke = 0.4, color = "black"
+    ) +
+    scale_fill_gradientn(
+      colors = c("white", "#FF495C"),
+      limits = c(0, count_max),
+      oob = scales::squish,
+      guide = "none" ,                 # set to colorbar to show a legend
+      name = "Abscess (A)"
+    ) +
+    ggnewscale::new_scale("fill") +
+    # Plaque (blue)
+    geom_point(
+      data = bubble_P,
+      aes(x = group2, y = Taxa_clean, size = count, fill = count),
+      shape = 21, alpha = 0.9, stroke = 0.4, color = "black"
+    ) +
+    scale_fill_gradientn(
+      colors = c("white", "#3185FC"),
+      limits = c(0, count_max),
+      oob = scales::squish,
+      guide = "none",                  # set to colorbar to show a legend
+      name = "Plaque (P)"
+    ) +
+    scale_size_area(
+      name = "Count",
+      max_size = bubble_max_size,
+      limits = c(0, count_max)
+    ) +
+    scale_x_discrete() +
+    # give a hair of vertical breathing room so edge bubbles don't touch frame
+    scale_y_discrete(limits = y_levels_plot, drop = TRUE, expand = expansion(mult = c(0, 0.02))) +
+    coord_cartesian(clip = "off") +
+    labs(x = NULL, y = NULL) +
+    theme_bw(base_size = 12) +
+    theme(
+      panel.border = element_blank(),   # <-- remove the panel border
+      axis.line    = element_blank(),   # (optional) remove axis lines too
+      text = element_text(color = "black"),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      strip.background = element_blank(),
+      axis.text.x = element_text(size = 11),
+      axis.text.y = element_text(face = "italic", size = 12),
+      legend.position = "right",
+      legend.box = "horizontal"
+    )
+  
+  # ------- Stitch (bar left, bubbles right)
+  combined <- bar_plot +
+    (bubble_plot +
+       labs(x = NULL) +
+       theme(axis.text.x = element_blank(),
+             axis.ticks.x = element_blank())) +
+    plot_layout(widths = c(3, 1)) 
+  
+  list(
+    bar_plot     = bar_plot,
+    bubble_plot  = bubble_plot,
+    combined_plot= combined,
+    data         = summ,
+    bubble_data  = bubble_df_full
+  )
+}
+
+
 # ---- Ordinations ----
 
 ## ---- Ordinations with Microviz ----
@@ -648,14 +892,6 @@ compare_ordination_methods <- function(phyloseq_obj,
                                        ord_calc_methods = c("PCA", "PCoA", "NMDS"),
                                        No_axes_to_correlated_with_LibSize = 2,
                                        variance_threshold = 0.80) { #find the number of axes needed for PCA and PCoA that explain this percent of variance  
-  library(phyloseq)
-  library(vegan)
-  library(cluster)
-  library(dplyr)
-  library(tibble)
-  library(purrr)
-  library(digest)
-  library(ggplot2)
   
   #Create a parameter hash so that you can just load results if they've already been run in an identical way
   param_hash <- digest(list(
@@ -919,13 +1155,7 @@ run_ordination_with_validation <- function(phyloseq_obj,
                                            Axis_1 = "Axis1",
                                            Axis_2 = "Axis2",
                                            colors_list = NULL) {
-  library(phyloseq)
-  library(vegan)
-  library(ggplot2)
-  library(dplyr)
-  library(tibble)
-  library(rlang)
-  
+
   # Validator
   validate_transformation_distance <- function(trans_type, dist_type, ord_method) {
     ord_method <- toupper(ord_method)
@@ -1135,16 +1365,13 @@ run_ordination_with_validation <- function(phyloseq_obj,
   ))
 }
 
-## ---- Analyze Sil Score ----
+## ---- Analyze Silhouette Score ----
 
 # Analyze Silhouette score using "Type" as cluster label and return plot
 analyze_type_clustering_on_pca <- function(scores_df,
                                            component_num = 2,
                                            colors_list = NULL) {
-  library(ggplot2)
-  library(dplyr)
-  library(cluster)
-  
+
   # Extract PCA axes
   pca_matrix <- scores_df[, paste0("Axis", 1:component_num)]
   
@@ -1386,6 +1613,147 @@ iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval
 }
 
 
+# Function to do the same iterrations, but with the picrust2 output
+iterate_maaslin2_picrust2 <- function(counts_input, metadata, iterative_methods, group, qval_threshold, percentage, plot_colors) {
+  
+  # Define the options for each parameter
+  analysis_methods <- c("LM", "CPLM", "ZINB", "NEGBIN")
+  transforms <- c("NONE", "LOG", "LOGIT", "AST")
+  normalizations <- c("TSS", "TMM", "CSS", "CLR")
+  enriched_taxa <- list()
+  
+  # Generate all combinations using expand.grid
+  combinations <- expand.grid(analysis_method = analysis_methods,
+                              transform = transforms,
+                              normalization = normalizations)
+  
+  # Convert each row into a list and store in a list
+  iterative_methods <- apply(combinations, 1, function(x) {
+    list(analysis_method = x["analysis_method"],
+         transform = x["transform"],
+         normalization = x["normalization"])
+  })
+  
+  # Create a unique hash for the parameters
+  param_hash <- digest(list(counts_input, group, qval_threshold))
+  # File path for the analysis results
+  result_file <- file.path("..saved_analysis_files/", paste0("iterative_maaslin2_picrust2_result_", param_hash, ".rds"))
+  
+  
+  # Initialize an empty data frame to store results
+  summary_table <- data.frame(
+    analysis_method = character(),
+    transform = character(),
+    normalization = character(),
+    significant_features = integer(),
+    stringsAsFactors = FALSE
+  )
+  
+  
+  # Loop through each combination of parameters
+  for (params in iterative_methods) {
+    
+    # Extract parameters for the current iteration
+    analysis_method <- params$analysis_method
+    transform <- params$transform
+    normalization <- params$normalization
+    
+    # Run Maaslin2 with current parameters inside tryCatch
+    tryCatch({
+      maaslin2_results <- Maaslin2(
+        counts_input,
+        metadata,
+        fixed_effects = group,
+        plot_heatmap = FALSE,
+        plot_scatter = FALSE,
+        output = "../saved_analysis_files/maaslin_iterations",
+        analysis_method = analysis_method,
+        normalization = normalization,
+        transform = transform
+      )
+      
+      # Filter results based on q-value threshold
+      maaslin_res_filt <- maaslin2_results$results %>% 
+        as.data.frame() %>%
+        filter(qval <= qval_threshold)
+      
+      # Count unique significant features
+      significant_count <- length(unique(maaslin_res_filt$feature))
+      features_list <- unique(maaslin_res_filt$feature)
+      features_list_str <- paste(features_list, collapse = ", ")
+      
+      
+      # Append results to the summary table
+      summary_table <- rbind(summary_table, data.frame(
+        analysis_method = analysis_method,
+        transform = transform,
+        normalization = normalization,
+        significant_features = significant_count,
+        features_list = features_list_str,
+        stringsAsFactors = FALSE
+      ))
+      
+    }, error = function(e) {
+      # Print an error message and skip to the next iteration
+      message(paste("Error in Maaslin2 for parameters:",
+                    "analysis_method =", analysis_method,
+                    "transform =", transform,
+                    "normalization =", normalization))
+      message("Error details:", e$message)
+    })
+    
+    
+  }
+  
+  
+  if (percentage == TRUE) {
+    
+    #Get the number of unique taxa for the proportion calc
+    total_path <- nrow(counts_input)
+    print(paste0("Total pathways: ", total_path))
+    
+    summary_table  <- summary_table %>%
+      mutate(normalization_transform = paste(normalization, transform, sep = "_")) %>%
+      mutate(percent_significant_features = round(((significant_features/total_path)*100), 0)) 
+    
+    p <- summary_table %>%
+      ggplot(., aes(x = analysis_method, y = percent_significant_features, fill = normalization_transform)) +
+      geom_col(position = position_dodge(width = .8), width = 0.5, color="black") +
+      geom_text(aes(label = percent_significant_features), 
+                position = position_dodge(width = 0.8), 
+                vjust = -0.5, size = 2) +  # Ensure labels match bar positions      theme_bw(base_size = 14) +
+      theme_bw(base_size = 14) +
+      theme(strip.text.x = element_text(size = 16))+
+      labs(
+        title = "Significant Features by Analysis Method, Resolution, and Normalization",
+        x = "Analysis Method",
+        y = "% of Total Features Found Signficiant"
+      ) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+      scale_fill_manual(values = plot_colors) + 
+      ylim(0, 100) 
+    
+  }else if (percentage == FALSE) {
+    
+    p <- summary_table %>%
+      mutate(normalization_transform = paste(normalization, transform, sep = "_")) %>%
+      ggplot(., aes(x = analysis_method, y = significant_features, fill = normalization_transform)) +
+      geom_col(position = position_dodge(width = .8), width = 0.5, color="black") +
+      geom_text(aes(label = significant_features), 
+                position = position_dodge(width = 0.8), 
+                vjust = -0.5, size = 2) +  # Ensure labels match bar positions
+      theme(strip.text.x = element_text(size = 16))+
+      theme_bw(base_size = 14) +
+      labs(
+        title = "Significant Features by Analysis Method, Resolution, and Normalization",
+        x = "Analysis Method",
+        y = "Significant Features"
+      ) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+      scale_fill_manual(values = plot_colors)
+  }
+  return(list(plot = p, results = summary_table))  
+}
 
 
 ### Run Maaslin2
@@ -2150,12 +2518,11 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
   clean_taxon <- function(x) {
     x  %>%
       stri_trans_nfkc() %>%                 # Unicode normalize
+      stringr::str_replace_all("^(g_|s_|p_)", "") %>%
       str_replace_all("\\p{Z}+", " ")  %>%  # any Unicode space class -> single space
       str_squish() %>%                     # trim + collapse internal spaces
       str_replace_all("[\\p{P}\\p{S}]+", " ")  %>%  # drop punctuation/symbols
       str_replace_all("-", "")  %>%        
-      str_replace_all("^p", "")  %>% 
-      str_replace_all("^g", "")  %>%
       str_replace_all(" s ", " ")  %>%
       str_replace_all(" F ", " F")  %>%
       str_replace_all(" G ", " G")  %>%
@@ -2314,20 +2681,35 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
       na = "white"
     )
 
-    # Freeze y order so all layers align
-    taxon_levels <- df_plot_plaque %>%
-      dplyr::arrange(enrichment, confidence, taxon) %>%
-      pull(taxon) %>% unique()
+    # Exact global order used by bubbles (per-enrichment), reversed once
+    y_levels_plaque <- df_plot %>%
+      dplyr::filter(enrichment == "Plaque") %>%
+      dplyr::arrange(confidence, taxon) %>%   # alphabetical within each confidence
+      dplyr::pull(taxon) %>%
+      unique()
     
-    df_plot_plaque <- df_plot_plaque %>% mutate(taxon = factor(taxon, levels = taxon_levels))
 
+    df_plot_plaque <- df_plot_plaque %>%
+      dplyr::mutate(taxon = forcats::fct_rev(factor(taxon, levels = y_levels_plaque)))
+
+    print(df_plot_plaque %>% filter(confidence == "Low"))
+    
+    
+     #I guess you have to do this to get the ordering correct! So annoying.
+    scaffold_plaque <- df_plot_plaque %>% distinct(confidence, taxon)
+    
+    
     # Build plot
     p_plaque <- ggplot() +
+      geom_blank(data = scaffold_plaque, aes(x = 0, y = taxon)) +  # again, for ordering
+
       # Column 1: MaAsLin2
       geom_tile(
         data = df_plot_plaque %>% filter(!is.na(Maaslin2_coef)),
         aes(x = x_pos["Maaslin2"], y = taxon, fill = Maaslin2_coef),
         color = "black",    # border color
+        width = 1,            # <— make the tile fill the column
+        height = 1, 
         size = 0.3              # border thickness
       ) +
       scale_fill_gradient2(
@@ -2349,6 +2731,8 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
         data = df_plot_plaque %>% filter(!is.na(ANCOMBC2_LFC)),
         aes(x = x_pos["ANCOMBC2"], y = taxon, fill = ANCOMBC2_LFC),
         color = "black",    # border color
+        width = 1,            # <— make the tile fill the column
+        height = 1, 
         size = 0.3              # border thickness
       ) +
       scale_fill_gradient2(
@@ -2370,6 +2754,8 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
         data = df_plot_plaque %>% filter(!is.na(Aldex2_EF)),
         aes(x = x_pos["ALDEx2"], y = taxon, fill = Aldex2_EF),
         color = "black",    # border color
+        width = 1,            # <— make the tile fill the column
+        height = 1, 
         size = 0.3              # border thickness
       ) +
       scale_fill_gradient2(
@@ -2384,9 +2770,15 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
         aes(x = x_pos["ALDEx2"], y = taxon, label = stars_aldex2),
         size = 5, vjust = .8
       ) +
-      
-      scale_x_continuous(breaks = x_pos, labels = x_lab,
-                         expand = expansion(mult = c(0.02, 0.02))) +
+      scale_x_continuous(
+        breaks = x_pos, labels = x_lab,
+        limits = c(min(x_pos) - 0.5, max(x_pos) + 0.5),  # <— half-step limits
+        expand = expansion(mult = c(0, 0))               # <— no padding
+      ) +
+      scale_y_discrete(
+        drop   = TRUE,
+        expand = expansion(mult = c(0, 0))  # <-- add this
+      ) +
       facet_grid(confidence ~ ., scales = "free_y", space = "free_y") +
       labs(x = NULL, y = NULL) +
       coord_cartesian(clip = "off") +
@@ -2417,21 +2809,30 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
     )
   
 
-
-    # Freeze y order so all layers align
-    taxon_levels <- df_plot_abscess %>%
-      dplyr::arrange(enrichment, confidence, taxon) %>%
-      pull(taxon) %>% unique()
+    # Exact global order used by bubbles (per-enrichment), reversed once
+    y_levels_abscess <- df_plot %>%
+      dplyr::filter(enrichment == "Abscess") %>%
+      dplyr::arrange(confidence, taxon) %>%   # alphabetical within each confidence
+      dplyr::pull(taxon) %>%
+      unique()
     
-    df_plot_abscess <- df_plot_abscess %>% mutate(taxon = factor(taxon, levels = taxon_levels))
-
+    df_plot_abscess <- df_plot_abscess %>%
+      dplyr::mutate(taxon = forcats::fct_rev(factor(taxon, levels = y_levels_abscess)))
+    
+    #I guess you have to do this to get the ordering correct! So annoying.
+    scaffold_abscess <- df_plot_abscess %>% distinct(confidence, taxon)
+    
     # Build plot
     a_plot <- ggplot() +
+      geom_blank(data = scaffold_abscess, aes(x = 0, y = taxon)) +  # again, for ordering
+      
       # Column 1: MaAsLin2
       geom_tile(
         data = df_plot_abscess %>% filter(!is.na(Maaslin2_coef)),
         aes(x = x_pos["Maaslin2"], y = taxon, fill = Maaslin2_coef),
         color = "black",    # border color
+        width = 1,            # <— make the tile fill the column
+        height = 1, 
         size = 0.3              # border thickness
       ) +
       scale_fill_gradient2(
@@ -2453,6 +2854,8 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
         data = df_plot_abscess %>% filter(!is.na(ANCOMBC2_LFC)),
         aes(x = x_pos["ANCOMBC2"], y = taxon, fill = ANCOMBC2_LFC),
         color = "black",    # border color
+        width = 1,            # <— make the tile fill the column
+        height = 1, 
         size = 0.3              # border thickness
       ) +
       scale_fill_gradient2(
@@ -2474,6 +2877,8 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
         data = df_plot_abscess %>% filter(!is.na(Aldex2_EF)),
         aes(x = x_pos["ALDEx2"], y = taxon, fill = Aldex2_EF),
         color = "black",    # border color
+        width = 1,            # <— make the tile fill the column
+        height = 1, 
         size = 0.3              # border thickness
       ) +
       scale_fill_gradient2(
@@ -2488,33 +2893,308 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
         aes(x = x_pos["ALDEx2"], y = taxon, label = stars_aldex2),
         size = 5, vjust = .8
       ) +
-    
-      scale_x_continuous(breaks = x_pos, labels = x_lab,
-                         expand = expansion(mult = c(0.02, 0.02))) +
-      facet_grid(confidence ~ ., scales = "free_y", space = "free_y") +
-      labs(x = NULL, y = NULL) +
-      coord_cartesian(clip = "off") +
-      theme_bw(base_size = 12) +
-      theme(
-        text = element_text(color = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        strip.background = element_blank(),   # removes the rectangle border
-        panel.spacing.x = unit(0.6, "lines"),
-        strip.text = element_text(size = 12, face = "bold"),
-        strip.text.y = element_text(angle = 0, vjust = 0.5, hjust = 0.5),
-        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12),
-        axis.text.y = element_text(face = "italic", color = "black", size = 12)
+      scale_x_continuous(
+        breaks = x_pos, labels = x_lab,
+        limits = c(min(x_pos) - 0.5, max(x_pos) + 0.5),  # <— half-step limits
+        expand = expansion(mult = c(0, 0))               # <— no padding
       ) +
-      theme(
-        legend.position = "bottom",
-        legend.box = "vertical"  
-      )
-    
+      scale_y_discrete(
+        drop   = TRUE,
+        expand = expansion(mult = c(0, 0))  # <-- add this
+      ) +
+  facet_grid(confidence ~ ., scales = "free_y", space = "free_y") +
+  labs(x = NULL, y = NULL) +
+  coord_cartesian(clip = "off") +
+  theme_bw(base_size = 12) +
+  theme(
+    text = element_text(color = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.background = element_blank(),   # removes the rectangle border
+    panel.spacing.x = unit(0.6, "lines"),
+    strip.text = element_text(size = 12, face = "bold"),
+    strip.text.y = element_text(angle = 0, vjust = 0.5, hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12),
+    axis.text.y = element_text(face = "italic", color = "black", size = 12)
+  ) + 
+  theme(
+    legend.position = "bottom",
+    legend.box = "vertical"  
+  )
+
     
     return(list(results = DA_results_df, plaque_plot = p_plaque, abscess_plot = a_plot, df_plot = df_plot))
 }
-    
+
+# This is the function I actually used for plotting - combines the results of the function above with a bubble plot for asessing robustness.
+combine_DA_with_bubbles <- function(da, 
+    CSV_formatted_relab_df,
+    group, tax_level,
+    filter_confidence = NULL,
+    heatmap_side = c("Plaque","Abscess"),
+    bubble_max_size = 8,
+    plot_layout_widths = c(2, 1)){
+  
+  
+  require(dplyr); require(stringr); require(tidyr)
+  require(ggplot2); require(forcats); require(patchwork)
+  require(ggnewscale); require(purrr)
+  
+  heatmap_side <- match.arg(heatmap_side)
+  
+  # ------ Get output of combine_DA function
+  heatmap_plot <- if (heatmap_side == "Plaque") da$plaque_plot else da$abscess_plot
+  
+  df_plot <- da$df_plot %>%
+    mutate(
+      confidence = factor(confidence, levels = c("High","Medium","Low")),
+      taxon = as.character(taxon)
+    )
+  
+  # --------- Bubble plot data with robust CANONICAL MAPPING (fixes weird names)
+  # One canonical normalizer used on BOTH sides
+  canon_taxon <- function(x) {
+    x %>%
+      stringi::stri_trans_nfkc() %>%          # Unicode normalize
+      stringr::str_to_lower() %>%             # casefold
+      # strip rank prefixes (at start or after ; | or space)
+      stringr::str_replace_all("(^|[;|\\|[:space:]])(?:[kpcofgs]__)", "\\1") %>%
+      # legacy single-underscore prefixes
+      stringr::str_replace_all("^(g_|s_|p_)", "") %>%
+      # species suffix artifact
+      stringr::str_replace_all("_s__", " ") %>%
+      # TM7 / G group variants: normalize separators like G1, G-1, G 1 -> g1
+      stringr::str_replace_all("\\b[gG][\\s_-]*([0-9]+)\\b", " g\\1") %>%
+      # normalize tm7 tokens (tm-7, tm_7, tm 7) -> tm7
+      stringr::str_replace_all("\\btm[\\s_-]*([0-9]+)\\b", " tm\\1") %>%
+      # remove brackets
+      stringr::str_replace_all("\\[|\\]", "") %>%
+      # underscores/hyphens -> space; drop symbols/punct
+      stringr::str_replace_all("[_\\-]+", " ") %>%
+      stringr::str_replace_all("[\\p{P}\\p{S}]+", " ") %>%
+      stringr::str_squish()
+  }
+  
+  enrich_pick <- if (heatmap_side == "Plaque") "Plaque" else "Abscess"
+  
+  # DA taxon set (only those shown on the selected side), with canonical key
+  da_taxa <- df_plot %>%
+    filter(enrichment == enrich_pick) %>%
+    distinct(taxon, confidence) %>%
+    mutate(taxon_canon = canon_taxon(taxon))
+  
+  # --- Build a column map for the CSV taxa *first*, so we can collapse synonyms
+  tax_cols <- grep("^(k|p|c|o|f|g|s)__|^(g_|s_|p_)", names(CSV_formatted_relab_df), value = TRUE)
+  
+  csv_tax_map <- tibble(
+    tax_orig  = tax_cols,
+    tax_canon = canon_taxon(tax_cols)
+  )
+  
+  # Keep only CSV taxa whose canonical key appears in DA on this side
+  keep_keys <- unique(da_taxa$taxon_canon)
+  csv_tax_map_keep <- csv_tax_map %>% filter(tax_canon %in% keep_keys)
+  
+  
+  # --- Melt CSV, canonicalize taxon names, standardize Type, collapse synonyms
+  csv_long <- CSV_formatted_relab_df %>%
+    pivot_longer(cols = all_of(csv_tax_map_keep$tax_orig),
+                 names_to = "tax_orig", values_to = "relab") %>%
+    dplyr::left_join(csv_tax_map_keep, by = "tax_orig") %>%
+    mutate(
+      # Standardize Type values robustly
+      Type = case_when(
+        tolower(Type) %in% c("p","plaque")  ~ "Plaque",
+        tolower(Type) %in% c("a","abscess") ~ "Abscess",
+        TRUE ~ as.character(Type)
+      ),
+      Sample = str_replace_all(Sample, "-P|-[Aa]", "")
+    ) %>%
+    group_by(Sample, Type, tax_canon) %>%
+    dplyr::summarise(relab = sum(relab, na.rm = TRUE), .groups = "drop")  # collapse synonyms -> one key
+  
+  # Pivot to wide by Type
+  csv_wide <- csv_long %>%
+    pivot_wider(names_from = "Type", values_from = "relab", values_fill = 0)
+  
+  # Ensure both Abscess and Plaque columns exist
+  if (!"Abscess" %in% names(csv_wide)) csv_wide$Abscess <- 0
+  if (!"Plaque"  %in% names(csv_wide)) csv_wide$Plaque  <- 0
+  
+  data_pull <- csv_wide %>%
+    mutate(
+      Ratio     = ifelse(Plaque == 0 & Abscess == 0, NA_real_, Abscess / dplyr::na_if(Plaque, 0)),
+      RatioFlag = case_when(
+        is.na(Ratio) ~ NA_integer_,
+        Ratio > 1    ~ 1L,   # Abscess enriched
+        TRUE         ~ -1L    # Plaque enriched (ties & <=1)
+      )
+    )
+  
+  df_summary_canon <- data_pull %>%
+    dplyr::group_by(tax_canon) %>%
+    dplyr::summarise(
+      Abscess_enriched = sum(RatioFlag == 1,  na.rm = TRUE),
+      Plaque_enriched  = sum(RatioFlag == -1, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  # Join back to DA (original taxon label + confidence) by canonical key
+  bubble_df <- da_taxa %>%
+    dplyr::left_join(df_summary_canon, by = c("taxon_canon" = "tax_canon")) %>%
+    dplyr::mutate(
+      Abscess_enriched = replace_na(Abscess_enriched, 0L),
+      Plaque_enriched  = replace_na(Plaque_enriched, 0L)
+    ) %>%
+    select(taxon, confidence, Abscess_enriched, Plaque_enriched) %>%
+    pivot_longer(
+      cols = c(Abscess_enriched, Plaque_enriched),
+      names_to = "group2", values_to = "count"
+    ) %>%
+    mutate(
+      group2     = recode(group2, "Abscess_enriched"="A", "Plaque_enriched"="P"),
+      confidence = factor(confidence, levels = c("High","Medium","Low"))
+    )
+  
+
+  # -------- Exact y-order, and per-facet scaffold (no extras; height matches)
+  y_levels <- df_plot %>%
+    filter(enrichment == enrich_pick) %>%
+    arrange(enrichment, confidence, taxon) %>%
+    pull(taxon) %>% unique() %>% rev()
+  
+  # Lock bubble_df to global levels (order identical to heatmap)
+  bubble_df <- bubble_df %>%
+    mutate(taxon = factor(taxon, levels = y_levels))
+  
+  taxa_by_conf <- df_plot %>%
+    dplyr::filter(enrichment == enrich_pick) %>%
+    dplyr::group_by(confidence) %>%
+    dplyr::summarise(
+      facet_taxa = list(y_levels[y_levels %in% unique(taxon)]),
+      .groups = "drop"
+    )
+  
+  scaffold <- map_dfr(seq_len(nrow(taxa_by_conf)), function(i) {
+    conf_i <- taxa_by_conf$confidence[i]
+    tax_i  <- taxa_by_conf$facet_taxa[[i]]
+    expand.grid(
+      confidence = factor(conf_i, levels = c("High","Medium","Low")),
+      taxon      = factor(tax_i, levels = y_levels),
+      group2     = c("A","P"),
+      stringsAsFactors = FALSE
+    )
+  })
+  
+  bubble_df_full <- scaffold %>%
+    dplyr::left_join(bubble_df, by = c("confidence","taxon","group2")) %>%
+    dplyr::mutate(count = replace_na(count, 0L))
+  
+  bubble_A <- bubble_df_full %>% filter(group2 == "A")
+  bubble_P <- bubble_df_full %>% filter(group2 == "P")
+  
+
+  # ------- Bubble plot (independent color ramps; shared size)
+  bubble_plot <- ggplot() +
+    # Abscess (red)
+    geom_point(
+      data = bubble_A,
+      aes(x = group2, y = taxon, size = count, fill = count),
+      shape = 21, alpha = 0.9, stroke = 0.4, color = "black"
+    ) +
+    # geom_text(
+    #   data = bubble_A,
+    #   aes(x = group2, y = taxon, label = count),
+    #   size = 3, vjust = 0.5
+    # ) +
+    scale_fill_gradientn(
+      colors = c("white", "#FF495C"),
+      limits = c(0, 25),
+      breaks = seq(0, 25, 5),        # <-- force 25 to appear
+      oob = scales::squish,
+      guide = "none"
+    ) +
+    ggnewscale::new_scale("fill") +
+    # Plaque (blue)
+    geom_point(
+      data = bubble_P,
+      aes(x = group2, y = taxon, size = count, fill = count),
+      shape = 21, alpha = 0.9, stroke = 0.4, color = "black"
+    ) +
+    # geom_text(
+    #   data = bubble_P,
+    #   aes(x = group2, y = taxon, label = count),
+    #   size = 3, vjust = 0.5
+    # ) +
+    scale_fill_gradientn(
+      colors = c("white", "#3185FC"),
+      limits = c(0, 25),
+      breaks = seq(0, 25, 5),        # <-- force 25 to appear
+      oob = scales::squish,
+      guide = "none"
+    ) +
+    scale_size_area(max_size = bubble_max_size, limits = c(0, NA)) +
+    scale_x_discrete(labels = c(A = "A", P = "P")) +
+    facet_grid(confidence ~ ., scales = "free_y", space = "free_y") +
+    coord_cartesian(clip = "off") +
+    labs(x = NULL, y = NULL, size = "Count") +
+    theme_bw(base_size = 12) +
+    theme(
+      text = element_text(color = "black"),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 12, face = "bold"),
+      strip.text.y = element_text(angle = 0, vjust = 0.5, hjust = 0.5),
+      axis.text.x = element_text(size = 11),
+      axis.text.y = element_text(face = "italic", size = 12),
+      legend.position = "bottom",
+      legend.box = "horizontal",
+      legend.direction = "horizontal"
+    )
+  
+  
+  # Size legend (make sure it shows 25)
+  scale_size_area(
+    name = "Count",
+    max_size = bubble_max_size,
+    limits = c(0, 25),
+    breaks = seq(0, 25, 5),        # <-- include 25 explicitly
+    guide = guide_legend(
+      override.aes = list(fill = "grey95", color = "black")
+    )
+  )
+  
+  bubble_plot <- bubble_plot +
+    scale_size_area(name="Count", limits=c(0,25), breaks=c(0,5,10,15,25),
+                    guide = guide_legend(nrow = 3, byrow = TRUE, direction = "horizontal"))
+  
+  combined <- (heatmap_plot + bubble_plot + plot_layout(widths = plot_layout_widths, guides = "collect")) &
+    theme(legend.position = "bottom", legend.box = "horizontal")
+  
+  heatmap_noleg <- heatmap_plot + theme(legend.position = "none", 
+                                        axis.title.y = element_blank(),
+                                        axis.ticks.y = element_blank(),
+                                        axis.text.y  = element_blank(),
+                                        axis.text.x  = element_blank())
+  bubble_noleg  <- bubble_plot  + theme(legend.position = "none", 
+                                        axis.title.y = element_blank(),
+                                        axis.ticks.y = element_blank(),
+                                        axis.text.y  = element_blank())
+  
+  combined_nolabs <- heatmap_noleg + 
+    bubble_noleg 
+
+  list(
+    results       = da$results,
+    heatmap       = heatmap_plot,
+    bubble_plot   = bubble_plot,
+    combined_plot = combined,
+    combined_plot_nolabs = combined_nolabs,
+    bubble_data   = bubble_df_full
+  )
+}
+
 
 
 
@@ -3178,78 +3858,87 @@ topic_membership <- function(lda_result, type_column, colors, g_df){
       ) %>%
       mutate(topic = factor(topic, levels = sort(unique(topic))))
 
-      ggplot(topics_long_type, aes(x = !!sym(type_column), y = gamma, fill = !!sym(type_column))) +
-        geom_boxplot() +
-        scale_fill_manual(values = colors) +
-        facet_wrap(
-          ~ topic,
-          labeller = labeller(topic = ~ paste0("Topic ", .x))  # "Topic 1", "Topic 2", ...
-        ) +
-        labs(x = type_column, y = expression(gamma)) +
-        theme_bw() +
-        theme(
-          strip.background = element_rect(fill = "white", color = "black"),  # white facet box
-          strip.text = element_text(face = "bold", size = 12),
-        )
+    # Run Wilcoxon test (default) or t.test
+    pvals <- topics_long_type %>%
+      dplyr::group_by(topic) %>%
+      dplyr::summarise(
+        p_value = wilcox.test(gamma ~ Type)$p.value,
+        .groups = "drop"
+      ) %>%
+      mutate(p_adj = p.adjust(p_value, method = "fdr"))  # adjust for multiple testing
+    
+    
+    ggplot(topics_long_type, aes(x = Type, y = gamma, fill = Type)) +
+      geom_boxplot() +
+      scale_fill_manual(values = colors) +
+      facet_wrap(~ topic, labeller = labeller(topic = ~ paste0("Topic ", .x))) +
+      labs(x = "Type", y = expression(gamma)) +
+      theme_bw() +
+      theme(
+        strip.background = element_rect(fill = "white", color = "black"),
+        strip.text = element_text(face = "bold", size = 12)
+      ) +
+      stat_compare_means(
+        aes(label = paste0("p=", ..p.format..)),
+        method = "wilcox.test",
+        label.y = 0.6   # move lower on the y-axis
+        
+      )
 }
 
 
 
 
-
 ### Heatmap of rel abundance in original data of top taxa
-#This is throwing an error with some ps objects, so I need to troubleshoot
-
-relab_heatmap <- function(lda_results, psobj, rank, type_column, topic_no, n_top_words, b_df){
-
-    #Gather a list of all the most important taxa(words) in the topic
-    taxa_list <- b_df %>%
-      filter(topic == topic_no) %>%
-      top_n(n_top_words, beta) %>% #takes the words with the top 10 beta scores
-      distinct(term) %>%
-      pull(term)
-    
-    #Agglomerate your phyloseq object at the desired level
-    core_ps <- tax_glom(psobj, taxrank = rank)
-    core_ps <- norm_tss(core_ps)
-    
-    tax_mat <- psmelt(core_ps) %>%
-                dplyr::select(c("Sample", "Abundance", rank)) %>%
-                pivot_wider(names_from = rank, values_from = "Abundance") %>%
-                select(any_of(taxa_list), Sample)
-
-    tax_mat_type <- meta_data%>% select(type_column) %>% 
-          rownames_to_column(var="Sample") %>% 
-          merge.data.frame(tax_mat, by="Sample")%>%
-          mutate(!!type_column := as.character(!!sym(type_column))) %>%  # Convert to character to ensure alphabetical sorting
-          dplyr::arrange(!!sym(type_column)) 
-
-    #Set annotation colors
-    type_annot <- meta_data %>%
-      select(c(type_column))
-    ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
-    
-            
-    data <- tax_mat_type %>% 
-      select(-type_column) %>% 
-      remove_rownames() %>% column_to_rownames(var="Sample") %>% t()
-    
-    if (ncol(data) == 0 || any(!is.finite(range(data, na.rm = TRUE)))) {
-      stop("Heatmap input matrix has no finite values. Check taxonomic rank or taxa list.")
-    }
-    
-    pheatmap(log10((100*data) + .00001),
-             annotation_col = type_annot,  # Add column annotations
-             scale = "none",               # Scale rows (optional)
-             cluster_rows = FALSE,         # Cluster rows
-             cluster_cols = FALSE,         # Cluster columns
-             color = colorRampPalette(c("#564592",  "white", "#D7CF07"))(50),  # Custom color palette
-             show_rownames = TRUE,        # Show row names
-             show_colnames = FALSE,         # Show column names
-             annotation_colors = ann_colors,
-             main = paste0("Topic ", topic_no)
-    )  
-    
+heatmap_by_topic <- function(b_df = result$b_df, normalized_count_table = ps_fs_genus_csv, n_top = 15, topic_no = 1){
+  
+  top_terms <- b_df %>% 
+    dplyr::filter(topic == topic_no) %>%
+    top_n(n_top, beta) %>%
+    ungroup() %>%
+    mutate(
+      topic = factor(topic),
+      # remove leading g__ and trailing _1/_2/_3
+      term = gsub("^g__", "", term),
+      term = str_replace_all(term, "\\.", ""),
+      term = str_replace_all(term, "_", " "),
+      term = str_replace_all(term, "__(1|2|3)$", "")
+    ) 
+  
+  data <- normalized_count_table %>%
+    dplyr::arrange(Type) %>%
+    mutate(Type := as.character(Type)) %>%  # Convert to character to ensure alphabetical sorting
+    dplyr::arrange(Type) %>% 
+    select(-Type) %>% 
+    column_to_rownames(var="Sample") %>% 
+    as.matrix() %>% t() %>% as.data.frame() %>%
+    rownames_to_column(var="term") %>%
+    mutate(term = gsub("^g__", "", term),
+           term = str_replace_all(term, "\\.", ""),
+           term = str_replace_all(term, "_", " "),
+           term = str_replace_all(term, "__(1|2|3)$", "")
+    ) %>%
+    filter(term %in% top_terms$term) %>%
+    column_to_rownames(var="term")
+  
+  
+  type_annot <- ps_fs_genus_csv %>%
+    select(c(Type, Sample)) %>% column_to_rownames(var="Sample")
+  
+  ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
+  
+  # Create the heatmap
+  p <- pheatmap(log(data),
+                annotation_col = type_annot,  # Add column annotations
+                scale = "none",               # Scale rows (optional)
+                cluster_rows = FALSE,         # Cluster rows
+                cluster_cols = FALSE,         # Cluster columns
+                color = colorRampPalette(c( "#564592", "white", "#D7CF07"))(100),  # Custom color palette
+                show_rownames = TRUE,        # Show row names
+                show_colnames = FALSE,         # Show column names
+                annotation_colors = ann_colors 
+  )
+  return(heatmap = p)
 }
 
 
@@ -3414,4 +4103,29 @@ correlations <- function(taxa_csv = ps_fs_genus_csv, top_n = 25){
     )
   
   return(list(data = df_plot, alluvial=p_alluvial, bubble_plot = p_bubble))
+}
+
+
+
+
+# Wilcoxon Test
+wilcox_tests <- function(df) {
+  
+  df <- df %>% column_to_rownames(var="Sample")
+  
+  taxa <- setdiff(names(df), "Type")
+  
+  pvals <- sapply(taxa, function(taxon) {
+    x <- df[df$Type == "Plaque", taxon]
+    y <- df[df$Type == "Abscess", taxon]
+    wilcox.test(x, y)$p.value
+  })
+  
+  results <- data.frame(
+    Taxon = taxa,
+    pval = pvals,
+    FDR = p.adjust(pvals, method = "fdr")
+  ) %>% remove_rownames() %>%
+    arrange(FDR)
+  return(results)
 }

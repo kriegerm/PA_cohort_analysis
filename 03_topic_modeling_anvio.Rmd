@@ -1,0 +1,326 @@
+---
+title: "03 Topic Modeling with Anvio Results"
+author: "Madeline Krieger"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    theme: "cosmo"
+    code_folding: "show"
+params:
+    output_suffix: NULL
+
+---
+
+```{r setup, include=FALSE}
+library(config)
+
+#CHANGE THIS CHUNK based on if you want to run Pediatric (default) or Adult Abscess (adult)
+cfg <- config::get(config = "default")
+
+knitr::opts_chunk$set(message = FALSE,
+                      warning = FALSE,
+                      error = FALSE,
+                      fig.path = cfg$figs,
+                      fig.keep = "all",
+                      dev = c("png"),
+                      cache = FALSE,
+                      # Do not use lazy loading which fails for large objects
+                      cache.lazy = FALSE)
+```
+
+
+# Load and Define
+
+## Load packages and presets
+### Packages
+```{r 1.1_load-packages}
+library("pacman")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "cowplot", "MicrobiomeStat", "randomForest", "caret", "mlbench", "MLmetrics", "mia", "here", "patchwork", "digest", "ANCOMBC", "Maaslin2", "microbiomeMarker", "fantaxtic", "topicmodels", "ldatuning", "umap", "tidytext", "cluster", "randomForest", "caret", "microbiome", "umap", "viridis", "ComplexHeatmap", "circlize", "ggnewscale", "stringi", "corrplot", "ggalluvial", "Hmisc")
+
+here::i_am("03_topic_modeling_anvio.Rmd")
+``` 
+
+
+###  My packages
+I was able to take some of these functions directly from the Topic Modeling functions in my cutstom Functions (used previously for taxa). However, the input is slightly different and there are no phyloseq objects, so I modified a lot of the functions slightly and just included that code below.  
+```{r}
+source("MK_Microbiome_Functions.R")
+```
+
+
+
+### Colors and presents
+```{r}
+colors_all= c("Abscess" = "#FF495C", "Plaque"="#3185FC")
+
+set.seed(1234)
+date = Sys.Date()
+```
+
+
+# Load data
+The PA_PANGENOME_summary.csv is a product of the anvi-summarize summarize command (see "anvio_commands.txt" for a complete anvio workflow). I get the file formatted correctly, I opened the "PA_PANGENOME_gene_clusters_summary.txt" file created as a result of the anvi-summarize command in excel. I then selected columns D (genome_name), R (COG20_FUNCTION) and moved them to a new sheet. I added a column called "Count" with just a 1 for every cell. Then, I used the pivot table feature in excel to create a table with the COG20_FUNCTION as rows, genome_name as columns and sum of Count as values. I then saved that as a csv file. This is the counts_data file.
+
+The metadata file is a simple csv with three columns: Genome, Taxa and Type (Plaque or Abscess). It is the exact table that is available in table S06 (MK CHECK THIS BEFORE PUBLICATION). 
+
+```{r}
+counts_data <- read_csv("DAspecies_anvio/PA_PANGENOME_summary.csv") %>%
+  column_to_rownames(var = "Pathway") 
+counts_data <- t(counts_data) #Want the genomes as rows and the pathways as columns
+
+meta_data <- read_csv("DAspecies_anvio/PA_PANGENOME_summary_metadata.csv") %>%
+  rename("Enrichment" = "Type")
+```
+
+## Use FindTopicsNumber() 
+Note: There is no alpha value here
+
+
+Because of interprebility, I want to select the lowest number of topics that reasonably minimizes/maximizes the metrics. 6 looked like an appropriate value based on the output below: K values of 6, 7, and 8 have relatively similar metrics, but 6 is the lowest of those three. The combined scores of 3, 4 and 5 are all much lower.
+```{r}
+topics <- seq(from = 2, to = 20, by = 1)
+res <- RunFindTopicsNumber(counts_data, topics, "Gibbs")
+res$metrics_df
+```
+
+
+
+## LDA: Create the model
+You can use the info from the optimum topic numbers printed out in the above function, or adjust as needed.
+```{r}
+result <- create_topic_model(counts_data, 6, TRUE, "Gibbs")
+model <- result$lda_model
+```
+
+## Plot beta
+I had to customize this function for use with the Anvio data.
+```{r, fig.height=20, fig.width=15}
+plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
+  library(dplyr)
+  library(ggplot2)
+  library(tidytext)
+  
+  top_terms <- b_df %>% 
+    group_by(topic) %>% 
+    top_n(n_top_topics, beta) %>%
+    ungroup()%>%
+    mutate(
+      topic = factor(topic),
+      term = str_replace_all(term, "_", " ")
+    )
+  
+  print(top_terms)
+  
+  p <- ggplot(top_terms, aes(
+    x = tidytext::reorder_within(term, beta, topic),
+    y = beta,
+    fill = topic
+  )) +
+    geom_col(show.legend = FALSE) +
+    facet_wrap(
+      ~ topic, scales = "free", ncol=1,
+      labeller = labeller(topic = ~ paste0("Topic ", .x))
+    ) +
+    scale_x_reordered() +              # strip the ___topic helper suffix
+    coord_flip() +
+    theme_bw(base_size = 12) +
+    theme(
+      strip.background = element_rect(fill = "white", color = "black"),
+      strip.text = element_text(face = "bold", size = 14),
+      axis.text.y = element_text( color="black", size=14),            
+      axis.text.x = element_text(angle=45, color="black", hjust=1)            
+    ) +
+    labs(x = NULL, y = "Beta")
+  
+  if (!is.null(fill_colors)) {
+    p <- p + scale_fill_manual(values = fill_colors)
+  } else {
+    p <- p + scale_fill_viridis_d()
+  }
+  return(list(p = p, top_terms =  top_terms))
+}
+
+# I actually go back and adjust these based on the output so I can highlight the things I want to.
+my_colors <- c("1" = "#3185FC", "2" = "grey", "3" = "#FF495C", "4" = "grey", "5" = "grey", "6" = "grey") 
+beta_results <- plot_beta(result, 15, result$b_df, fill_colors = my_colors)
+
+# Just FYI, if there are ties both will be included, so some may have more than the n number of topics you set above.
+table(beta_results$top_terms$topic)
+```
+
+```{r, fig.width=15, fig.height=30}
+beta_results$p
+```
+
+## Heatmap of gamma scores 
+Again, I went in and customized this for use with this particular dataset.
+```{r, fig.height=3.5, fig.width=9}
+
+topics_wide <- result$g_df %>%
+    pivot_wider(names_from = topic, values_from = gamma)
+
+# Bring in the type column and order by it
+topics_wide_type <- meta_data %>% select(Type, Genome) %>% 
+      dplyr::rename("document" = "Genome")%>% 
+      merge.data.frame(topics_wide, by="document") %>%
+      dplyr::arrange(Type) 
+  
+# Column annotations: rownames must match heatmap columns (documents)
+type_annot <- topics_wide_type %>%
+    select(document, Type) %>%
+    column_to_rownames("document") %>%
+    as.data.frame()
+
+# Matrix: topics as rows, documents as columns
+mat <- topics_wide_type %>%
+    select(-document, -all_of("Type")) %>%
+    as.data.frame()
+rownames(mat) <- topics_wide_type$document
+mat <- t(as.matrix(mat))
+
+
+# Annotation color list name must match the annotation column name exactly
+ann_colors <- setNames(
+    list(c(Plaque = "#3185FC", Abscess = "#FF495C")),
+    nm = "Type"
+  )
+
+  # Draw heatmap
+  pheatmap(
+    mat,
+    annotation_col   = type_annot,
+    annotation_colors = ann_colors,
+    scale            = "none",
+    cluster_rows     = FALSE,
+    cluster_cols     = FALSE,
+    color            = colorRampPalette(c("#564592", "white", "#D7CF07"))(100),
+    show_rownames    = TRUE,
+    show_colnames    = TRUE
+  )
+
+
+```
+
+## UMAP of gamma scores
+Custom to deal with this input.
+```{r fig.height=6, fig.width=6}
+topics_wide <- result$g_df %>%
+          pivot_wider(names_from = topic,
+                      values_from = gamma) 
+    
+res_with_annotations <- meta_data %>% select(Type, Genome) %>% 
+        dplyr::rename("document" = "Genome")%>% 
+          merge.data.frame(topics_wide, by="document") 
+    
+#Set UMAP seed
+custom.config <- umap.defaults
+custom.config$random_state <- 1234
+    
+# Run UMAP
+umap_result <- res_with_annotations %>% select(-Type) %>% column_to_rownames(var="document") %>% umap(., config=custom.config)
+
+# Convert the annotations to numeric for coloring
+annotations <- res_with_annotations %>% column_to_rownames(var="document") %>%  pull(Type)  # Extract "Type" as a vector
+
+# Assign colors to each type
+colors <- colors_all[annotations]  # Match colors to each sample
+
+# Plot UMAP
+umap_plot <- plot(umap_result$layout, 
+     col = colors,
+     pch = 19,           # Point type
+     xlab = "UMAP 1", 
+     ylab = "UMAP 2", 
+     main = "UMAP Visualization")
+```
+```{r, fig.width=2.8, figh.height=6}
+# Extract PCA axes
+pca_matrix <- umap_result$layout
+
+# Ensure 'Type' is a factor
+meta_data$Type <- factor(meta_data$Type)
+
+# Calculate distance matrix and silhouette scores using "Type" as cluster labels
+dist_matrix <- dist(pca_matrix)
+cluster_labels <- as.integer(meta_data$Type)  # silhouette() needs numeric cluster labels
+
+sil <- silhouette(cluster_labels, dist_matrix)
+
+sil_df <- as.data.frame(sil[, 1:3])
+sil_df$Type <- meta_data$Type
+colnames(sil_df) <- c("Cluster", "Neighbor", "Silhouette", "Type")
+
+# Boxplot of silhouette scores by Type
+sil_plot <- ggplot(sil_df, aes(x = Type, y = Silhouette, fill = Type)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.9) +
+    geom_jitter(width = 0.2, size = 1, alpha = 0.5) +
+    stat_summary(fun = median, geom = "text", aes(label = round(..y.., 2)),
+               vjust = .9, color = "white", fontface = "bold", size = 4) +
+    labs(title = "Silhouette Scores by Type",
+       x = "Type",
+       y = "Silhouette Score") +
+    theme_bw() +
+  scale_fill_manual(values = colors_all) 
+sil_plot
+```
+
+
+##Membership of topic by Type
+```{r, fig.height=4.5, fig.width=5}
+topics_wide <- result$g_df %>%
+      tidyr::pivot_wider(names_from = topic, values_from = gamma)  # columns "1","2",...
+    
+topics_long_type <- meta_data %>%
+      dplyr::select(Type, Genome) %>%
+        dplyr::rename("document" = "Genome") %>% 
+      dplyr::left_join(topics_wide, by = "document") %>%
+      tidyr::pivot_longer(
+        cols = -c(document, Type),
+        names_to = "topic",
+        values_to = "gamma"
+      ) %>%
+      mutate(topic = factor(topic, levels = sort(unique(topic))))
+
+topics_long_type$topic <- topics_long_type$topic %>% as.factor()
+
+
+library(ggpubr)   # for stat_compare_means
+
+# Run Wilcoxon test (default) or t.test
+pvals <- topics_long_type %>%
+  dplyr::group_by(topic) %>%
+  dplyr::summarise(
+    p_value = wilcox.test(gamma ~ Type)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(p_adj = p.adjust(p_value, method = "fdr"))  # adjust for multiple testing
+
+print(pvals)
+
+ggplot(topics_long_type, aes(x = Type, y = gamma, fill = Type)) +
+  geom_boxplot() +
+  scale_fill_manual(values = colors) +
+  facet_wrap(~ topic, labeller = labeller(topic = ~ paste0("Topic ", .x))) +
+  labs(x = "Type", y = expression(gamma)) +
+  theme_bw() +
+  theme(
+    strip.background = element_rect(fill = "white", color = "black"),
+    strip.text = element_text(face = "bold", size = 12)
+  ) +
+  stat_compare_means(
+    aes(label = paste0("p=", ..p.format..)),
+    method = "wilcox.test",
+      label.y = 0.6   # move lower on the y-axis
+
+  )
+```
+
+```{r}
+sessionInfo()
+```
+
+

@@ -1,0 +1,151 @@
+# Download genomes
+$ conda activate ncbi_databsets
+$ datasets download genome accession \
+  --inputfile accessions.txt \
+  --include genome \
+  --assembly-source refseq \
+  --dehydrated
+
+$ unzip ncbi_dataset.zip -d genomes
+$ datasets rehydrate --directory genomes
+$ cd genomes
+$ mv ncbi_dataset/data/*/*.fna ./
+
+$ mv ncbi_dataset/data/*/*.fna ./genomes
+
+
+#Change the file names
+$ for item in *.fna;
+do 
+	storevar=$(echo `ls $item | cut -d"." -f1`)
+	mv $item ${storevar}.fasta
+done
+
+
+
+$ ls *fasta | awk 'BEGIN{FS=".fasta"}{print $1}' > genomes.txt
+
+$ conda deactivate
+conda activate anvio-8
+
+# ----- Put the below code in a bash script to run ----- #
+
+for g in `cat genomes.txt`
+do
+    echo
+    echo "Working on $g ..."
+    echo
+    anvi-script-reformat-fasta ${g}.fasta \
+                               --min-len 2500 \
+                               --simplify-names \
+                               -o ${g}_scaffolds_2.5K.fasta
+done
+
+
+for g in `cat genomes.txt`
+do
+    echo
+    echo "Working on $g ..."
+    echo
+    anvi-gen-contigs-database -f ${g}_scaffolds_2.5K.fasta \
+                              -o ${g}.db \
+                              --num-threads 4 \
+                              -n ${g}
+done
+
+
+for g in *.db
+do
+    anvi-run-hmms -c $g --num-threads 4
+    anvi-run-ncbi-cogs -c $g --num-threads 4
+    anvi-scan-trnas -c $g --num-threads 4
+    anvi-run-scg-taxonomy -c $g --num-threads 4
+    anvi-run-kegg-kofams -c $g --num-threads 4
+
+done
+
+
+# ----- End bash script ----- #
+
+mkdir dbs
+cp genomes/*db dbs
+cd dbs 
+
+#LOOK FOR CONTAMINATION
+anvi-script-gen-genomes-file --input-dir ./ -o external-genomes.txt
+anvi-estimate-genome-completeness -e external-genomes.txt
+
+
+##LOOK AT GENE STATS
+anvi-display-contigs-stats *db
+
+
+
+
+
+##############PANGENOME ANALYSIS
+#COMPUTE THE PANGENOME
+
+anvi-gen-genomes-storage -e external-genomes.txt -o PA_GENOMES.db
+anvi-pan-genome -g PA_GENOMES.db --project-name PA_PANGENOME --num-threads 4 2>> pangenome_log.txt
+
+
+#IMPORT NEW LAYERS (CLADES), then re-compute the pangenome
+anvi-import-misc-data -p PA_PANGENOME/PA_PANGENOME-PAN.db -t layers metadata.txt
+
+#COMPUTE FUNCTIONAL ENRICHMNET
+#see this page for explanation of results: https://merenlab.org/2016/11/08/pangenomics-v2/
+anvi-compute-functional-enrichment-in-pan -p PA_PANGENOME/PA_PANGENOME-PAN.db -g PA_GENOMES.db  -o functional-enrichment_COG20_FUNCTION.txt --category-variable Type --annotation-source COG20_FUNCTION
+anvi-compute-functional-enrichment-in-pan -p PA_PANGENOME/PA_PANGENOME-PAN.db -g PA_GENOMES.db  -o functional-enrichment_KEGG_BRITE.txt --category-variable Type --annotation-source KEGG_BRITE
+anvi-compute-functional-enrichment-in-pan -p PA_PANGENOME/PA_PANGENOME-PAN.db -g PA_GENOMES.db  -o functional-enrichment_KEGG_Module.txt --category-variable Type --annotation-source KEGG_Module
+anvi-compute-functional-enrichment-in-pan -p PA_PANGENOME/PA_PANGENOME-PAN.db -g PA_GENOMES.db  -o functional-enrichment_KEGG_Class.txt --category-variable Type --annotation-source KEGG_Class
+anvi-compute-functional-enrichment-in-pan -p PA_PANGENOME/PA_PANGENOME-PAN.db -g PA_GENOMES.db  -o functional-enrichment_KOfam.txt --category-variable Type --annotation-source KOfam
+anvi-compute-functional-enrichment-in-pan -p PA_PANGENOME/PA_PANGENOME-PAN.db -g PA_GENOMES.db  -o functional-enrichment_COG20_CATEGORY.txt --category-variable Type --annotation-source COG20_CATEGORY
+anvi-compute-functional-enrichment-in-pan -p PA_PANGENOME/PA_PANGENOME-PAN.db -g PA_GENOMES.db  -o functional-enrichment_COG20_PATHWAY.txt --category-variable Type --annotation-source COG20_PATHWAY
+
+
+#COMPUTE ANI
+anvi-compute-genome-similarity --external-genomes external-genomes.txt --program fastANI --output-dir ANI --num-threads 6 --pan-db PA_PANGENOME/PA_PANGENOME-PAN.db 
+
+
+
+#FILTER USING ANVI'O INTERACTIVE INTO THE BIN "FunHom.95_GenHom1_SCG"
+Min number of genomes where cluster occurs: 
+Max genes from each genome: 1
+Max functional homogenicity index: .95
+Max genometric homogenicity index: 1
+
+#USE THE "FunHom.95_GenHom1_SCG" TO MAKE A TREE IN THE ANVI'O WORKSPACE......otherwise the FastTree algorithm won't work because there are too many gene calls to consider.
+
+
+#DISPLAY THE PANGENOME
+$ anvi-display-pan -p PA_PANGENOME/PA_PANGENOME-PAN.db -g PA_GENOMES.db
+
+
+#I can't figure out how to export the tree, so we are going to have to make one
+anvi-get-sequences-for-gene-clusters -g PA_GENOMES.db \
+                                     -p PA_PANGENOME/PA_PANGENOME-PAN.db \
+                                     -o FunHom95_GenHom1_SCG_fasta \
+                                     -C FunHom95_GenHom1_SCG -b FunHom95_GenHom1_SCG  --concatenate
+
+anvi-gen-phylogenomic-tree -f FunHom95_GenHom1_SCG_fasta  
+                           -o FunHom95_GenHom1_SCG_FastTree
+
+
+  
+anvi-script-add-default-collection -c PA_GENOMES.db -p PA_PANGENOME/PA_PANGENOME-PAN.db -C DEFAULT -b DEFAULT_BIN
+
+
+anvi-summarize -g PA_GENOMES.db -p PA_PANGENOME/PA_PANGENOME-PAN.db -o PA_PANGENOME_summary -C DEFAULT 
+
+
+
+
+anvi-display-pan -p -p PA_PANGENOME_KEGG/PA_PANGENOME_KEGG-PAN.db -g ./PA_GENOMES.db
+
+
+ s)
+
+
+ (PWY.7820)
+

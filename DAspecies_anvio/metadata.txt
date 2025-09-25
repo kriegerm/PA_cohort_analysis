@@ -1,0 +1,54 @@
+	Taxon	Type	Confidence
+GCF_000008185	Treponema denticola	Abscess	Low
+GCF_000023905	Leptotrichia buccalis	Plaque	High
+GCF_000144405	Prevotella melaninogenica	Plaque	Medium
+GCF_000159995	Alloprevotella tannerae	Abscess	Medium
+GCF_000160055	Dialister invisus	Abscess	Medium
+GCF_000160475	Fusobacterium periodonticum	Plaque	Medium
+GCF_000162475	Granulicatella elegans	Plaque	Medium
+GCF_000164695	Rothia dentocariosa	Plaque	Medium
+GCF_000175375	Corynebacterium matruchotii	Plaque	Medium
+GCF_000208405	Selenomonas sputigena	Abscess	Low
+GCF_000235445	Johnsonella ignava	Abscess	Low
+GCF_000269805	Actinomyces massiliensis	Plaque	Medium
+GCF_000318095	Alloprevotella sp HMT 473	Plaque	High
+GCF_000413055	Treponema maltophilum	Abscess	Medium
+GCF_000429225	Actinomyces dentalis	Plaque	Low
+GCF_000466335	Aggregatibacter sp HMT 458	Plaque	Low
+GCF_000468055	Treponema lecithinolyticum	Abscess	Low
+GCF_000469505	Leptotrichia sp HMT 215	Plaque	Medium
+GCF_000469565	Oribacterium sp HMT 078	Abscess	High
+GCF_000565015	Porphyromonas catoniae	Plaque	Low
+GCF_000829055	Lacticaseibacillus casei	Abscess	Low
+GCF_001455085	Fusobacterium hwasookii	Plaque	Low
+GCF_002240055	Leptotrichia sp HMT 498	Plaque	Medium
+GCF_002302495	Capnocytophaga sputigena	Plaque	Medium
+GCF_002998595	Haemophilus sp HMT 036	Plaque	Low
+GCF_003019295	Fusobacterium nucleatum	Abscess	Low
+GCF_003570845	Dialister pneumosintes	Abscess	Low
+GCF_003589745	Lachnoanaerobaculum umeaense	Plaque	Medium
+GCF_005221305	Neisseria subflava	Plaque	Medium
+GCF_007990525	Leptotrichia hofstadii	Plaque	Medium
+GCF_008327825	Leptotrichia shahii	Plaque	Low
+GCF_013267415	Abiotrophia defectiva	Plaque	Medium
+GCF_014054985	Kingella oralis	Plaque	Medium
+GCF_014647755	Porphyromonas pasteri	Plaque	High
+GCF_016127215	Haemophilus parainfluenzae	Plaque	Medium
+GCF_016127955	Actinomyces oris	Plaque	Medium
+GCF_016726365	Rothia aeria	Plaque	High
+GCF_018127725	Streptococcus lactarius	Plaque	Low
+GCF_018127825	Prevotella nigrescens	Abscess	Low
+GCF_020097375	Porphyromonas endodontalis	Abscess	Medium
+GCF_024181585	Treponema socranskii	Abscess	Medium
+GCF_030408675	Corynebacterium durum	Plaque	High
+GCF_036323475	Solobacterium moorei	Abscess	Medium
+GCF_900446675	Capnocytophaga granulosa	Plaque	Medium
+GCF_900453895	Neisseria elongata	Plaque	Medium
+GCF_900475315	Neisseria cinerea	Plaque	Low
+GCF_900475505	Streptococcus sanguinis	Plaque	High
+GCF_900476045	Gemella morbillorum	Plaque	Medium
+GCF_900637305	Cardiobacterium hominis	Plaque	Medium
+GCF_900637555	Lautropia mirabilis	Plaque	Medium
+GCF_900637725	Arachnia propionica	Plaque	Medium
+GCF_963669195	Streptococcus oralis subsp dentisani clade 058	Plaque	Medium
+GCF_964642095	Fretibacterium fastidiosum	Abscess	Low

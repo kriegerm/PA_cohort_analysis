@@ -1,0 +1,54 @@
+﻿isolate,Taxon,Type,Confidence
+GCF_000008185.1,Treponema denticola,Abscess,Low
+GCF_000023905.1,Leptotrichia buccalis,Plaque,High
+GCF_000144405.1,Prevotella melaninogenica,Plaque,Medium
+GCF_000159995.1,Alloprevotella tannerae,Abscess,Medium
+GCF_000160055.1,Dialister invisus,Abscess,Medium
+GCF_000160475.1,Fusobacterium periodonticum,Plaque,Medium
+GCF_000162475.2,Granulicatella elegans,Plaque,Medium
+GCF_000164695.2,Rothia dentocariosa,Plaque,Medium
+GCF_000175375.1,Corynebacterium matruchotii,Plaque,Medium
+GCF_000208405.1,Selenomonas sputigena,Abscess,Low
+GCF_000235445.1,Johnsonella ignava,Abscess,Low
+GCF_000269805.1,Actinomyces massiliensis,Plaque,Medium
+GCF_000318095.2,Alloprevotella sp HMT 473,Plaque,High
+GCF_000413055.1,Treponema maltophilum,Abscess,Medium
+GCF_000429225.1,Actinomyces dentalis,Plaque,Low
+GCF_000466335.1,Aggregatibacter sp HMT 458,Plaque,Low
+GCF_000468055.1,Treponema lecithinolyticum,Abscess,Low
+GCF_000469505.1,Leptotrichia sp HMT 215,Plaque,Medium
+GCF_000469565.1,Oribacterium sp HMT 078,Abscess,High
+GCF_000565015.1,Porphyromonas catoniae,Plaque,Low
+GCF_000829055.1,Lacticaseibacillus casei,Abscess,Low
+GCF_001455085.1,Fusobacterium hwasookii,Plaque,Low
+GCF_002240055.1,Leptotrichia sp HMT 498,Plaque,Medium
+GCF_002302495.1,Capnocytophaga sputigena,Plaque,Medium
+GCF_002998595.1,Haemophilus sp HMT 036,Plaque,Low
+GCF_003019295.1,Fusobacterium nucleatum,Abscess,Low
+GCF_003570845.1,Dialister pneumosintes,Abscess,Low
+GCF_003589745.1,Lachnoanaerobaculum umeaense,Plaque,Medium
+GCF_005221305.1,Neisseria subflava,Plaque,Medium
+GCF_007990525.1,Leptotrichia hofstadii,Plaque,Medium
+GCF_008327825.1,Leptotrichia shahii,Plaque,Low
+GCF_013267415.1,Abiotrophia defectiva,Plaque,Medium
+GCF_014054985.1,Kingella oralis,Plaque,Medium
+GCF_014647755.1,Porphyromonas pasteri,Plaque,High
+GCF_016127215.1,Haemophilus parainfluenzae,Plaque,Medium
+GCF_016127955.1,Actinomyces oris,Plaque,Medium
+GCF_016726365.1,Rothia aeria,Plaque,High
+GCF_018127725.1,Streptococcus lactarius,Plaque,Low
+GCF_018127825.1,Prevotella nigrescens,Abscess,Low
+GCF_020097375.1,Porphyromonas endodontalis,Abscess,Medium
+GCF_024181585.1,Treponema socranskii,Abscess,Medium
+GCF_030408675.1,Corynebacterium durum,Plaque,High
+GCF_036323475.1,Solobacterium moorei,Abscess,Medium
+GCF_900446675.1,Capnocytophaga granulosa,Plaque,Medium
+GCF_900453895.1,Neisseria elongata,Plaque,Medium
+GCF_900475315.1,Neisseria cinerea,Plaque,Low
+GCF_900475505.1,Streptococcus sanguinis,Plaque,High
+GCF_900476045.1,Gemella morbillorum,Plaque,Medium
+GCF_900637305.1,Cardiobacterium hominis,Plaque,Medium
+GCF_900637555.1,Lautropia mirabilis,Plaque,Medium
+GCF_900637725.1,Arachnia propionica,Plaque,Medium
+GCF_963669195.1,Streptococcus oralis subsp dentisani clade 058,Plaque,Medium
+GCF_964642095.1,Fretibacterium fastidiosum,Abscess,Low
