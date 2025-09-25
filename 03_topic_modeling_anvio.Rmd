@@ -1,5 +1,5 @@
 ---
-title: "01 Cohort Analysis"
+title: "03 Topic Modeling with Anvio Results"
 author: "Madeline Krieger"
 date: "`r Sys.Date()`"
 output:
@@ -158,7 +158,7 @@ beta_results$p
 
 ## Heatmap of gamma scores 
 Again, I went in and customized this for use with this particular dataset.
-```{r, fig.height=4, fig.width=9}
+```{r, fig.height=3.5, fig.width=9}
 
 topics_wide <- result$g_df %>%
     pivot_wider(names_from = topic, values_from = gamma)

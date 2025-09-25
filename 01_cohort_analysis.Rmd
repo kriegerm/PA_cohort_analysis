@@ -39,9 +39,19 @@ knitr::opts_chunk$set(message = FALSE,
 ### 1.1.1 Packages
 ```{r 1.1_load-packages}
 library("pacman")
-pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "ggpubr", "microViz", "microbiome", "pheatmap", "vegan", "reshape2", "magrittr", "microshades", "pheatmap","vegan", "data.table", "Polychrome", "fantaxtic","cetcolor", "cowplot", "MicrobiomeStat", "randomForest", "caret", "mlbench", "MLmetrics", "mia", "here", "patchwork", "digest", "ANCOMBC", "Maaslin2", "microbiomeMarker", "fantaxtic", "topicmodels", "ldatuning", "umap", "tidytext", "cluster", "randomForest", "caret", "microbiome", "umap", "viridis", "ComplexHeatmap", "circlize", "ggnewscale", "stringi", "corrplot", "ggalluvial", "Hmisc")
+pacman::p_load(
+  rmarkdown, tidyverse, phyloseq, knitr, kableExtra, here, plyr, ggpubr, microViz,
+  microbiome, pheatmap, vegan, reshape2, magrittr, microshades, data.table,
+  Polychrome, fantaxtic, cetcolor, cowplot, MicrobiomeStat, randomForest, caret,
+  mlbench, MLmetrics, mia, patchwork, digest, ANCOMBC, Maaslin2, microbiomeMarker,
+  topicmodels, ldatuning, umap, tidytext, cluster, viridis, ComplexHeatmap,
+  circlize, ggnewscale, stringi, corrplot, ggalluvial, Hmisc, dplyr, stringr,
+  forcats, purrr, rlang, tidyr, tibble, ggplot2
+)
 
 here::i_am("01_cohort_analysis.Rmd")
+
+if (!dir.exists("output")) dir.create("output")
 ``` 
 
 
@@ -434,7 +444,7 @@ top_df %>%
 ```
 
 ### 4.1.3 Microshades Genus MB
-```{r, eval=FASE, fig.width=8, fig.height=4}
+```{r, eval=FALSE, fig.width=8, fig.height=4}
 # Use microshades function prep_mdf to agglomerate, normalize, and melt the phyloseq object
 mdf_prep <- prep_mdf(ps_fs)
 
@@ -539,38 +549,27 @@ pheatmap(log(df),
 
 # 5.0 Taxa trends
 
-## Genus
-```{r, fig.height=4.2, fig.width=3.5}
-source("MK_Microbiome_Functions.R")
 
-tax_shift_genus <- plot_taxa_shifts(top_number = 10,
-                        input_df = ps_fs_genus_csv)
-
-tax_shift_genus_data <- tax_shift_genus$data
+```{r, fig.height=5, fig.width=7}
+taxa_shifts_genus <- plot_taxa_shifts(top_number = 10,
+                             input_df = ps_fs_genus_csv,
+                             bubble_max_size = 7,
+                             count_max = 25) 
+taxa_shifts_genus$combined_plot
 ```
 
-```{r, fig.width=.8, fig.height=5}
-tax_shift_genus$count_plot
-```
+
+
 
 ## Species
 
-```{r, fig.height=4.2, fig.width=5}
-tax_shift_species <- plot_taxa_shifts(top_number = 10,
-                        input_df = ps_fs_species_csv)
-
-tax_shift_species$bar_plot
-
-tax_shift_species_data <- tax_shift_species$data
-
+```{r, fig.height=5, fig.width=12}
+taxa_shifts_species <- plot_taxa_shifts(top_number = 10,
+                             input_df = ps_fs_species_csv,
+                             bubble_max_size = 7,
+                             count_max = 25) 
+taxa_shifts_species$combined_plot
 ```
-
-
-```{r, fig.width=.8, fig.height=5}
-tax_shift_species$count_plot
-```
-
-
 
 
 
@@ -805,44 +804,120 @@ ALDEX_sp <- run_aldex2(ps_fs,
 ### Phylum
 ```{r, fig.height=3.9, fig.width=3.2}
 DA_results_df_Phylum <- combine_DA(maaslin2_results_Phylum_0.05, ancombc2_results_df_Phylum, aldex2_res_Phylum, "Type", "Phylum")
-DA_results_df_Phylum$plaque_plot
 
 ```
 
-
-```{r, fig.height=4.2, fig.width=2.9}
-DA_results_df_Phylum$abscess_plot
+```{r, fig.width=6.2, fig.height=3}
+phylum_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
+  CSV_formatted_relab_df = ps_fs_phylum_csv,
+  group = "Type",               # your contrast label used in ANCOMBC2 column names
+  tax_level = "Phylum",
+  heatmap_side = "Plaque",        # or "Abscess"
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1))
+phylum_combined_bubbles_P$combined_plot
 ```
+
+```{r, eval=FALSE, fig.width=11, fig.height=1.9}
+phylum_combined_bubbles_P$combined_plot_nolabs
+```
+
+
+```{r, fig.width=5.5, fig.height=3.5}
+phylum_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
+  CSV_formatted_relab_df = ps_fs_phylum_csv,
+  group = "Type",               # your contrast label used in ANCOMBC2 column names
+  tax_level = "Phylum",
+  heatmap_side = "Abscess",        
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1))
+phylum_combined_bubbles_A$combined_plot
+```
+
+
+```{r,  eval=FALSE, fig.width=11, fig.height=1.9}
+phylum_combined_bubbles_P$combined_plot_nolabs
+```
+
 
 
 ### Genus
-```{r, fig.height=7.8, fig.width=3.9}
+
+
+```{r, fig.height=12, fig.width=3.9}
 DA_results_df_genus <- combine_DA(maaslin2_results_Genus_0.05, ancombc2_results_df_Genus, aldex2_res_Genus, "Type", "Genus", filter_confidence = NULL)
-
-DA_results_df_genus$plaque_plot
 ```
 
-```{r, fig.height=7, fig.width=4}
-DA_results_df_genus$abscess_plot
+```{r, fig.width=7.5, fig.height=8}
+genus_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_genus,
+  CSV_formatted_relab_df = ps_fs_genus_csv,
+  group = "Type",               # your contrast label used in ANCOMBC2 column names
+  tax_level = "genus",
+  heatmap_side = "Plaque",        # or "Abscess"
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1))
+genus_combined_bubbles_P$combined_plot
+
 ```
 
+```{r,  eval=FALSE, fig.width=11.5, fig.height=9}
+genus_combined_bubbles_P$combined_plot_nolabs
+```
 
+```{r, fig.width=7.5, fig.height=6.8}
 
+genus_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_genus,
+  CSV_formatted_relab_df = ps_fs_genus_csv,
+  group = "Type",               
+  tax_level = "genus",
+  heatmap_side = "Abscess",        
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1))
+genus_combined_bubbles_A$combined_plot
 
+```
+
+```{r,  eval=FALSE,  fig.width=12, fig.height=7}
+genus_combined_bubbles_A$combined_plot_nolabs
+```
 
 ### Species
 ```{r, fig.height=11, fig.width=5.5}
 DA_results_df_sp <- combine_DA(maaslin2_results_Species_0.05, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species")
+```
 
-DA_results_df_sp$plaque_plot
+```{r, fig.width=10.7, fig.height=12}
+sp_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_sp,
+  CSV_formatted_relab_df = ps_fs_species_csv,
+  group = "Type",               
+  tax_level = "species",
+  heatmap_side = "Plaque",        
+  bubble_max_size = 7,
+  plot_layout_widths = c(2, 1))
+sp_combined_bubbles_P$combined_plot
 ```
 
 
-```{r, fig.height=7.6, fig.width=5.7}
-DA_results_df_sp$abscess_plot
+```{r, eval=FALSE, fig.width=3.5, fig.height=12}
+sp_combined_bubbles_P$combined_plot_nolabs
+```
+
+```{r, fig.width=11, fig.height=8}
+species_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_sp,
+  CSV_formatted_relab_df = ps_fs_species_csv,
+  group = "Type",               
+  tax_level = "species",
+  heatmap_side = "Abscess",        
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1))
+species_combined_bubbles_A$combined_plot
+
 ```
 
 
+```{r, fig.width=3.5, fig.height=6}
+species_combined_bubbles_A$combined_plot_nolabs
+```
 
 
 ## 6.5 Per taxa plots
@@ -1221,7 +1296,7 @@ plot <- ggplot(core_df_genus, aes(x = prevalence, y = Genera, fill = value)) +
 # 9.0 Topic modeling
 
 ## Iterate through scaling factors and topic numbers to choose the ideal combination
-```{r}
+```{r, eval=F}
 iterate_res <- iterate_scaling_factors(ps_fs, 
                         "Genus",
                         scale_factors = c(10, 100, 1000, 10000), 
@@ -1297,41 +1372,43 @@ source("MK_Microbiome_Functions.R")
 topic_membership(result, "Type", colors_all, result$g_df)
 ```
 
+## Relab heatmaps by topic
 
-## Heatmap of rel abundance in original data of top taxa
-```{r, fig.height=3, fig.width=7}
-relab_heatmap(result, ps_fs, "Genus", "Type", topic_no=1, n_top_words=10, result$b_df)
-
-relab_heatmap(result, ps_fs, "Genus", "Type", topic_no=2, n_top_words=10, result$b_df)
-
-relab_heatmap(result, ps_fs, "Genus", "Type", topic_no=3, n_top_words=10, result$b_df)
-
+```{r, fig.height=3, fig.width=6.3}
+topic1_res <- heatmap_by_topic(result$b_df, ps_fs_genus_csv, n_top = 15, topic = 1)
+topic1_res
 ```
 
+```{r, fig.height=3, fig.width=6.5}
+topic2_res <- heatmap_by_topic(result$b_df, ps_fs_genus_csv, n_top = 15, topic = 2)
+topic2_res
+```
 
+```{r, fig.height=3, fig.width=6.3}
+topic3_res <- heatmap_by_topic(result$b_df, ps_fs_genus_csv, n_top = 15, topic = 3)
+topic3_res
+```
 
+# 10.0 Wilcoxon Test
 ```{r}
-#This is kind of a weird heatmap, I'm not sure it's actualy usfule. 
+res_sp <- wilcox_tests(ps_fs_species_csv)
+head(res_sp)
 
-posterior_results <- posterior(model)
-topics_terms <- posterior_results$terms 
+write_csv(res_sp, "output/wilcox_species_results.csv")
 
-# Blank out most term names
-term_names <- colnames(topics_terms)
-term_labels <- ifelse((seq_along(term_names) %% 5) == 0, term_names, "")
+res_genus <- wilcox_tests(ps_fs_genus_csv)
+head(res_genus)
 
-# Apply these as column names
-colnames(topics_terms) <- term_labels
+write_csv(res_genus, "output/wilcox_genus_results.csv")
 
-pheatmap(log(topics_terms), 
-         cluster_rows = TRUE, 
-         cluster_cols = TRUE,
-         scale = "none", 
-         show_rownames = TRUE, 
-         show_colnames = TRUE)
+
+res_phy <- wilcox_tests(ps_fs_phylum_csv)
+head(res_phy)
+
+write_csv(res_phy, "output/wilcox_phylum_results.csv")
+
 
 ```
-
 
 
 
