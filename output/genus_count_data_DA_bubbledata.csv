@@ -1,0 +1,40 @@
+confidence,taxon,A,P,Type
+High,Veillonellaceae G1,18,7,Abscess
+High,Treponema,22,3,Abscess
+High,Dialister,21,4,Abscess
+Medium,Solobacterium,19,6,Abscess
+Medium,Lancefieldella,22,3,Abscess
+Low,Prevotella,20,5,Abscess
+Low,Peptostreptococcaceae G4,20,5,Abscess
+Low,Peptococcus,19,6,Abscess
+Low,Oribacterium,17,8,Abscess
+Low,Mycoplasma,19,6,Abscess
+Low,Lactobacillus,20,5,Abscess
+Low,Lacticaseibacillus,17,8,Abscess
+Low,Johnsonella,17,8,Abscess
+Low,Fretibacterium,20,5,Abscess
+Low,Bacteroidetes G3,21,4,Abscess
+Low,Bacteroidales G2,17,8,Abscess
+High,Leptotrichia,4,21,Plaque
+High,Corynebacterium,3,22,Plaque
+High,Actinomyces,4,21,Plaque
+Medium,Weeksellaceae G1,9,16,Plaque
+Medium,Rothia,4,21,Plaque
+Medium,Riemerella,6,19,Plaque
+Medium,Peptidiphaga,7,18,Plaque
+Medium,Neisseria,7,18,Plaque
+Medium,Lautropia,4,21,Plaque
+Medium,Lachnoanaerobaculum,7,18,Plaque
+Medium,Kingella,5,20,Plaque
+Medium,Haemophilus,6,19,Plaque
+Medium,Gemella,6,19,Plaque
+Medium,Capnocytophaga,7,18,Plaque
+Medium,Arachnia,6,19,Plaque
+Medium,Abiotrophia,3,22,Plaque
+Low,Veillonella,8,17,Plaque
+Low,Streptococcus,6,19,Plaque
+Low,Schaalia,8,17,Plaque
+Low,Saccharibacteria TM7 G6,12,13,Plaque
+Low,Granulicatella,8,17,Plaque
+Low,Gracilibacteria GN02 G1,12,13,Plaque
+Low,Aggregatibacter,10,15,Plaque

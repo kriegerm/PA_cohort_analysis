@@ -445,37 +445,37 @@ top_df %>%
 
 ### 4.1.3 Microshades Genus MB
 ```{r, eval=FALSE, fig.width=8, fig.height=4}
-# Use microshades function prep_mdf to agglomerate, normalize, and melt the phyloseq object
-mdf_prep <- prep_mdf(ps_fs)
-
-mdf_prep <- mdf_prep %>%
-  mutate(Kingdom = gsub("k__", "", Kingdom)) %>%
-  mutate(Phylum = gsub("p__", "", Phylum)) %>%
-  mutate(Class = gsub("c__", "", Class)) %>%
-  mutate(Order = gsub("o__", "", Order)) %>%
-  mutate(Family = gsub("f__", "", Family)) %>%
-  mutate(Genus = gsub("g__", "", Genus)) %>%
-  mutate(Species = gsub("s__", "", Species)) 
-
-print(unique(mdf_prep$Phylum))
-
-# Create a color object for the specified data
-color_obj <- create_color_dfs(mdf_prep, 
-            selected_groups = c("Proteobacteria", "Actinobacteria","Bacteroidetes", "Fusobacteria",
-                                "Spirochaetes"),
-    cvd = FALSE, top_orientation=TRUE)
-
-# Extract
-mdf <- color_obj$mdf
-cdf <- color_obj$cdf
-
-plot_1 <- plot_microshades(mdf, cdf)
-
-plot_1 + scale_y_continuous(labels = scales::percent, expand = expansion(0)) +
-  theme_bw() +
-  theme(legend.key.size = unit(0.2, "cm"), text=element_text(size=10), ) +
-  theme(axis.text.x = element_text(size= 6)) +
-  facet_wrap(~Type, scales= "free_x") 
+# # Use microshades function prep_mdf to agglomerate, normalize, and melt the phyloseq object
+# mdf_prep <- prep_mdf(ps_fs)
+# 
+# mdf_prep <- mdf_prep %>%
+#   mutate(Kingdom = gsub("k__", "", Kingdom)) %>%
+#   mutate(Phylum = gsub("p__", "", Phylum)) %>%
+#   mutate(Class = gsub("c__", "", Class)) %>%
+#   mutate(Order = gsub("o__", "", Order)) %>%
+#   mutate(Family = gsub("f__", "", Family)) %>%
+#   mutate(Genus = gsub("g__", "", Genus)) %>%
+#   mutate(Species = gsub("s__", "", Species)) 
+# 
+# print(unique(mdf_prep$Phylum))
+# 
+# # Create a color object for the specified data
+# color_obj <- create_color_dfs(mdf_prep, 
+#             selected_groups = c("Proteobacteria", "Actinobacteria","Bacteroidetes", "Fusobacteria",
+#                                 "Spirochaetes"),
+#     cvd = FALSE, top_orientation=TRUE)
+# 
+# # Extract
+# mdf <- color_obj$mdf
+# cdf <- color_obj$cdf
+# 
+# plot_1 <- plot_microshades(mdf, cdf)
+# 
+# plot_1 + scale_y_continuous(labels = scales::percent, expand = expansion(0)) +
+#   theme_bw() +
+#   theme(legend.key.size = unit(0.2, "cm"), text=element_text(size=10), ) +
+#   theme(axis.text.x = element_text(size= 6)) +
+#   facet_wrap(~Type, scales= "free_x") 
 ```
 
 
@@ -549,13 +549,20 @@ pheatmap(log(df),
 
 # 5.0 Taxa trends
 
-
+## Genus
 ```{r, fig.height=5, fig.width=7}
 taxa_shifts_genus <- plot_taxa_shifts(top_number = 10,
                              input_df = ps_fs_genus_csv,
                              bubble_max_size = 7,
                              count_max = 25) 
 taxa_shifts_genus$combined_plot
+
+count_data_genus <- taxa_shifts_genus$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) 
+
+write_csv(count_data_genus, "output/taxa_trends_genus_count_data.csv")
+
+
 ```
 
 
@@ -569,6 +576,14 @@ taxa_shifts_species <- plot_taxa_shifts(top_number = 10,
                              bubble_max_size = 7,
                              count_max = 25) 
 taxa_shifts_species$combined_plot
+
+
+count_data_species <- taxa_shifts_species$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) 
+
+
+write_csv(count_data_species, "output/taxa_trends_species_count_data.csv")
+
 ```
 
 
@@ -612,14 +627,14 @@ ANCOM_sp <- runANCOM(ps_fs,
 
 ### 6.2.1 Iterate Parameters
 ```{r, eval=FALSE, fig.height=8, fig.width=10}
-resolutions <- c("Species", "Genus", "Phylum")
-iterate_maaslin2(ps_obj = ps_fs, 
-                 iterative_methods = iterative_methods,
-                 resolutions = resolutions,
-                 group = "Type",
-                 qval_threshold = .25, 
-                 percentage = TRUE, 
-                 plot_colors = colors_all)
+# resolutions <- c("Species", "Genus", "Phylum")
+# iterate_maaslin2(ps_obj = ps_fs, 
+#                  iterative_methods = iterative_methods,
+#                  resolutions = resolutions,
+#                  group = "Type",
+#                  qval_threshold = .25, 
+#                  percentage = TRUE, 
+#                  plot_colors = colors_all)
 ```
 
 ### 6.2.2 Run Maaslin2
@@ -741,22 +756,22 @@ https://www.nature.com/articles/s41467-022-28034-z
 ALDEx2 uses by default the centred log-ratio (clr) transformation which is scale invariant
 
 ```{r, eval=FALSE,  fig.width=20, fig.height=12}
-resolutions <- c("Species", "Genus", "Phylum")
- 
-iterate_aldex2(ps_obj = ps_fs, 
-                 iterative_methods = iterative_methods,
-                 resolutions = resolutions,
-                 group = "Type",
-                 percentage = FALSE)
-
-aldex2_iterative_summary_table %>%
-  filter(resolution == "Genus") %>%
-  filter(paired == FALSE) %>%
-  filter(paired == FALSE) %>%
-  filter(denom == "all") %>%
-  filter(transform == "log10") %>%
-  dplyr::arrange(desc(significant_features)) %>%
-  filter(significant_features > 0)
+# resolutions <- c("Species", "Genus", "Phylum")
+#   
+# iterate_aldex2(ps_obj = ps_fs, 
+#                  iterative_methods = iterative_methods,
+#                  resolutions = resolutions,
+#                  group = "Type",
+#                  percentage = FALSE)
+# 
+# aldex2_iterative_summary_table %>%
+#   filter(resolution == "Genus") %>%
+#   filter(paired == FALSE) %>%
+#   filter(paired == FALSE) %>%
+#   filter(denom == "all") %>%
+#   filter(transform == "log10") %>%
+#   dplyr::arrange(desc(significant_features)) %>%
+#   filter(significant_features > 0)
 ```
 
 ### 6.3.2 Run Aldex2
@@ -802,7 +817,7 @@ ALDEX_sp <- run_aldex2(ps_fs,
 ## 6.4 Combine results
 
 ### Phylum
-```{r, fig.height=3.9, fig.width=3.2}
+```{r, fig.height=3.6, fig.width=3.2}
 DA_results_df_Phylum <- combine_DA(maaslin2_results_Phylum_0.05, ancombc2_results_df_Phylum, aldex2_res_Phylum, "Type", "Phylum")
 
 ```
@@ -816,6 +831,10 @@ phylum_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
   bubble_max_size = 9,
   plot_layout_widths = c(2, 1))
 phylum_combined_bubbles_P$combined_plot
+
+phylum_bubbledata_P <- phylum_combined_bubbles_P$bubble_data %>% 
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Plaque")
 ```
 
 ```{r, eval=FALSE, fig.width=11, fig.height=1.9}
@@ -823,7 +842,7 @@ phylum_combined_bubbles_P$combined_plot_nolabs
 ```
 
 
-```{r, fig.width=5.5, fig.height=3.5}
+```{r, fig.width=5, fig.height=3.5}
 phylum_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
   CSV_formatted_relab_df = ps_fs_phylum_csv,
   group = "Type",               # your contrast label used in ANCOMBC2 column names
@@ -832,13 +851,25 @@ phylum_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
   bubble_max_size = 9,
   plot_layout_widths = c(2, 1))
 phylum_combined_bubbles_A$combined_plot
+
+phylum_bubbledata_A <- phylum_combined_bubbles_A$bubble_data %>% 
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Abscess")
 ```
+
 
 
 ```{r,  eval=FALSE, fig.width=11, fig.height=1.9}
 phylum_combined_bubbles_P$combined_plot_nolabs
 ```
 
+```{r}
+# Combine the count data results and write to a file
+phylum_count_data <- phylum_bubbledata_A %>%
+  dplyr::full_join(phylum_bubbledata_P)
+
+write_csv(phylum_count_data, "output/phylum_count_data_DA_bubbledata.csv")
+```
 
 
 ### Genus
@@ -858,13 +889,16 @@ genus_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_genus,
   plot_layout_widths = c(2, 1))
 genus_combined_bubbles_P$combined_plot
 
+genus_bubbledata_P <- genus_combined_bubbles_P$bubble_data %>% 
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Plaque")
 ```
 
 ```{r,  eval=FALSE, fig.width=11.5, fig.height=9}
 genus_combined_bubbles_P$combined_plot_nolabs
 ```
 
-```{r, fig.width=7.5, fig.height=6.8}
+```{r, fig.width=7.9, fig.height=6.8}
 
 genus_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_genus,
   CSV_formatted_relab_df = ps_fs_genus_csv,
@@ -875,18 +909,31 @@ genus_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_genus,
   plot_layout_widths = c(2, 1))
 genus_combined_bubbles_A$combined_plot
 
+genus_bubbledata_A <- genus_combined_bubbles_A$bubble_data %>% 
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Abscess")
 ```
 
 ```{r,  eval=FALSE,  fig.width=12, fig.height=7}
 genus_combined_bubbles_A$combined_plot_nolabs
 ```
 
+```{r}
+# Combine the count data results and write to a file
+genus_count_data <- genus_bubbledata_A %>%
+  dplyr::full_join(genus_bubbledata_P)
+
+write_csv(genus_count_data, "output/genus_count_data_DA_bubbledata.csv")
+```
+
+
+
 ### Species
 ```{r, fig.height=11, fig.width=5.5}
 DA_results_df_sp <- combine_DA(maaslin2_results_Species_0.05, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species")
 ```
 
-```{r, fig.width=10.7, fig.height=12}
+```{r, fig.width=10.7, fig.height=11}
 sp_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_sp,
   CSV_formatted_relab_df = ps_fs_species_csv,
   group = "Type",               
@@ -895,14 +942,20 @@ sp_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_sp,
   bubble_max_size = 7,
   plot_layout_widths = c(2, 1))
 sp_combined_bubbles_P$combined_plot
+
+sp_bubbledata_P <- sp_combined_bubbles_P$bubble_data %>% 
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Plaque")
+
+
 ```
 
 
-```{r, eval=FALSE, fig.width=3.5, fig.height=12}
+```{r, fig.width=3.5, fig.height=12}
 sp_combined_bubbles_P$combined_plot_nolabs
 ```
 
-```{r, fig.width=11, fig.height=8}
+```{r, fig.width=10.7, fig.height=7}
 species_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_sp,
   CSV_formatted_relab_df = ps_fs_species_csv,
   group = "Type",               
@@ -912,6 +965,12 @@ species_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_sp,
   plot_layout_widths = c(2, 1))
 species_combined_bubbles_A$combined_plot
 
+
+sp_bubbledata_A <- species_combined_bubbles_A$bubble_data %>% 
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Abscess")
+
+
 ```
 
 
@@ -919,6 +978,14 @@ species_combined_bubbles_A$combined_plot
 species_combined_bubbles_A$combined_plot_nolabs
 ```
 
+```{r}
+# Combine the count data results and write to a file
+sp_count_data <- sp_bubbledata_A %>%
+  dplyr::full_join(sp_bubbledata_P)
+
+write_csv(sp_count_data, "output/species_count_data_DA_bubbledata.csv")
+
+```
 
 ## 6.5 Per taxa plots
 
@@ -1343,13 +1410,73 @@ model <- result$lda_model
 ```
 
 ## Plot beta
-```{r, fig.height=3, fig.width=9}
-source("MK_Microbiome_Functions.R")
+```{r}
 
+### Plot beta
+#plot_beta(result, 15)
+#Plot beta, or the numbers that are assigned to each word in a topic. If the beta score is higher, the word matters more in that topic.
+
+plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
+  
+  # ----- Top terms across topics for barplots
+  top_terms <- b_df %>% 
+    group_by(topic) %>% 
+    slice_max(beta, n = n_top_topics, with_ties = FALSE) %>%
+    ungroup() %>%
+    mutate(
+      topic = factor(topic),
+      term  = gsub("^g__", "", term),
+      term  = str_replace_all(term, "\\.", ""),
+      term  = str_replace_all(term, "_", " "),
+      term  = str_replace_all(term, "__(1|2|3)$", "")
+    )
+  
+  # ----- Barplots
+  barplots <- ggplot(top_terms, aes(
+    x = tidytext::reorder_within(term, beta, topic),
+    y = beta,
+    fill = topic
+  )) +
+    geom_col(show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free", labeller = labeller(topic = ~ paste0("Topic ", .x))) +
+    scale_x_reordered() +
+    coord_flip() +
+    theme_bw(base_size = 12) +
+    theme(
+      strip.background = element_rect(fill = "white", color = "black"),
+      strip.text = element_text(face = "bold", size = 14),
+      axis.text.y = element_text(face = "italic", color="black", size=14),
+      axis.text.x = element_text(angle=45, color="black", hjust=1)
+    ) +
+    labs(x = NULL, y = "Beta")
+  
+  if (!is.null(fill_colors)) {
+    barplots <- barplots + scale_fill_manual(values = fill_colors)
+  } else {
+    barplots <- barplots + scale_fill_viridis_d()
+  }
+  
+  # Return: barplots ggplot + list of pheatmap objects
+  return(barplots)
+}
+
+```
+
+
+
+```{r, fig.height=3, fig.width=9}
 my_colors <- c("1" = "#3185FC", "2" = "#FF495C", "3" = "grey")
-p <- plot_beta(result, 10, result$b_df, fill_colors = my_colors)
+p <- plot_beta(result, 10, result$b_df,  fill_colors = my_colors)
 p
 ```
+
+```{r, fig.height=3, fig.width=6}
+p2 <- plot_beta_heatmaps(result, 10, result$b_df, normalized_count_table = ps_fs_genus_csv, fill_colors = my_colors)
+p2[1]
+p2[2]
+p2[3]
+```
+
 
 ## Heatmap of gamma scores 
 ```{r, fig.height=1.5, fig.width=9}

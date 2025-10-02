@@ -1,0 +1,47 @@
+confidence,taxon,group2,count
+High,Leptotrichia,A,4
+High,Corynebacterium,A,3
+High,Actinomyces,A,4
+High,Leptotrichia,P,21
+High,Corynebacterium,P,22
+High,Actinomyces,P,21
+Medium,Weeksellaceae G1,A,9
+Medium,Rothia,A,4
+Medium,Riemerella,A,6
+Medium,Peptidiphaga,A,7
+Medium,Neisseria,A,7
+Medium,Lautropia,A,4
+Medium,Lachnoanaerobaculum,A,7
+Medium,Kingella,A,5
+Medium,Haemophilus,A,6
+Medium,Gemella,A,6
+Medium,Capnocytophaga,A,7
+Medium,Arachnia,A,6
+Medium,Abiotrophia,A,3
+Medium,Weeksellaceae G1,P,16
+Medium,Rothia,P,21
+Medium,Riemerella,P,19
+Medium,Peptidiphaga,P,18
+Medium,Neisseria,P,18
+Medium,Lautropia,P,21
+Medium,Lachnoanaerobaculum,P,18
+Medium,Kingella,P,20
+Medium,Haemophilus,P,19
+Medium,Gemella,P,19
+Medium,Capnocytophaga,P,18
+Medium,Arachnia,P,19
+Medium,Abiotrophia,P,22
+Low,Veillonella,A,8
+Low,Streptococcus,A,6
+Low,Schaalia,A,8
+Low,Saccharibacteria TM7 G6,A,12
+Low,Granulicatella,A,8
+Low,Gracilibacteria GN02 G1,A,12
+Low,Aggregatibacter,A,10
+Low,Veillonella,P,17
+Low,Streptococcus,P,19
+Low,Schaalia,P,17
+Low,Saccharibacteria TM7 G6,P,13
+Low,Granulicatella,P,17
+Low,Gracilibacteria GN02 G1,P,13
+Low,Aggregatibacter,P,15

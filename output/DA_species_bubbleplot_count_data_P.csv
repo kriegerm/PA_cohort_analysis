@@ -1,0 +1,93 @@
+confidence,taxon,group2,count
+High,Streptococcus sanguinis,A,2
+High,Rothia aeria,A,8
+High,Porphyromonas pasteri,A,7
+High,Leptotrichia buccalis,A,8
+High,Corynebacterium durum,A,6
+High,Alloprevotella sp HMT 473,A,11
+High,Streptococcus sanguinis,P,23
+High,Rothia aeria,P,17
+High,Porphyromonas pasteri,P,18
+High,Leptotrichia buccalis,P,17
+High,Corynebacterium durum,P,19
+High,Alloprevotella sp HMT 473,P,14
+Medium,Streptococcus oralis subsp dentisani clade 058,A,4
+Medium,Streptococcus cristatus clade 578,A,6
+Medium,Rothia dentocariosa,A,8
+Medium,Riemerella sp HMT 322,A,6
+Medium,Prevotella melaninogenica,A,7
+Medium,Neisseria subflava,A,9
+Medium,Neisseria flava,A,6
+Medium,Neisseria elongata,A,7
+Medium,Leptotrichia sp HMT 498,A,10
+Medium,Leptotrichia sp HMT 215,A,8
+Medium,Leptotrichia hofstadii,A,10
+Medium,Lautropia mirabilis,A,4
+Medium,Lachnoanaerobaculum umeaense,A,9
+Medium,Kingella oralis,A,4
+Medium,Haemophilus parainfluenzae,A,4
+Medium,Granulicatella elegans,A,7
+Medium,Gemella morbillorum,A,7
+Medium,Fusobacterium periodonticum,A,6
+Medium,Corynebacterium matruchotii,A,4
+Medium,Cardiobacterium hominis,A,10
+Medium,Capnocytophaga sputigena,A,6
+Medium,Capnocytophaga granulosa,A,6
+Medium,Arachnia propionica,A,7
+Medium,Actinomyces oris,A,9
+Medium,Actinomyces massiliensis,A,7
+Medium,Abiotrophia defectiva,A,3
+Medium,Streptococcus oralis subsp dentisani clade 058,P,21
+Medium,Streptococcus cristatus clade 578,P,19
+Medium,Rothia dentocariosa,P,17
+Medium,Riemerella sp HMT 322,P,19
+Medium,Prevotella melaninogenica,P,18
+Medium,Neisseria subflava,P,16
+Medium,Neisseria flava,P,19
+Medium,Neisseria elongata,P,18
+Medium,Leptotrichia sp HMT 498,P,15
+Medium,Leptotrichia sp HMT 215,P,17
+Medium,Leptotrichia hofstadii,P,15
+Medium,Lautropia mirabilis,P,21
+Medium,Lachnoanaerobaculum umeaense,P,16
+Medium,Kingella oralis,P,21
+Medium,Haemophilus parainfluenzae,P,21
+Medium,Granulicatella elegans,P,18
+Medium,Gemella morbillorum,P,18
+Medium,Fusobacterium periodonticum,P,19
+Medium,Corynebacterium matruchotii,P,21
+Medium,Cardiobacterium hominis,P,15
+Medium,Capnocytophaga sputigena,P,19
+Medium,Capnocytophaga granulosa,P,19
+Medium,Arachnia propionica,P,18
+Medium,Actinomyces oris,P,16
+Medium,Actinomyces massiliensis,P,18
+Medium,Abiotrophia defectiva,P,22
+Low,Weeksellaceae G1 sp HMT 907,A,12
+Low,Streptococcus lactarius,A,10
+Low,Saccharibacteria TM7 G6 bacterium HMT 870,A,12
+Low,Porphyromonas sp HMT 930,A,8
+Low,Porphyromonas catoniae,A,9
+Low,Peptidiphaga sp HMT 183,A,10
+Low,Neisseria cinerea,A,9
+Low,Leptotrichia shahii,A,11
+Low,Haemophilus sp HMT 036,A,10
+Low,Fusobacterium hwasookii,A,10
+Low,Alloprevotella sp HMT 914,A,10
+Low,Alloprevotella sp HMT 912,A,14
+Low,Aggregatibacter sp HMT 458,A,11
+Low,Actinomyces dentalis,A,14
+Low,Weeksellaceae G1 sp HMT 907,P,13
+Low,Streptococcus lactarius,P,15
+Low,Saccharibacteria TM7 G6 bacterium HMT 870,P,13
+Low,Porphyromonas sp HMT 930,P,17
+Low,Porphyromonas catoniae,P,16
+Low,Peptidiphaga sp HMT 183,P,15
+Low,Neisseria cinerea,P,16
+Low,Leptotrichia shahii,P,14
+Low,Haemophilus sp HMT 036,P,15
+Low,Fusobacterium hwasookii,P,15
+Low,Alloprevotella sp HMT 914,P,15
+Low,Alloprevotella sp HMT 912,P,11
+Low,Aggregatibacter sp HMT 458,P,14
+Low,Actinomyces dentalis,P,11

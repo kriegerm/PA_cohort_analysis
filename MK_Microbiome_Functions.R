@@ -3150,7 +3150,8 @@ combine_DA_with_bubbles <- function(da,
       axis.text.y = element_text(face = "italic", size = 12),
       legend.position = "bottom",
       legend.box = "horizontal",
-      legend.direction = "horizontal"
+      legend.direction = "horizontal",
+      panel.border = element_blank()
     )
   
   
@@ -3169,7 +3170,11 @@ combine_DA_with_bubbles <- function(da,
     scale_size_area(name="Count", limits=c(0,25), breaks=c(0,5,10,15,25),
                     guide = guide_legend(nrow = 3, byrow = TRUE, direction = "horizontal"))
   
-  combined <- (heatmap_plot + bubble_plot + plot_layout(widths = plot_layout_widths, guides = "collect")) &
+  #Have to mask the heatmap legend so I can actually see the bubble plot legend and use it for scaling
+  heatmap_masklegend <- heatmap_plot +
+    theme(legend.position = "none")
+  
+  combined <- (heatmap_masklegend + bubble_plot + plot_layout(widths = plot_layout_widths, guides = "collect")) &
     theme(legend.position = "bottom", legend.box = "horizontal")
   
   heatmap_noleg <- heatmap_plot + theme(legend.position = "none", 
@@ -3673,59 +3678,207 @@ create_topic_model <- function(counts_data, k_value, alpha, method){
 #plot_beta(result, 15)
 #Plot beta, or the numbers that are assigned to each word in a topic. If the beta score is higher, the word matters more in that topic.
 
-plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
+plot_beta <- function(lda_result, n_top_topics, b_df, normalized_count_table, fill_colors = NULL) {
   library(dplyr)
   library(ggplot2)
   library(tidytext)
+  library(pheatmap)
+  library(stringr)
   
+  # ----- Top terms across topics for barplots
   top_terms <- b_df %>% 
     group_by(topic) %>% 
-    top_n(n_top_topics, beta) %>%
+    slice_max(beta, n = n_top_topics, with_ties = FALSE) %>%
     ungroup() %>%
     mutate(
       topic = factor(topic),
-      # remove leading g__ and trailing _1/_2/_3
-      term = gsub("^g__", "", term),
-      term = str_replace_all(term, "\\.", ""),
-      term = str_replace_all(term, "_", " "),
-      term = str_replace_all(term, "__(1|2|3)$", "")
+      term  = gsub("^g__", "", term),
+      term  = str_replace_all(term, "\\.", ""),
+      term  = str_replace_all(term, "_", " "),
+      term  = str_replace_all(term, "__(1|2|3)$", "")
     )
   
-  print(top_terms)
-  # ensure topic is a factor for consistent fill mapping
-  top_terms <- top_terms %>%
-    mutate(topic = factor(topic))
-  
-  p <- ggplot(top_terms, aes(
+  # ----- Barplots
+  barplots <- ggplot(top_terms, aes(
     x = tidytext::reorder_within(term, beta, topic),
     y = beta,
     fill = topic
   )) +
     geom_col(show.legend = FALSE) +
-    facet_wrap(
-      ~ topic, scales = "free",
-      labeller = labeller(topic = ~ paste0("Topic ", .x))
-    ) +
-    scale_x_reordered() +              # strip the ___topic helper suffix
+    facet_wrap(~ topic, scales = "free", labeller = labeller(topic = ~ paste0("Topic ", .x))) +
+    scale_x_reordered() +
     coord_flip() +
     theme_bw(base_size = 12) +
     theme(
       strip.background = element_rect(fill = "white", color = "black"),
       strip.text = element_text(face = "bold", size = 14),
-      axis.text.y = element_text(face = "italic", color="black", size=14),             # italic genus labels
-      axis.text.x = element_text(angle=45, color="black", hjust=1)            
+      axis.text.y = element_text(face = "italic", color="black", size=14),
+      axis.text.x = element_text(angle=45, color="black", hjust=1)
     ) +
     labs(x = NULL, y = "Beta")
   
   if (!is.null(fill_colors)) {
-    p <- p + scale_fill_manual(values = fill_colors)
+    barplots <- barplots + scale_fill_manual(values = fill_colors)
   } else {
-    p <- p + scale_fill_viridis_d()
+    barplots <- barplots + scale_fill_viridis_d()
   }
-  return(p)
+  
+  # ----- One heatmap per topic
+  build_heatmap_for_topic <- function(topic_no, n_top = 10) {
+    
+    # Top terms for this topic (cleaned)
+    tt <- b_df %>% 
+      filter(topic == topic_no) %>%
+      slice_max(beta, n = n_top, with_ties = FALSE) %>%
+      ungroup() %>%
+      mutate(
+        topic = factor(topic),
+        term  = gsub("^g__", "", term),
+        term  = str_replace_all(term, "\\.", ""),
+        term  = str_replace_all(term, "_", " "),
+        term  = str_replace_all(term, "__(1|2|3)$", "")
+      )
+    
+    # Ensure unique order vector
+    term_order <- unique(tt$term)
+    
+    # Build the matrix in the same cleaned naming space
+    data_mat <- normalized_count_table %>%
+      arrange(Type) %>%
+      mutate(Type = as.character(Type)) %>%
+      arrange(Type) %>%
+      select(-Type) %>%
+      tibble::column_to_rownames("Sample") %>%
+      as.matrix() %>%
+      t() %>% as.data.frame() %>%
+      tibble::rownames_to_column("term") %>%
+      mutate(
+        term = gsub("^g__", "", term),
+        term = str_replace_all(term, "\\.", ""),
+        term = str_replace_all(term, "_", " "),
+        term = str_replace_all(term, "__(1|2|3)$", "")
+      ) %>%
+      filter(term %in% term_order) %>%
+      tibble::column_to_rownames("term") %>%
+      as.matrix()
+    
+    # Reorder rows to match top_terms order
+    data_mat <- data_mat[term_order, , drop = FALSE]
+    
+    # Column annotations (samples x Type)
+    type_annot <- normalized_count_table %>%
+      select(Sample, Type) %>%
+      tibble::column_to_rownames("Sample")
+    
+    ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
+    
+    # Build heatmap (silent)
+    pheatmap(
+      log1p(data_mat),                  # safer than log()
+      annotation_col    = type_annot,
+      annotation_colors = ann_colors,
+      scale             = "none",
+      cluster_rows      = FALSE,        # preserve your order
+      cluster_cols      = FALSE,
+      color             = colorRampPalette(c("#564592", "white", "#D7CF07"))(100),
+      show_rownames     = TRUE,
+      show_colnames     = FALSE,
+      main              = paste("Topic", topic_no),
+      silent            = TRUE
+    )
+  }
+  
+  # Build heatmaps for topics 1, 2, 3 using n_top_topics
+  hm_list <- lapply(1:3, build_heatmap_for_topic, n_top = n_top_topics)
+  
+  # Return: barplots ggplot + list of pheatmap objects
+  list(bar_plots = barplots, heatmaps = hm_list)
 }
 
-
+# Heatmap of the relab of the top terms in each topic
+plot_beta_heatmaps <- function(lda_result, n_top_topics, normalized_count_table, b_df, fill_colors = NULL) {
+  
+  # ----- One heatmap per topic
+  build_heatmap_for_topic <- function(topic_no, n_top = 10) {
+    
+    # Top terms for this topic (cleaned)
+    tt <- b_df %>% 
+      filter(topic == topic_no) %>%
+      slice_max(beta, n = n_top, with_ties = FALSE) %>%
+      ungroup() %>%
+      mutate(
+        topic = factor(topic),
+        term  = gsub("^g__", "", term),
+        term  = str_replace_all(term, "\\.", ""),
+        term  = str_replace_all(term, "_", " "),
+        term  = str_replace_all(term, "__(1|2|3)$", "")
+      )
+    
+    # ---- Matrix for heatmap (with duplicate-handling)
+    data_mat <- normalized_count_table %>%
+      arrange(Type) %>%
+      mutate(Type = as.character(Type)) %>%
+      arrange(Type) %>%
+      select(-Type) %>%
+      tibble::column_to_rownames("Sample") %>%
+      as.matrix() %>%
+      t() %>% as.data.frame() %>%
+      tibble::rownames_to_column("term") %>%
+      mutate(
+        term = gsub("^g__", "", term),
+        term = stringr::str_replace_all(term, "\\.", ""),
+        term = stringr::str_replace_all(term, "_", " "),
+        term = stringr::str_replace_all(term, "__(1|2|3)$", "")
+      ) %>%
+      # If cleaning collapses multiple rows to the same 'term',
+      # combine them (sum; use mean if you prefer)
+      dplyr::group_by(term) %>%
+      dplyr::summarise(dplyr::across(dplyr::everything(), sum), .groups = "drop") %>%
+      # Keep only the topic's top terms
+      dplyr::filter(term %in% tt$term) %>%
+      tibble::column_to_rownames("term") %>%
+      as.matrix()
+    
+    # ---- Robust order vector: keep only terms that actually exist as rows
+    term_order <- unique(tt$term)
+    term_order <- term_order[term_order %in% rownames(data_mat)]
+    
+    if (length(term_order) == 0) {
+      stop("None of the top terms for topic ", topic_no, " were found in normalized_count_table after cleaning.")
+    }
+    
+    # Reorder rows to match top-terms order
+    data_mat <- data_mat[term_order, , drop = FALSE]
+    
+    # Column annotations (samples x Type)
+    type_annot <- normalized_count_table %>%
+      select(Sample, Type) %>%
+      tibble::column_to_rownames("Sample")
+    
+    ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
+    
+    # Build heatmap (silent)
+    pheatmap(
+      log(data_mat),                  # safer than log()
+      annotation_col    = type_annot,
+      annotation_colors = ann_colors,
+      scale             = "none",
+      cluster_rows      = FALSE,        # preserve your order
+      cluster_cols      = FALSE,
+      color             = colorRampPalette(c("#564592", "white", "#D7CF07"))(100),
+      show_rownames     = TRUE,
+      show_colnames     = FALSE,
+      main              = paste("Topic", topic_no),
+      silent            = TRUE
+    )
+  }
+  
+  # Build heatmaps for topics 1, 2, 3 using n_top_topics
+  hm_list <- lapply(1:3, build_heatmap_for_topic, n_top = n_top_topics)
+  
+  return(hm_list)
+  
+}
 
 ### Heatmap of gamma scores 
 #heatmap_gamma(result)
