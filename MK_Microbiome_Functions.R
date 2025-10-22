@@ -292,7 +292,8 @@ plot_all_taxa <- function(ps_obj,
   # Filter for selected taxa, if provided
   if (!is.null(taxa_filter)) {
     plot_data <- plot_data %>%
-      filter(!!sym(taxa_level) %in% taxa_filter)
+      filter(!!sym(taxa_level) %in% taxa_filter) %>%
+      mutate(!!sym(taxa_level) := factor(!!sym(taxa_level), levels = taxa_filter))
   }
   
    # Create dot plot
@@ -306,7 +307,10 @@ plot_all_taxa <- function(ps_obj,
     theme(
       strip.background = element_blank(),
       strip.placement = "outside",
-      strip.text = element_text(face = "bold")
+      strip.text = element_text(face = "bold"),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
+      
     )
   
    #Box plot
@@ -322,7 +326,9 @@ plot_all_taxa <- function(ps_obj,
       theme(
         strip.background = element_blank(),
         strip.placement = "outside",
-        strip.text = element_text(face = "bold")
+        strip.text = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
       )
     
   #Violin
@@ -338,7 +344,9 @@ plot_all_taxa <- function(ps_obj,
         theme(
           strip.background = element_blank(),
           strip.placement = "outside",
-          strip.text = element_text(face = "bold")
+          strip.text = element_text(face = "bold"),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank()
         )
   } else {
       stop("Invalid plot type. Please specify 'box', 'violin', 'density' or 'dot'.")
@@ -801,86 +809,8 @@ plot_taxa_shifts <- function(top_number = 10,
 
 # ---- Ordinations ----
 
-## ---- Ordinations with Microviz ----
-
-#Example (to iterate through a list of ranks):
-#resolution <- c("Phylum", "Class", "Order", "Family", "Genus", "Species")
-#plots <- lapply(resolution, function(rank) {
-#  plot_pca(phyloseq_obj = merged_phylo_obj_f, 
-#           rank_transformation = rank, 
-#           variable = "Study", 
-#           colors_list = colors_study)})
-#combined_plot <- wrap_plots(plots, ncol = 2) & theme(legend.position = "bottom") 
-
-plot_pca_microviz <- function(phyloseq_obj, rank_transformation, variable, colors_list=NULL) {
-  # Transform and calculate distance
-  phylo_trans <- phyloseq_obj %>% tax_fix() %>% tax_transform(rank = rank_transformation, trans = "identity")
-  dist_matrix <- dist_calc(phylo_trans, "euclidean")
-  ord_res <- ord_calc(dist_matrix, "PCA")
-  
-  # Plot
-  p <- ord_plot(ord_res, axes = c(1, 2), fill = variable, shape = variable, alpha = 0.8, size = 2) +
-    ggtitle(label = paste0(
-      rank_transformation)) +
-    scale_shape_girafe_filled() +
-    ggplot2::stat_ellipse(aes(color = !!sym(variable) ) )+
-    theme(
-      plot.title = element_text(face = "bold", size = 12, hjust = .5),
-      legend.text = element_text(size = 14),
-      legend.title = element_text(size = 14),
-      axis.text = element_text(size = 10, vjust = 0.5, hjust = 1)
-    )
-  
-    # Add color scales if a custom colors_list is provided
-  if (!is.null(colors_list)) {
-    p <- p + scale_fill_manual(values = colors_list) +
-      scale_color_manual(values = colors_list)
-  }
-  return(p)
-}
 
 
-#Example (to iterate through a list of ranks):
-#resolution <- c("Phylum", "Class", "Order", "Family", "Genus", "Species")
-#plots <- lapply(resolution, function(rank) {
-#  plot_PCoA(phyloseq_obj = merged_phylo_obj_f,
-#    rank_transformation = rank,
-#    trans_type = "identity",        
-#    dist_cal_type = "bray",   
-#    ord_calc_method = "NMDS",
-#    variable = "Study", 
-#    colors_list = colors_study)})
-#combined_plot <- wrap_plots(plots, ncol = 2) & theme(legend.position = "bottom") 
-
-plot_PCoA_microviz <- function(phyloseq_obj, rank_transformation, trans_type, dist_cal_type, ord_calc_method, variable, colors_list=NULL) {
-  # Transform and calculate distance
-  phylo_trans <- phyloseq_obj %>% tax_fix() %>%
-    tax_transform(rank = rank_transformation, trans = trans_type)
-  dist_matrix <- dist_calc(phylo_trans, dist_cal_type)
-  ord_res <- ord_calc(dist_matrix, ord_calc_method)
-  
-
-  # Plot
-  p <- ord_plot(ord_res, axes = c(1, 2), fill = variable, shape = variable, alpha = 0.8, size = 2, plot_taxa = 1:5, size = 2) +
-    ggtitle(label = paste0(
-      rank_transformation)) +
-    scale_shape_girafe_filled() +
-    ggplot2::stat_ellipse(aes(color =!!sym(variable) )) +
-    theme(
-      plot.title = element_text(face = "bold", size = 12, hjust = .5),
-      legend.text = element_text(size = 14),
-      legend.title = element_text(size = 14),
-      axis.text = element_text(size = 10, vjust = 0.5, hjust = 1)
-    )
-  
-    # Add color scales if a custom colors_list is provided
-  if (!is.null(colors_list)) {
-    p <- p + scale_fill_manual(values = colors_list) +
-      scale_color_manual(values = colors_list)
-  }
-  return(p)
-
-}
 
 ## ---- Compare methods ----
 
@@ -1312,7 +1242,9 @@ run_ordination_with_validation <- function(phyloseq_obj,
       plot.title = element_text(face = "bold", size = 12, hjust = .5),
       legend.text = element_text(size = 14),
       legend.title = element_text(size = 14),
-      axis.text = element_text(size = 12, vjust = 0.5, hjust = 1)
+      axis.text = element_text(size = 12, vjust = 0.5, hjust = 1),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
     )
   
   if (!is.null(colors_list)) {
@@ -1397,7 +1329,10 @@ analyze_type_clustering_on_pca <- function(scores_df,
     labs(title = "Silhouette Scores by Type",
          x = "Type",
          y = "Silhouette Score") +
-    theme_bw() 
+    theme_bw() +
+    theme(
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
   
   if (!is.null(colors_list)) {
     sil_plot <- sil_plot + scale_fill_manual(values = colors_list)
@@ -1844,7 +1779,9 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
     labs(title = "Maaslin2 Results", x=NA, y = "coef") +
     theme_bw()+
     theme(axis.text.x = element_text(angle = 0, hjust = 1), 
-          axis.text.y = element_text(face="italic"))
+          axis.text.y = element_text(face="italic"),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
   
   dot_plot <- df_fig %>%
     ggplot(aes(x = abs(coef), y = feature_order)) +
@@ -1857,7 +1794,9 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1), # Rotate x-axis labels
       plot.title = element_text(hjust = 0.5),  # Center the title
-      axis.text.y = element_text(hjust = 1)) 
+      axis.text.y = element_text(hjust = 1),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank())
   
   
   #CREATE PLOTS OF COUNTS, TSS, and CLR
@@ -1896,7 +1835,9 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
       theme(
         strip.background = element_blank(),
         strip.placement = "outside",
-        strip.text = element_text(face = "bold")
+        strip.text = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
       )
     
     #Box plot
@@ -1912,7 +1853,9 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
       theme(
         strip.background = element_blank(),
         strip.placement = "outside",
-        strip.text = element_text(face = "bold")
+        strip.text = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
       )
     
     #Violin
@@ -1928,7 +1871,9 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
       theme(
         strip.background = element_blank(),
         strip.placement = "outside",
-        strip.text = element_text(face = "bold")
+        strip.text = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
       )
   } else {
     stop("Invalid plot type. Please specify 'box', 'violin', 'density' or 'dot'.")
@@ -2080,7 +2025,9 @@ runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1), # Rotate x-axis labels
       plot.title = element_text(hjust = 0.5),  # Center the title
-      axis.text.y = element_text(hjust = 1, color = df_fig$color)) 
+      axis.text.y = element_text(hjust = 1, color = df_fig$color),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank())
   
   
   #Bar plot
@@ -2100,7 +2047,9 @@ runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved
     theme_bw() + 
     theme(plot.title = element_text(hjust = 0.5),
           panel.grid.minor.y = element_blank(),
-          axis.text.y = element_text(hjust = 1, color = df_fig$color)) +
+          axis.text.y = element_text(hjust = 1, color = df_fig$color),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank()) +
     coord_flip()
   
   
@@ -2146,7 +2095,9 @@ runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved
       theme(
         strip.background = element_blank(),
         strip.placement = "outside",
-        strip.text = element_text(face = "bold")
+        strip.text = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
       )
     
     #Box plot
@@ -2162,7 +2113,9 @@ runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved
       theme(
         strip.background = element_blank(),
         strip.placement = "outside",
-        strip.text = element_text(face = "bold")
+        strip.text = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
       )
     
     #Violin
@@ -2178,7 +2131,9 @@ runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved
       theme(
         strip.background = element_blank(),
         strip.placement = "outside",
-        strip.text = element_text(face = "bold")
+        strip.text = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
       )
     
     #Density
@@ -2193,7 +2148,9 @@ runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved
       theme(
         strip.background = element_blank(),
         strip.placement = "outside",
-        strip.text = element_text(face = "bold")
+        strip.text = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
       )
     
     
@@ -2405,7 +2362,9 @@ iterate_aldex2 <- function(ps_obj, iterative_methods, resolutions, group, plot_c
         x = "Analysis Method",
         y = "Significant Features"
       ) +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank())
    # scale_fill_manual(values = plot_colors)
   }
 
@@ -2489,7 +2448,9 @@ run_aldex2 <- function(ps_obj, group, tax_rank, method, transform, normalization
     theme_bw() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1),
-      plot.title = element_text(hjust = 0.5)
+      plot.title = element_text(hjust = 0.5),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
     )
   
   # Bar plot
@@ -2502,7 +2463,9 @@ run_aldex2 <- function(ps_obj, group, tax_rank, method, transform, normalization
     theme_bw() +
     theme(
       plot.title = element_text(hjust = 0.5),
-      panel.grid.minor.y = element_blank()
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
     )
   
   #Return
@@ -2792,8 +2755,7 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
         strip.text = element_text(size = 12, face = "bold"),
         strip.text.y = element_text(angle = 0, vjust = 0.5, hjust = 0.5),
         axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12),
-        axis.text.y = element_text(face = "italic", color = "black", size = 12)
-      ) + 
+        axis.text.y = element_text(face = "italic", color = "black", size = 12)) + 
       theme(
         legend.position = "bottom",
         legend.box = "vertical"  
@@ -3677,13 +3639,7 @@ create_topic_model <- function(counts_data, k_value, alpha, method){
 ### Plot beta
 #plot_beta(result, 15)
 #Plot beta, or the numbers that are assigned to each word in a topic. If the beta score is higher, the word matters more in that topic.
-
-plot_beta <- function(lda_result, n_top_topics, b_df, normalized_count_table, fill_colors = NULL) {
-  library(dplyr)
-  library(ggplot2)
-  library(tidytext)
-  library(pheatmap)
-  library(stringr)
+plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
   
   # ----- Top terms across topics for barplots
   top_terms <- b_df %>% 
@@ -3713,8 +3669,9 @@ plot_beta <- function(lda_result, n_top_topics, b_df, normalized_count_table, fi
       strip.background = element_rect(fill = "white", color = "black"),
       strip.text = element_text(face = "bold", size = 14),
       axis.text.y = element_text(face = "italic", color="black", size=14),
-      axis.text.x = element_text(angle=45, color="black", hjust=1)
-    ) +
+      axis.text.x = element_text(angle=45, color="black", hjust=1),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()) +
     labs(x = NULL, y = "Beta")
   
   if (!is.null(fill_colors)) {
@@ -3723,76 +3680,8 @@ plot_beta <- function(lda_result, n_top_topics, b_df, normalized_count_table, fi
     barplots <- barplots + scale_fill_viridis_d()
   }
   
-  # ----- One heatmap per topic
-  build_heatmap_for_topic <- function(topic_no, n_top = 10) {
-    
-    # Top terms for this topic (cleaned)
-    tt <- b_df %>% 
-      filter(topic == topic_no) %>%
-      slice_max(beta, n = n_top, with_ties = FALSE) %>%
-      ungroup() %>%
-      mutate(
-        topic = factor(topic),
-        term  = gsub("^g__", "", term),
-        term  = str_replace_all(term, "\\.", ""),
-        term  = str_replace_all(term, "_", " "),
-        term  = str_replace_all(term, "__(1|2|3)$", "")
-      )
-    
-    # Ensure unique order vector
-    term_order <- unique(tt$term)
-    
-    # Build the matrix in the same cleaned naming space
-    data_mat <- normalized_count_table %>%
-      arrange(Type) %>%
-      mutate(Type = as.character(Type)) %>%
-      arrange(Type) %>%
-      select(-Type) %>%
-      tibble::column_to_rownames("Sample") %>%
-      as.matrix() %>%
-      t() %>% as.data.frame() %>%
-      tibble::rownames_to_column("term") %>%
-      mutate(
-        term = gsub("^g__", "", term),
-        term = str_replace_all(term, "\\.", ""),
-        term = str_replace_all(term, "_", " "),
-        term = str_replace_all(term, "__(1|2|3)$", "")
-      ) %>%
-      filter(term %in% term_order) %>%
-      tibble::column_to_rownames("term") %>%
-      as.matrix()
-    
-    # Reorder rows to match top_terms order
-    data_mat <- data_mat[term_order, , drop = FALSE]
-    
-    # Column annotations (samples x Type)
-    type_annot <- normalized_count_table %>%
-      select(Sample, Type) %>%
-      tibble::column_to_rownames("Sample")
-    
-    ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
-    
-    # Build heatmap (silent)
-    pheatmap(
-      log1p(data_mat),                  # safer than log()
-      annotation_col    = type_annot,
-      annotation_colors = ann_colors,
-      scale             = "none",
-      cluster_rows      = FALSE,        # preserve your order
-      cluster_cols      = FALSE,
-      color             = colorRampPalette(c("#564592", "white", "#D7CF07"))(100),
-      show_rownames     = TRUE,
-      show_colnames     = FALSE,
-      main              = paste("Topic", topic_no),
-      silent            = TRUE
-    )
-  }
-  
-  # Build heatmaps for topics 1, 2, 3 using n_top_topics
-  hm_list <- lapply(1:3, build_heatmap_for_topic, n_top = n_top_topics)
-  
   # Return: barplots ggplot + list of pheatmap objects
-  list(bar_plots = barplots, heatmaps = hm_list)
+  return(barplots)
 }
 
 # Heatmap of the relab of the top terms in each topic
@@ -3983,7 +3872,9 @@ plot_gamma_umap <- function(lda_results, type_column, type_colors, g_df ){
       labs(title = "Silhouette Scores by Type",
            x = "Type",
            y = "Silhouette Score") +
-      theme_bw() 
+      theme_bw() + 
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank())
     
     if (!is.null(type_colors)) {
       sil_plot <- sil_plot + scale_fill_manual(values = type_colors)
@@ -4021,7 +3912,7 @@ topic_membership <- function(lda_result, type_column, colors, g_df){
       mutate(p_adj = p.adjust(p_value, method = "fdr"))  # adjust for multiple testing
     
     
-    ggplot(topics_long_type, aes(x = Type, y = gamma, fill = Type)) +
+    plot <- ggplot(topics_long_type, aes(x = Type, y = gamma, fill = Type)) +
       geom_boxplot() +
       scale_fill_manual(values = colors) +
       facet_wrap(~ topic, labeller = labeller(topic = ~ paste0("Topic ", .x))) +
@@ -4029,14 +3920,12 @@ topic_membership <- function(lda_result, type_column, colors, g_df){
       theme_bw() +
       theme(
         strip.background = element_rect(fill = "white", color = "black"),
-        strip.text = element_text(face = "bold", size = 12)
-      ) +
-      stat_compare_means(
-        aes(label = paste0("p=", ..p.format..)),
-        method = "wilcox.test",
-        label.y = 0.6   # move lower on the y-axis
-        
-      )
+        strip.text = element_text(face = "bold", size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+      ) 
+    
+    return(list(plot = plot))
 }
 
 
@@ -4094,191 +3983,3 @@ heatmap_by_topic <- function(b_df = result$b_df, normalized_count_table = ps_fs_
   return(heatmap = p)
 }
 
-
-# ---- Correlations ----
-
-correlations <- function(taxa_csv = ps_fs_genus_csv, top_n = 25){
-  
-  flattenCorrMatrix <- function(cormat, pmat) {
-    ut <- upper.tri(cormat)
-    data.frame(
-      row    = rownames(cormat)[row(cormat)[ut]],
-      column = colnames(cormat)[col(cormat)[ut]],  # <- use colnames here
-      cor    = cormat[ut],
-      p      = pmat[ut],
-      stringsAsFactors = FALSE
-    )
-  }
-  
-  # Optional: add FDR and stars
-  p_to_stars <- function(p) ifelse(is.na(p), "",
-                                   ifelse(p <= 0.001, "***",
-                                          ifelse(p <= 0.01,  "**",
-                                                 ifelse(p <= 0.05,  "*", ""))))
-  
-  clean_taxon <- function(x) {
-    x  %>%
-      stri_trans_nfkc() %>%                 # Unicode normalize
-      str_replace_all("_A$", "")  %>%     
-      str_replace_all("_P$", "")  %>%        
-      str_replace_all("\\p{Z}+", " ")  %>%  # any Unicode space class -> single space
-      str_squish() %>%                     # trim + collapse internal spaces
-      str_replace_all("[\\p{P}\\p{S}]+", " ")  %>%  # drop punctuation/symbols
-      str_replace_all("-", "")  %>%        
-      str_replace_all("^p", "")  %>% 
-      str_replace_all("^g", "")  %>%
-      str_replace_all(" s ", " ")  %>%
-      str_replace_all(" G ", " G")  %>%
-      str_replace_all(" F ", " F")  %>%
-      str_squish() 
-  }
-  
-  
-  df_plaque <- taxa_csv %>%
-    dplyr::filter(Type == "Plaque") %>%
-    dplyr::select(-c("Type")) %>%
-    dplyr::rename_with(~ paste0(.x, "_P")) %>%
-    dplyr::rename("Sample" = "Sample_P") %>%
-    dplyr::mutate(Sample = sub("-[PA]$", "", Sample))
-  
-  df_abscess <- taxa_csv %>%
-    dplyr::filter(Type == "Abscess") %>%
-    dplyr::select(-c("Type")) %>%
-    dplyr::rename_with(~ paste0(.x, "_A"))%>%
-    dplyr::rename("Sample" = "Sample_A")%>%
-    dplyr:: mutate(Sample = sub("-[PA]$", "", Sample))
-  
-  df_join <- dplyr::inner_join(df_plaque, df_abscess, by = "Sample") %>% select(-Sample) %>%  data.matrix()
-  
-  corr <- Hmisc::rcorr(df_join, type = "spearman")
-  
-  flat_corr <- flattenCorrMatrix(corr$r, corr$P)
-  
-  df_plot <- flat_corr %>%
-    dplyr::mutate(
-      q = p.adjust(p, method = "BH"),
-      stars = p_to_stars(p),
-      alpha_sig = ifelse(p < 0.05, 1, 0.25)   
-    ) %>%
-    as.data.frame() %>%
-    filter(str_ends(row, "_P"), str_ends(column, "_A")) %>%  # keep P→A pairs
-    filter(q < .05) %>%
-    filter(!is.na(cor)) %>%
-    dplyr::arrange(dplyr::desc(abs(cor))) %>%
-    dplyr::mutate(row = clean_taxon(row)) %>%
-    dplyr::mutate(column = clean_taxon(column)) 
-  
-  
-  p_bubble <- ggplot(df_plot, aes(x = row, y = column)) +
-    # bubbles
-    geom_point(aes(size = log(q), color = cor, alpha = alpha_sig)) +
-    # p-value stars on top
-    #geom_text(aes(label = stars), vjust = 0.5, size = 3) +
-    # diverging palette centered at 0
-    scale_color_gradient2(
-      low = "#752ACB", high = "#89D0C1",
-      midpoint = 0, name = "Spearman's Rho"
-    ) +
-    scale_size(range = c(2.5, 6), name = "Log q-value") +
-    scale_alpha_identity() +
-    coord_fixed() +
-    labs(
-      x = "Plaque Taxa", y = "Abscess Taxa",
-      title = "Plaque–Abscess Cross-Correlations"
-    ) +
-    theme_bw(base_size = 12) +
-    theme(
-      axis.title = element_text(face = "bold", color = "black", size = 14),
-      axis.text.x = element_text(face = "italic", color = "black", size = 12,  hjust = 1, angle=45),
-      axis.text.y = element_text(face = "italic", color = "black", size = 12),
-      legend.position = "right"
-    )
-  
-  
-  
-  ## -- Alluvial plot
-  
-  # Build a tidy "links" table for alluvial
-  df_alluv <- df_plot %>%
-    transmute(
-      plaque  = row,
-      abscess = column,
-      weight  = pmax(1e-4, abs(cor)),  # avoid true zeros (makes ribbons vanish)
-      cor     = cor,
-      sig     = p < 0.05,
-      stars   = stars
-    )
-  
-  # Optional: order strata by total flow to keep it readable
-  plaque_order <- df_alluv %>%
-    group_by(plaque) %>% dplyr::summarise(tot = sum(weight), .groups = "drop") %>%
-    dplyr::arrange(dplyr::desc(tot)) %>% pull(plaque)
-  
-  abscess_order <- df_alluv %>%
-    dplyr::group_by(abscess) %>% dplyr::summarise(tot = sum(weight), .groups = "drop") %>%
-    arrange(dplyr::desc(tot)) %>% pull(abscess)
-  
-  df_alluv <- df_alluv %>%
-    dplyr::mutate(
-      plaque  = factor(plaque,  levels = plaque_order),
-      abscess = factor(abscess, levels = abscess_order)
-    ) %>%
-    dplyr::filter(sig == "TRUE")
-  
-  # Plot: bipartite alluvial with flow color = correlation
-  p_alluvial <- ggplot(
-    df_alluv,
-    aes(axis1 = plaque, axis2 = abscess, y = weight,
-        fill = cor, alpha = ifelse(sig, 1, 0.35))
-  ) +
-    geom_alluvium(width = 0.6, knot.pos = 0.4, decreasing = FALSE, color = "grey30") +
-    geom_stratum(width = 0.6, fill = "grey92", color = "grey30") +
-    # italic taxon labels on strata
-    geom_text(stat = "stratum", aes(label = after_stat(stratum)),
-              size = 3.2, fontface = "italic") +
-    # axes names
-    scale_x_discrete(limits = c("Plaque taxa", "Abscess taxa"), expand = c(.1, .1)) +
-    # color encodes correlation (same palette as your bubble plot)
-    scale_fill_gradient2(
-      low = "#752ACB", mid = "#E5ECF2", high = "#C0E6DE",
-      midpoint = 0, limits = c(-1, 1), name = "r (Spearman)"
-    ) +
-    scale_alpha_identity() +
-    labs(
-      title = "Plaque–Abscess cross-correlations (alluvial view)",
-      y = "|correlation| (flow width)", x = NULL
-    ) +
-    theme_minimal(base_size = 12) +
-    theme(
-      legend.position = "right",
-      axis.text.x = element_text(face = "bold", color = "black"),
-      plot.title = element_text(face = "bold")
-    )
-  
-  return(list(data = df_plot, alluvial=p_alluvial, bubble_plot = p_bubble))
-}
-
-
-
-
-# Wilcoxon Test
-wilcox_tests <- function(df) {
-  
-  df <- df %>% column_to_rownames(var="Sample")
-  
-  taxa <- setdiff(names(df), "Type")
-  
-  pvals <- sapply(taxa, function(taxon) {
-    x <- df[df$Type == "Plaque", taxon]
-    y <- df[df$Type == "Abscess", taxon]
-    wilcox.test(x, y)$p.value
-  })
-  
-  results <- data.frame(
-    Taxon = taxa,
-    pval = pvals,
-    FDR = p.adjust(pvals, method = "fdr")
-  ) %>% remove_rownames() %>%
-    arrange(FDR)
-  return(results)
-}

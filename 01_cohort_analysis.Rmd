@@ -152,32 +152,7 @@ df_sorted %>% filter(rho_rank == 1 | rho_rank == 2 ) %>% kable()
 ```
 
 
-## NMDS Genus relab bray
-```{r, fig.width=5, fig.height=3.5}
-Genus_NMDS_res <- run_ordination_with_validation(
-  phyloseq_obj = ps_f,
-  rank_transformation = "Genus",
-  trans_type = "relab",
-  ord_calc_method = "NMDS",
-  dist_cal_type = "bray",  #only needed for PCoA, PCA uses euclidean by default
-  component_num = 2,
-  variable = "Type",
-  Axis_1 = "Axis1",
-  Axis_2 = "Axis2",
-  colors_list = colors_all
-)
 
-Genus_NMDS_res$plot
-```
-
-```{r, fig.width=3, fig.height=3}
-Genus_NMDS_res_scores_df <- as.data.frame(Genus_NMDS_res$scores)
-
-Genus_NMDS_res_scores_df_sil <- analyze_type_clustering_on_pca(Genus_NMDS_res_scores_df,                                           
-                                          component_num = 2,
-                                          colors_list = colors_all)
-Genus_NMDS_res_scores_df_sil$sil_plot
-```
 
 ## PCoA Genus relab bray
 ```{r, fig.width=5, fig.height=3.5}
@@ -196,6 +171,9 @@ Genus_PCoA_res <- run_ordination_with_validation(
 
 Genus_PCoA_res$plot
 Genus_PCoA_res$lib_size_with_Axis1_corr
+
+ggsave("output/Genus_PCoA_relab_bray_plot.png", Genus_PCoA_res$plot, width = 5, height = 3.5, dpi=600)
+
 ```
 
 ```{r, fig.width=3, fig.height=3}
@@ -205,6 +183,8 @@ Genus_PCoA_res_scores_df_sil <- analyze_type_clustering_on_pca(Genus_PCoA_res_sc
                                           component_num = 2,
                                           colors_list = colors_all)
 Genus_PCoA_res_scores_df_sil$sil_plot
+ggsave("output/Genus_PCoA_relab_bray_sil_scores.png",Genus_PCoA_res_scores_df_sil$sil_plot, width = 3, height = 3, dpi=600)
+
 ```
 
 
@@ -238,34 +218,8 @@ Genus_PCA_res_scores_df_sil$sil_plot
 
 
 
-## NMDS Phylum relab bray
-```{r, fig.width=5, fig.height=3.5}
-Phylum_NMDS_res <- run_ordination_with_validation(
-  phyloseq_obj = ps_f,
-  rank_transformation = "Phylum",
-  trans_type = "relab",
-  ord_calc_method = "NMDS",
-  dist_cal_type = "bray",  #only needed for PCoA, PCA uses euclidean by default
-  component_num = 2,
-  variable = "Type",
-  Axis_1 = "Axis1",
-  Axis_2 = "Axis2",
-  colors_list = colors_all
-)
 
-Phylum_NMDS_res$plot
-```
-
-```{r, fig.width=3, fig.height=3}
-Phylum_NMDS_res_scores_df <- as.data.frame(Phylum_NMDS_res$scores)
-
-Phylum_NMDS_res_scores_df_sil <- analyze_type_clustering_on_pca(Phylum_NMDS_res_scores_df,                                           
-                                          component_num = 2,
-                                          colors_list = colors_all)
-Phylum_NMDS_res_scores_df_sil$sil_plot
-```
-
-## PCoA Phylum relab jaccard
+## PCoA Phylum relab bray
 ```{r, fig.width=5, fig.height=3.5}
 Phylum_PCoA_res <- run_ordination_with_validation(
   phyloseq_obj = ps_f,
@@ -282,6 +236,9 @@ Phylum_PCoA_res <- run_ordination_with_validation(
 
 Phylum_PCoA_res$plot
 Phylum_PCoA_res$lib_size_with_Axis1_corr
+
+ggsave("output/Phylum_PCoA_relab_bray.png", Phylum_PCoA_res$plot, width = 5, height = 3.5, dpi=600)
+
 ```
 
 ```{r, fig.width=3, fig.height=3}
@@ -291,6 +248,9 @@ Phylum_PCoA_res_scores_df_sil <- analyze_type_clustering_on_pca(Phylum_PCoA_res_
                                           component_num = 2,
                                           colors_list = colors_all)
 Phylum_PCoA_res_scores_df_sil$sil_plot
+
+ggsave("output/Phylum_PCoA_relab_bray_sil_scores.png", Phylum_PCoA_res_scores_df_sil$sil_plot, width = 3, height = 3, dpi=600)
+
 ```
 
 
@@ -330,39 +290,60 @@ Phylum_PCA_res_scores_df_sil$sil_plot
 a_my_comparisons <- list( c("Abscess", "Plaque"))
 symnum.args = list(cutpoints = c(0, 0.001, 0.01, 0.05, 0.1, 1), symbols = c("****", "***", "**", "*", "ns"))
 
-p_Shannon <- plot_richness(ps_f, x="Type", measures="Shannon", color = "Type")+
-    geom_boxplot(alpha=1, width = 0.6) +
-    theme_bw(base_size=14) +
-  theme(legend.position="none",         
-        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), 
-        axis.title.x = element_blank(),
-        strip.background = element_rect(fill = "white", color = "white"), 
-        strip.text = element_blank())  +
-  stat_compare_means(method = "wilcox.test", comparisons = a_my_comparisons, label = "p.format")+
+Shan_df <- plot_richness(ps_f, x="Type", measures="Shannon")$data
+
+p_Shannon <- ggplot(Shan_df, aes(x=Type, y=value, color=Type)) +
+  geom_boxplot(alpha = 1, width = 0.6, outlier.shape = NA) +
+  geom_jitter(size = 1.2, width = 0.15, alpha = 0.7) +
+  stat_compare_means(method="wilcox.test", comparisons=a_my_comparisons, label="p.format",
+                     label.y = c(5.5), 
+                     vjust = -.4) +
   scale_color_manual(values = colors_all) +
-  ylim(0, 6.2)
+  ylim(1, 6.2) +
+  theme_bw(base_size = 14) +
+  labs(title="Shannon") + 
+  theme(
+    legend.position="none",
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+    axis.title.x = element_blank(),
+    strip.background = element_rect(fill="white", color="white"),
+    strip.text = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
 
 
+ob_df <- plot_richness(ps_f, x="Type", measures="Observed")$data
 
-p_Observed <- plot_richness(ps_f, x="Type", measures="Observed", color = "Type")+
-    geom_boxplot(alpha=1, width = 0.6) +
-    theme_bw(base_size=14) +
-  theme(legend.position="none",         
-        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), 
-        axis.title.x = element_blank(),
-        strip.background = element_rect(fill = "white", color = "white"), 
-        strip.text = element_blank())  +
-  stat_compare_means(method = "wilcox.test", comparisons = a_my_comparisons, label = "p.format")+
+p_Observed <- ggplot(ob_df, aes(x=Type, y=value, color=Type)) +
+  geom_boxplot(alpha = 1, width = 0.6, outlier.shape = NA) +
+  geom_jitter(size = 1.2, width = 0.15, alpha = 0.7) +
+  stat_compare_means(method="wilcox.test", comparisons=a_my_comparisons, label="p.format", 
+    label.y = c(380), 
+    vjust = -.4) +
   scale_color_manual(values = colors_all) +
-  ylim(0, 470)
-
-p_Shannon
-
+  ylim(0, 450) +
+  theme_bw(base_size = 14) +
+  labs(title="Observed") + 
+  theme(
+    legend.position="none",
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+    axis.title.x = element_blank(),
+    strip.background = element_rect(fill="white", color="white"),
+    strip.text = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
 ```
 
 
-```{r, fig.width=1.8, fig.height=3}
-p_Observed
+```{r, fig.width=3.3, fig.height=3}
+combined_alpha <- p_Shannon + p_Observed
+combined_alpha
+
+ggsave("output/Alpha_Diversity_Plots.png", combined_alpha, width = 3.3, height = 3, dpi=600)
+```
+```{r}
 
 ```
 
@@ -406,7 +387,14 @@ top_df %>%
             ylab = "Average Relative Abundance",
             ggtheme = theme_bw()) + 
   font("title", face="bold") +
-  theme(plot.title=element_text(hjust=0.5), plot.subtitle=element_text(hjust=0.5), legend.text = element_text(face = "italic"))
+  theme(plot.title=element_text(hjust=0.5), 
+        plot.subtitle=element_text(hjust=0.5), 
+        legend.text = element_text(face = "italic"), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+ggsave("output/Phylum_Average_Barplot.png", width = 4.2, height = 4, dpi=600)
+
 ```
 
 ### 4.1.2 Genus 
@@ -440,44 +428,14 @@ top_df %>%
             ylab = "Average Relative Abundance",
             ggtheme = theme_bw()) + 
   font("title", face="bold") +
-  theme(plot.title=element_text(hjust=0.5), plot.subtitle=element_text(hjust=0.5), legend.text = element_text(face = "italic"))
-```
+  theme(plot.title=element_text(hjust=0.5), 
+        plot.subtitle=element_text(hjust=0.5), 
+        legend.text = element_text(face = "italic"), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
 
-### 4.1.3 Microshades Genus MB
-```{r, eval=FALSE, fig.width=8, fig.height=4}
-# # Use microshades function prep_mdf to agglomerate, normalize, and melt the phyloseq object
-# mdf_prep <- prep_mdf(ps_fs)
-# 
-# mdf_prep <- mdf_prep %>%
-#   mutate(Kingdom = gsub("k__", "", Kingdom)) %>%
-#   mutate(Phylum = gsub("p__", "", Phylum)) %>%
-#   mutate(Class = gsub("c__", "", Class)) %>%
-#   mutate(Order = gsub("o__", "", Order)) %>%
-#   mutate(Family = gsub("f__", "", Family)) %>%
-#   mutate(Genus = gsub("g__", "", Genus)) %>%
-#   mutate(Species = gsub("s__", "", Species)) 
-# 
-# print(unique(mdf_prep$Phylum))
-# 
-# # Create a color object for the specified data
-# color_obj <- create_color_dfs(mdf_prep, 
-#             selected_groups = c("Proteobacteria", "Actinobacteria","Bacteroidetes", "Fusobacteria",
-#                                 "Spirochaetes"),
-#     cvd = FALSE, top_orientation=TRUE)
-# 
-# # Extract
-# mdf <- color_obj$mdf
-# cdf <- color_obj$cdf
-# 
-# plot_1 <- plot_microshades(mdf, cdf)
-# 
-# plot_1 + scale_y_continuous(labels = scales::percent, expand = expansion(0)) +
-#   theme_bw() +
-#   theme(legend.key.size = unit(0.2, "cm"), text=element_text(size=10), ) +
-#   theme(axis.text.x = element_text(size= 6)) +
-#   facet_wrap(~Type, scales= "free_x") 
+ggsave("output/Genus_Average_Barplot.png", width = 3.5, height = 4, dpi=600)
 ```
-
 
 
 ### 4.1.4 Species 
@@ -511,7 +469,11 @@ top_df %>%
             ylab = "Average Abundance",
             ggtheme = theme_bw()) + 
   font("title", face="bold") +
-  theme(plot.title=element_text(hjust=0.5), plot.subtitle=element_text(hjust=0.5))
+  theme(plot.title=element_text(hjust=0.5), 
+        plot.subtitle=element_text(hjust=0.5), 
+        legend.text = element_text(face = "italic"), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
 ```
 
 
@@ -544,6 +506,8 @@ pheatmap(log(df),
          annotation_colors = ann_colors,
          color = my_colors,
          border_color = NA)
+
+ggsave("output/Genus_Heatmap.png", width = 6.5, height = 5, dpi=600)
 ```
 
 
@@ -562,7 +526,7 @@ count_data_genus <- taxa_shifts_genus$bubble_data %>%
 
 write_csv(count_data_genus, "output/taxa_trends_genus_count_data.csv")
 
-
+ggsave("output/Genus_Taxa_Shifts.png", taxa_shifts_genus$combined_plot, width = 7, height = 5, dpi=600)
 ```
 
 
@@ -584,6 +548,7 @@ count_data_species <- taxa_shifts_species$bubble_data %>%
 
 write_csv(count_data_species, "output/taxa_trends_species_count_data.csv")
 
+ggsave("output/Species_Taxa_Shifts.png", taxa_shifts_species$combined_plot, width = 12, height = 5, dpi=600)
 ```
 
 
@@ -830,19 +795,24 @@ phylum_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
   heatmap_side = "Plaque",        # or "Abscess"
   bubble_max_size = 9,
   plot_layout_widths = c(2, 1))
+
 phylum_combined_bubbles_P$combined_plot
+ggsave("output/Phylum_DA_Bubble_Plaque_labs.png", phylum_combined_bubbles_P$combined_plot, width = 6.2, height = 3, dpi=600)
 
 phylum_bubbledata_P <- phylum_combined_bubbles_P$bubble_data %>% 
   pivot_wider(names_from = group2, values_from = count) %>%
   dplyr::mutate(Type = "Plaque")
 ```
 
-```{r, eval=FALSE, fig.width=11, fig.height=1.9}
+```{r, fig.width=3.2, fig.height=1.1}
 phylum_combined_bubbles_P$combined_plot_nolabs
+
+ggsave("output/Phylum_DA_Bubble_Plaque_no-labs.png", phylum_combined_bubbles_P$combined_plot_nolabs, width = 3.2, height = 1.1, dpi=600)
+
 ```
 
 
-```{r, fig.width=5, fig.height=3.5}
+```{r, fig.width=6, fig.height=3.4}
 phylum_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
   CSV_formatted_relab_df = ps_fs_phylum_csv,
   group = "Type",               # your contrast label used in ANCOMBC2 column names
@@ -852,6 +822,8 @@ phylum_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
   plot_layout_widths = c(2, 1))
 phylum_combined_bubbles_A$combined_plot
 
+ggsave("output/Phylum_DA_Bubble_Abscess_labs.png", phylum_combined_bubbles_A$combined_plot, width = 6, height = 3.4, dpi=600)
+
 phylum_bubbledata_A <- phylum_combined_bubbles_A$bubble_data %>% 
   pivot_wider(names_from = group2, values_from = count) %>%
   dplyr::mutate(Type = "Abscess")
@@ -859,8 +831,10 @@ phylum_bubbledata_A <- phylum_combined_bubbles_A$bubble_data %>%
 
 
 
-```{r,  eval=FALSE, fig.width=11, fig.height=1.9}
-phylum_combined_bubbles_P$combined_plot_nolabs
+```{r, fig.width=3.8, fig.height=1.45}
+phylum_combined_bubbles_A$combined_plot_nolabs
+
+ggsave("output/Phylum_DA_Bubble_Abscess_no-labs.png", phylum_combined_bubbles_A$combined_plot_nolabs, width = 3.8, height = 1.45, dpi=600)
 ```
 
 ```{r}
@@ -889,6 +863,8 @@ genus_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_genus,
   plot_layout_widths = c(2, 1))
 genus_combined_bubbles_P$combined_plot
 
+ggsave("output/Genus_DA_Bubble_Plaque_labs.png", genus_combined_bubbles_P$combined_plot, width = 7.5, height = 8, dpi=600)
+
 genus_bubbledata_P <- genus_combined_bubbles_P$bubble_data %>% 
   pivot_wider(names_from = group2, values_from = count) %>%
   dplyr::mutate(Type = "Plaque")
@@ -908,6 +884,8 @@ genus_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_genus,
   bubble_max_size = 9,
   plot_layout_widths = c(2, 1))
 genus_combined_bubbles_A$combined_plot
+
+ggsave("output/Genus_DA_Bubble_Abscess_labs.png", genus_combined_bubbles_A$combined_plot, width = 7.9, height = 6.8, dpi=600)
 
 genus_bubbledata_A <- genus_combined_bubbles_A$bubble_data %>% 
   pivot_wider(names_from = group2, values_from = count) %>%
@@ -933,7 +911,7 @@ write_csv(genus_count_data, "output/genus_count_data_DA_bubbledata.csv")
 DA_results_df_sp <- combine_DA(maaslin2_results_Species_0.05, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species")
 ```
 
-```{r, fig.width=10.7, fig.height=11}
+```{r, fig.width=10.6, fig.height=11.1}
 sp_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_sp,
   CSV_formatted_relab_df = ps_fs_species_csv,
   group = "Type",               
@@ -942,6 +920,8 @@ sp_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_sp,
   bubble_max_size = 7,
   plot_layout_widths = c(2, 1))
 sp_combined_bubbles_P$combined_plot
+
+ggsave("output/Species_DA_Bubble_Plaque_labs.png", sp_combined_bubbles_P$combined_plot, width = 10.6, height = 11.1, dpi=600)
 
 sp_bubbledata_P <- sp_combined_bubbles_P$bubble_data %>% 
   pivot_wider(names_from = group2, values_from = count) %>%
@@ -955,7 +935,7 @@ sp_bubbledata_P <- sp_combined_bubbles_P$bubble_data %>%
 sp_combined_bubbles_P$combined_plot_nolabs
 ```
 
-```{r, fig.width=10.7, fig.height=7}
+```{r, fig.width=10.9, fig.height=7.2}
 species_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_sp,
   CSV_formatted_relab_df = ps_fs_species_csv,
   group = "Type",               
@@ -965,6 +945,7 @@ species_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_sp,
   plot_layout_widths = c(2, 1))
 species_combined_bubbles_A$combined_plot
 
+ggsave("output/Species_DA_Bubble_Abscess_labs.png", species_combined_bubbles_A$combined_plot, width = 10.9, height = 7.2, dpi=600)
 
 sp_bubbledata_A <- species_combined_bubbles_A$bubble_data %>% 
   pivot_wider(names_from = group2, values_from = count) %>%
@@ -1008,6 +989,8 @@ plot_all_taxa(ps_obj = ps_fs,
               plot_type = "dot",
               plot_colors = colors_all,
               taxa_filter = c("p__Fusobacteria" ))
+
+ggsave("output/Selected_Phyla_Fusobacteria_Dotplot_TSS.png", width = 2.5, height = 2.8, dpi=600)
 ```
 ```{r, fig.width=2.5, fig.height=2.8}
 plot_all_taxa(ps_obj = ps_fs,
@@ -1017,6 +1000,8 @@ plot_all_taxa(ps_obj = ps_fs,
               plot_type = "dot",
               plot_colors = colors_all,
               taxa_filter = c("p__Fusobacteria" ))
+
+ggsave("output/Selected_Phyla_Fusobacteria_Dotplot_CLR.png", width = 2.5, height = 2.8, dpi=600)
 ```
 ### Selected Genus Plot
 ```{r, fig.width=8, fig.height=3}
@@ -1026,7 +1011,9 @@ plot_all_taxa(ps_obj = ps_fs,
               taxa_level = "Genus",
               plot_type = "dot",
               plot_colors = colors_all,
-              taxa_filter = c("g__Leptotrichia", "g__Corynebacterium", "g__Actinomyces", "g__Treponema", "g__Dialister", "g__Veillonellaceae_[G-1]"))
+              taxa_filter = c( "g__Actinomyces", "g__Corynebacterium", "g__Leptotrichia","g__Dialister", "g__Treponema",  "g__Veillonellaceae_[G-1]"))
+
+ggsave("output/Selected_Genus_Dotplot_1.png", width = 8, height = 3, dpi=600)
 ```
 
 ```{r, fig.width=8, fig.height=3}
@@ -1036,45 +1023,55 @@ plot_all_taxa(ps_obj = ps_fs,
               taxa_level = "Genus",
               plot_type = "dot",
               plot_colors = colors_all,
-              taxa_filter = c("g__Rothia", "g__Neisseria", "g__Lautropia", "g__Lancefieldella", "g__Solobacterium", "g__Oribacterium"))
+              taxa_filter = c("g__Lautropia", "g__Neisseria",  "g__Rothia", "g__Lancefieldella", "g__Oribacterium", "g__Solobacterium"))
+
+ggsave("output/Selected_Genus_Dotplot_2.png", width = 8, height = 3, dpi=600)
 ```
 
 ```{r, fig.width=2.5, fig.height=3}
-plot_all_taxa(ps_obj = ps_fs,
+clr_fuso <- plot_all_taxa(ps_obj = ps_fs,
               transformation = "CLR",
               group = "Type",
               taxa_level = "Genus",
               plot_type = "dot",
               plot_colors = colors_all,
               taxa_filter = c("g__Fusobacterium"))
+clr_fuso
+ggsave("output/Selected_Genus_CLR_Fusobacterium_Dotplot.png", clr_fuso, width = 2.5, height = 3, dpi=600)
 
-plot_all_taxa(ps_obj = ps_fs,
+tss_fuso <- plot_all_taxa(ps_obj = ps_fs,
               transformation = "TSS",
               group = "Type",
               taxa_level = "Genus",
               plot_type = "dot",
               plot_colors = colors_all,
               taxa_filter = c("g__Fusobacterium"))
+tss_fuso
+ggsave("output/Selected_Genus_TSS_Fusobacterium_Dotplot.png", tss_fuso, width = 2.5, height = 3, dpi=600)
+
 ```
 
 ### Selected Species Plot
 ```{r, fig.width=4, fig.height=3}
-plot_all_taxa(ps_obj = ps_fs,
+sp_fuso_tss <- plot_all_taxa(ps_obj = ps_fs,
               transformation = "TSS",
               group = "Type",
               taxa_level = "Species",
               plot_type = "dot",
               plot_colors = colors_all,
               taxa_filter = c("g__Fusobacterium_s__nucleatum", "g__Fusobacterium_s__periodonticum"))
+sp_fuso_tss
+ggsave("output/Selected_Species_TSS_Fusobacterium_Dotplot.png", sp_fuso_tss, width = 4, height = 3, dpi=600)
 
-
-plot_all_taxa(ps_obj = ps_fs,
+sp_fuso_clr <- plot_all_taxa(ps_obj = ps_fs,
               transformation = "CLR",
               group = "Type",
               taxa_level = "Species",
               plot_type = "dot",
               plot_colors = colors_all,
               taxa_filter = c("g__Fusobacterium_s__nucleatum", "g__Fusobacterium_s__periodonticum"))
+sp_fuso_clr
+ggsave("output/Selected_Species_CLR_Fusobacterium_Dotplot.png", sp_fuso_clr, width = 4, height = 3, dpi=600)
 ```
 
 
@@ -1155,7 +1152,7 @@ labs <- rownames(mat)
 labs_expr <- parse(text = sprintf("italic('%s')",
                                   gsub("'", "\\\\'", labs, fixed = TRUE)))
 
-pheatmap(log(mat),
+p <- pheatmap(log(mat),
          cluster_rows = FALSE,
          cluster_cols = FALSE,
          labels_row = labs_expr,
@@ -1163,6 +1160,9 @@ pheatmap(log(mat),
         display_numbers = round(as.matrix(mat), 1),  # 1 decimal place
         fontsize_number = 10,
          main = "Feature Ranks per Fold")
+p 
+
+ggsave("output/RF_Feature_Ranks_per_Fold_Heatmap.png", p, width = 3.8, height = 4, dpi=600)
 ```
 
 
@@ -1181,13 +1181,16 @@ for (fold in unique(for_lift$resample)) {
 
 lift_obj <- lift(Class ~ rf, data = for_lift, class = "Plaque")
 
-ggplot(lift_df) +
+roc_p <- ggplot(lift_df) +
   geom_line(aes(x = 1 - Sp, y = Sn, color = fold)) +
   scale_color_manual(
     name = "Fold",
     values = c("#DD1155", "#00CC99", "#F4B942", "#3399FF")
   ) +
   theme_bw()
+roc_p
+
+ggsave("output/RF_ROC_Curve_per_Fold.png", roc_p, width = 4, height = 3, dpi=600)
 ```
 
 
@@ -1358,6 +1361,8 @@ plot <- ggplot(core_df_genus, aes(x = prevalence, y = Genera, fill = value)) +
     legend.text = element_text(size = 8)
   )
 
+ggsave("output/Core_Genera_Heatmap.png", plot, width = 5, height = 5, dpi=600)
+
 ```
 
 # 9.0 Topic modeling
@@ -1410,64 +1415,16 @@ model <- result$lda_model
 ```
 
 ## Plot beta
-```{r}
-
+```{r, fig.height=3, fig.width=9}
 ### Plot beta
 #plot_beta(result, 15)
 #Plot beta, or the numbers that are assigned to each word in a topic. If the beta score is higher, the word matters more in that topic.
 
-plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
-  
-  # ----- Top terms across topics for barplots
-  top_terms <- b_df %>% 
-    group_by(topic) %>% 
-    slice_max(beta, n = n_top_topics, with_ties = FALSE) %>%
-    ungroup() %>%
-    mutate(
-      topic = factor(topic),
-      term  = gsub("^g__", "", term),
-      term  = str_replace_all(term, "\\.", ""),
-      term  = str_replace_all(term, "_", " "),
-      term  = str_replace_all(term, "__(1|2|3)$", "")
-    )
-  
-  # ----- Barplots
-  barplots <- ggplot(top_terms, aes(
-    x = tidytext::reorder_within(term, beta, topic),
-    y = beta,
-    fill = topic
-  )) +
-    geom_col(show.legend = FALSE) +
-    facet_wrap(~ topic, scales = "free", labeller = labeller(topic = ~ paste0("Topic ", .x))) +
-    scale_x_reordered() +
-    coord_flip() +
-    theme_bw(base_size = 12) +
-    theme(
-      strip.background = element_rect(fill = "white", color = "black"),
-      strip.text = element_text(face = "bold", size = 14),
-      axis.text.y = element_text(face = "italic", color="black", size=14),
-      axis.text.x = element_text(angle=45, color="black", hjust=1)
-    ) +
-    labs(x = NULL, y = "Beta")
-  
-  if (!is.null(fill_colors)) {
-    barplots <- barplots + scale_fill_manual(values = fill_colors)
-  } else {
-    barplots <- barplots + scale_fill_viridis_d()
-  }
-  
-  # Return: barplots ggplot + list of pheatmap objects
-  return(barplots)
-}
-
-```
-
-
-
-```{r, fig.height=3, fig.width=9}
-my_colors <- c("1" = "#3185FC", "2" = "#FF495C", "3" = "grey")
+my_colors <- c("1" = "#3185FC", "2" = "#FF495C", "3" = "#c7defe")
 p <- plot_beta(result, 10, result$b_df,  fill_colors = my_colors)
 p
+
+ggsave("output/Topic_Model_Beta_Barplots.png", p, width = 9, height = 3, dpi=600)
 ```
 
 ```{r, fig.height=3, fig.width=6}
@@ -1475,28 +1432,52 @@ p2 <- plot_beta_heatmaps(result, 10, result$b_df, normalized_count_table = ps_fs
 p2[1]
 p2[2]
 p2[3]
+
+ggsave("output/Topic_Model_Beta_Heatmap_Topic1.png", p2[[1]], width = 6, height = 3, dpi=600)
+ggsave("output/Topic_Model_Beta_Heatmap_Topic2.png", p2[[2]], width = 6, height = 3, dpi=600)
+ggsave("output/Topic_Model_Beta_Heatmap_Topic3.png", p2[[3]], width = 6, height = 3, dpi=600)
+
 ```
 
 
 ## Heatmap of gamma scores 
 ```{r, fig.height=1.5, fig.width=9}
 heatmap_gamma(result, "Type", result$g_df)
+
+ggsave("output/Topic_Model_Gamma_Heatmap.png", last_plot(), width = 9, height = 1.5, dpi=600)
 ```
 
 ## UMAP of gamma scores
 ```{r fig.height=6, fig.width=6}
 UMAP_res <- plot_gamma_umap(results, "Type", colors_all, result$g_df)
+
+ggsave("output/Topic_Model_Gamma_UMAP.png", UMAP_res$umap_plot, width = 6, height = 6, dpi=600)
 ```
 
 ```{r, fig.width=3, fig.height=3}
 UMAP_res$sil_plot
+
+ggsave("output/Topic_Model_Gamma_UMAP_Silhouette.png", UMAP_res$sil_plot, width = 3, height = 3, dpi=600)
 ```
 
 ##Membership of topic by Type
 ```{r, fig.height=2.5, fig.width=4}
-source("MK_Microbiome_Functions.R")
 
-topic_membership(result, "Type", colors_all, result$g_df)
+topic_membership_res <- topic_membership(result, "Type", colors_all, result$g_df)
+
+hist(result$g_df$gamma)
+
+plot <- topic_membership_res$plot + 
+  stat_compare_means(
+    comparisons = list(c("Abscess", "Plaque")),
+    method = "wilcox.test",
+    label.y = c(1), 
+    vjust = .45,
+    label = "p.signif")+ 
+    ylim(0, 1.1)
+plot
+
+ggsave("output/Topic_Model_Topic_Membership_by_Type.png", plot, width = 4, height = 2.5, dpi=600)
 ```
 
 ## Relab heatmaps by topic
@@ -1504,11 +1485,13 @@ topic_membership(result, "Type", colors_all, result$g_df)
 ```{r, fig.height=3, fig.width=6.3}
 topic1_res <- heatmap_by_topic(result$b_df, ps_fs_genus_csv, n_top = 15, topic = 1)
 topic1_res
+
 ```
 
 ```{r, fig.height=3, fig.width=6.5}
 topic2_res <- heatmap_by_topic(result$b_df, ps_fs_genus_csv, n_top = 15, topic = 2)
 topic2_res
+
 ```
 
 ```{r, fig.height=3, fig.width=6.3}
