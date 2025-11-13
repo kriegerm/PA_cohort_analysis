@@ -1,7 +1,6 @@
 confidence,taxon,A,P,Type
 High,Oribacterium sp HMT 078,19,6,Abscess
 Medium,Treponema socranskii,20,5,Abscess
-Medium,Treponema maltophilum,21,4,Abscess
 Medium,Solobacterium moorei,19,6,Abscess
 Medium,Prevotella sp HMT 292,20,5,Abscess
 Medium,Prevotella oris,22,3,Abscess
@@ -10,6 +9,7 @@ Medium,Dialister invisus,20,5,Abscess
 Medium,Alloprevotella tannerae,24,1,Abscess
 Low,Veillonellaceae G1 bacterium HMT 150,20,5,Abscess
 Low,Treponema sp HMT 231,20,5,Abscess
+Low,Treponema maltophilum,21,4,Abscess
 Low,Treponema lecithinolyticum,20,5,Abscess
 Low,Treponema denticola,19,6,Abscess
 Low,Selenomonas sputigena,19,6,Abscess

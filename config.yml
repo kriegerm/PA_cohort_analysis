@@ -1,9 +1,0 @@
-default:
-  figs: "../figures/01/pediatric/"
-  rds: "00data_Pediatric.rds"
-  study: "pediatric"
-  
-adult:
-  figs: "../figures/01/adult/"
-  rds: "00data_AdultAbscess.rds"
-  study: "adult_abscess"

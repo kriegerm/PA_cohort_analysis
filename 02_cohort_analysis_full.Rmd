@@ -1,5 +1,5 @@
 ---
-title: "01 Cohort Analysis"
+title: "02 Cohort Analysis"
 author: "Madeline Krieger"
 date: "`r Sys.Date()`"
 output:
@@ -15,20 +15,14 @@ params:
 
 ---
 
+This contains all of the analyses done to produce the manuscript figures, including the behind-the-scenes troubleshooting and diagnostics. For a cleaner verson of this script, see "02_cohort_analysis_manuscript.Rmd", where the code to make each figure is very clearly labeled. 
+
 ```{r setup, include=FALSE}
-library(config)
-
-#CHANGE THIS CHUNK based on if you want to run Pediatric (default) or Adult Abscess (adult)
-cfg <- config::get(config = "default")
-
 knitr::opts_chunk$set(message = FALSE,
                       warning = FALSE,
                       error = FALSE,
-                      fig.path = cfg$figs,
-                      fig.keep = "all",
-                      dev = c("png"),
+                      fig.keep = none,
                       cache = FALSE,
-                      # Do not use lazy loading which fails for large objects
                       cache.lazy = FALSE)
 ```
 
@@ -49,9 +43,12 @@ pacman::p_load(
   forcats, purrr, rlang, tidyr, tibble, ggplot2
 )
 
-here::i_am("01_cohort_analysis.Rmd")
+#Create directories for output
+output_path = "output/"
+output_path_data = "output/data/" #Already created in script 01
 
-if (!dir.exists("output")) dir.create("output")
+# Create these directories
+dir.create(output_path, showWarnings = FALSE, recursive = TRUE)
 ``` 
 
 
@@ -86,10 +83,10 @@ date = Sys.Date()
 
 ## 1.2 Load data and process
 
-### 1.2.1 Load Data from 00
+### 1.2.1 Load Data from 01
 ```{r}
 # Load the saved Rds file
-loaded_objects <- readRDS(cfg$rds)
+loaded_objects <- readRDS(paste0(output_path_data, "00data.rds"))
 
 # Assign back the objects to the environment, if needed
 list2env(loaded_objects, .GlobalEnv)
@@ -150,8 +147,6 @@ df_sorted <- df_sorted %>%
 
 df_sorted %>% filter(rho_rank == 1 | rho_rank == 2 ) %>% kable()
 ```
-
-
 
 
 ## PCoA Genus relab bray

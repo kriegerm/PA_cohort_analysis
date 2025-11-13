@@ -132,7 +132,9 @@ plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
       strip.background = element_rect(fill = "white", color = "black"),
       strip.text = element_text(face = "bold", size = 14),
       axis.text.y = element_text( color="black", size=14),            
-      axis.text.x = element_text(angle=45, color="black", hjust=1)            
+      axis.text.x = element_text(angle=45, color="black", hjust=1) ,
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()           
     ) +
     labs(x = NULL, y = "Beta")
   
@@ -152,8 +154,17 @@ beta_results <- plot_beta(result, 15, result$b_df, fill_colors = my_colors)
 table(beta_results$top_terms$topic)
 ```
 
-```{r, fig.width=15, fig.height=30}
+```{r, fig.width=15, fig.height=25}
+
+write.csv(beta_results$top_terms, file = paste0("output/Topic_modeling_Anvio_Topic_Beta_Top15_terms.csv"))
+
 beta_results$p
+
+ggsave(filename = paste0("output/Topic_modeling_Anvio_Topic_Beta_Top15.png"),
+       plot = beta_results$p,
+       width = 15,
+       height = 30,
+       dpi = 300)
 ```
 
 ## Heatmap of gamma scores 
@@ -236,16 +247,22 @@ umap_plot <- plot(umap_result$layout,
      xlab = "UMAP 1", 
      ylab = "UMAP 2", 
      main = "UMAP Visualization")
+
+ggsave(filename = paste0("output/Topic_modeling_Anvio_Topic_UMAP.png"),
+       plot = umap_plot,
+       width = 6,
+       height = 6,
+       dpi = 300)
 ```
-```{r, fig.width=2.8, figh.height=6}
-# Extract PCA axes
-pca_matrix <- umap_result$layout
+```{r, fig.width=2.8, figh.height=8}
+# Extract  axes
+umap_matrix <- umap_result$layout
 
 # Ensure 'Type' is a factor
 meta_data$Type <- factor(meta_data$Type)
 
 # Calculate distance matrix and silhouette scores using "Type" as cluster labels
-dist_matrix <- dist(pca_matrix)
+dist_matrix <- dist(umap_matrix)
 cluster_labels <- as.integer(meta_data$Type)  # silhouette() needs numeric cluster labels
 
 sil <- silhouette(cluster_labels, dist_matrix)
@@ -264,8 +281,17 @@ sil_plot <- ggplot(sil_df, aes(x = Type, y = Silhouette, fill = Type)) +
        x = "Type",
        y = "Silhouette Score") +
     theme_bw() +
+  theme(
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
   scale_fill_manual(values = colors_all) 
 sil_plot
+
+ggsave(filename = paste0("output/Topic_modeling_Anvio_Topic_UMAP_Silhouette_by_Type.png"),
+       plot = sil_plot,
+       width = 2.8,
+       height = 8,
+       dpi = 300)
 ```
 
 
@@ -301,7 +327,7 @@ pvals <- topics_long_type %>%
 
 print(pvals)
 
-ggplot(topics_long_type, aes(x = Type, y = gamma, fill = Type)) +
+plot <- ggplot(topics_long_type, aes(x = Type, y = gamma, fill = Type)) +
   geom_boxplot() +
   scale_fill_manual(values = colors) +
   facet_wrap(~ topic, labeller = labeller(topic = ~ paste0("Topic ", .x))) +
@@ -309,14 +335,25 @@ ggplot(topics_long_type, aes(x = Type, y = gamma, fill = Type)) +
   theme_bw() +
   theme(
     strip.background = element_rect(fill = "white", color = "black"),
-    strip.text = element_text(face = "bold", size = 12)
-  ) +
-  stat_compare_means(
-    aes(label = paste0("p=", ..p.format..)),
+    strip.text = element_text(face = "bold", size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+    
+  ) +  stat_compare_means(
+    comparisons = list(c("Abscess", "Plaque")),
     method = "wilcox.test",
-      label.y = 0.6   # move lower on the y-axis
+    label.y = c(.65), 
+    vjust = .45,
+    hide.ns = TRUE,
+    label = "p.signif")+ 
+    ylim(0, .72)
+plot
 
-  )
+ggsave(filename = paste0("output/Topic_modeling_Anvio_Topic_Membership_by_Type_", date, ".png"),
+       plot = plot,
+       width = 5,
+       height = 4.5,
+       dpi = 300)
 ```
 
 ```{r}

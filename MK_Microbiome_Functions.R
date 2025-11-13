@@ -116,50 +116,6 @@ filter_unmatched_samples_Pediatric <- function(phyloseq_obj) {
 }
 
 
-## Filter for unmatched samples - non-Pediatric study
-#This function is used inside the function filter_phyloseq
-# For the manuscript I only use the pediatric study, but I'm keeping this here in case we ever want to use it on other studies
-filter_unmatched_samples <- function(phyloseq_obj) {
-  
-  #Make sure only Plaque and Abscess samples are retained
-  phyloseq_obj <- subset_samples(phyloseq_obj, Type %in% c("Abscess", "Plaque"))
-  
-  # Extract sample data with sample_names as a column
-  sample_data_df <- as(sample_data(phyloseq_obj), "data.frame")
-  sample_data_df$SampleID <- rownames(sample_data_df)  # These are sample_names()
-  
-  # Check for required columns
-  if (!all(c("Sample", "Type") %in% colnames(sample_data_df))) {
-    stop("Sample data must contain 'Sample' and 'Type' columns.")
-  }
-  
-  #Find Samples (i.e., individuals) that only have one Type
-  type_counts <- sample_data_df %>%
-    dplyr::filter(Type %in% c("Plaque", "Abscess")) %>%
-    dplyr::group_by(Sample) %>%
-    dplyr::summarise(num_types = n_distinct(Type), .groups = "drop")
-  
-  # Get the Sample IDs (individuals) to drop
-  single_type_sample_values <- type_counts %>%
-    dplyr::filter(num_types == 1) %>%
-    dplyr::pull(Sample)
-  
-  #Find the sample_names (SampleID) associated with those individuals
-  sample_names_to_remove <- sample_data_df %>%
-    dplyr::filter(Sample %in% single_type_sample_values) %>%
-    dplyr::pull(SampleID)
-  
-  # Print for confirmation
-  print("Samples being removed (sample_names):")
-  print(sample_names_to_remove)
-  
-  # Prune phyloseq object
-  filtered_phyloseq_obj <- prune_samples(!(sample_names(phyloseq_obj) %in% sample_names_to_remove), phyloseq_obj)
-  return(filtered_phyloseq_obj)
-}
-
-
-
 ## ---- Filter Phyloseq ----
 #Example:
 #filter_phyloseq(phy_obj_oscc, "Pediatric", Contam_g, Contam_f, Contam_s)
@@ -358,222 +314,7 @@ plot_all_taxa <- function(ps_obj,
 
 # ---- Taxa Trends ----
 
-# This is an old function I wrote - it works just as well as the new one, but produces a heatmap kind of thing of counts, and I opted for a bubble plot. That function is defined below this one.
-plot_taxa_shifts_count_plots <- function(top_number = 10,
-                             input_df = ps_fs_genus_csv){
-  
-  # --- This function probably isn't that flexible...it does exactly what I want for this very specific use case.
-  
-  # Manipulate the input DF
-  df_long <- input_df %>%
-    select(-Sample) %>%
-    pivot_longer(-Type, names_to = "Taxa", values_to = "Abundance")
-  
-  stopifnot(all(c("Type","Taxa","Abundance") %in% names(df_long)))
-  
-  # Per-taxon stats: medians, means, Wilcoxon, FDR 
-  summ <- df_long %>%
-    dplyr::group_by(Taxa) %>%                     
-    dplyr::summarise(
-      n_plaque  = sum(Type == "Plaque"),
-      n_abscess = sum(Type == "Abscess"),
-      median_plaque = median(Abundance[Type == "Plaque"],  na.rm = TRUE),
-      median_abscess= median(Abundance[Type == "Abscess"], na.rm = TRUE),
-      mean_plaque   = mean(Abundance[Type == "Plaque"],    na.rm = TRUE),
-      mean_abscess  = mean(Abundance[Type == "Abscess"],   na.rm = TRUE),
-      # Wilcoxon rank-sum (two-sided)
-      p = tryCatch(
-        wilcox.test(Abundance[Type == "Plaque"], Abundance[Type == "Abscess"],
-                    exact = FALSE)$p.value,
-        error = function(e) NA_real_
-      ),
-      .groups = "drop"
-    ) %>%
-    dplyr::mutate(
-      diff_median = median_plaque - median_abscess,   # magnitude (median)
-      diff_mean   = mean_plaque   - mean_abscess,     # magnitude (mean)
-      direction   = case_when(
-        diff_median >  0 ~ "Plaque",
-        diff_median <  0 ~ "Abscess",
-        TRUE             ~ "Tie"
-      ),
-      padj = p.adjust(p, method = "BH")
-    )
-  
-  
-  # Pick top-10 (or top X) per direction by |median difference|
-  top10 <- summ %>%
-    dplyr::filter(padj <= .05) %>%
-    dplyr::filter(direction %in% c("Plaque", "Abscess")) %>%
-    dplyr::group_by(direction) %>%
-    slice_max(order_by = abs(diff_median), n = top_number, with_ties = FALSE) %>%
-    ungroup() %>%
-    # clean labels
-    dplyr::mutate(
-      Taxa_clean = str_remove(Taxa, "^g__"),
-      Taxa_clean = str_remove_all(Taxa_clean, "s__"),
-      Taxa_clean = str_replace_all(Taxa_clean, "_", " "),
-      #Taxa_clean = str_replace_all(Taxa_clean, "-", ""),
-      Taxa_clean = str_replace_all(Taxa_clean, "G ", "G"),
-      Taxa_clean = str_remove_all(Taxa_clean, "\\[|\\]"),
-      signed_effect = diff_median   # positive -> Plaque, negative -> Abscess
-    ) 
-  
-  
-  # Significance stars from FDR (padj)
-  p_to_stars <- function(p) {
-    ifelse(is.na(p), "",
-           ifelse(p < 0.001, "***",
-                  ifelse(p < 0.01, "**",
-                         ifelse(p < 0.05, "*", "")
-                  )
-           )
-    )
-  }
-  
-  offset <- 0.1 * max(abs(top10$signed_effect), na.rm = TRUE)
-  top10 <- top10 %>%
-    mutate(
-      star = p_to_stars(padj),
-      label_y = signed_effect + ifelse(signed_effect >= 0, offset, -offset)
-    )
-  
-  
-  # Bar Plot: positive bars = Plaque enrichment; negative = Abscess
-  bar_plot <- ggplot(top10,
-                     aes(x = reorder(Taxa_clean, signed_effect),
-                         y = signed_effect,
-                         fill = direction)) +
-    geom_col(color = "black") +
-    geom_text(aes(y = label_y, label = star), size = 5, vjust = .8) +
-    coord_flip() +
-    geom_vline(xintercept = seq(1.5, length(unique(top10$Taxa)) - 0.5, 1),
-               color = "black", size = 0.3) +
-    geom_hline(yintercept = 0, linetype = "dashed") +
-    labs(x = NULL,
-         y = "",
-         fill = "Enriched in") +
-    theme_bw(base_size = 12) +
-    theme(
-      axis.text.y = element_text(face = "italic", color="black", size=11),
-      axis.text.x = element_text(angle = 45, color="black", size=11, hjust=1),
-      panel.grid.major = element_blank(),
-      panel.grid.minor = element_blank(),
-      legend.position = "none"
-    ) +
-    scale_fill_manual(values = colors_all) 
-  
-  
-  # Make heatmaps of sample-specific trends
-  tax_pull <- top10$Taxa
-  
-  #A lot of code to determine the ratio of Abscess to plaque (+1 for more in abscess and -1 for more in plaque)
-  data_pull <- input_df %>% 
-    pivot_longer(cols=starts_with("g_"), names_to = "Taxa", values_to = "relab") %>% 
-    dplyr::filter(Taxa %in% tax_pull) %>%
-    dplyr::mutate(Taxa = str_remove(Taxa, "^g__")) %>%
-    dplyr::mutate(Taxa = str_remove(Taxa, "s__")) %>%
-    dplyr::mutate(Taxa = str_replace_all(Taxa, "_", " ")) %>%
-    dplyr::mutate(Taxa = str_remove_all(Taxa, "\\[|\\]")) %>%
-    dplyr::mutate(Sample = str_replace_all(Sample, "-P", "")) %>%
-    dplyr::mutate(Sample = str_replace_all(Sample, "-A", "")) %>%
-    pivot_wider(names_from = "Type", values_from = "relab") %>%
-    dplyr::mutate(Ratio = Abscess / Plaque, RatioFlag = if_else(Ratio > 1, 1, -1))
-  
-  
-  #Counting the number of samples for each taxa with plaque and abscess enrichment
-  df_summary <- data_pull %>%
-    mutate(Taxa = trimws(as.character(Taxa))) %>%  # ensure clean text
-    dplyr::group_by(Taxa) %>%
-    dplyr::summarise(
-      Abscess_enriched  = sum(RatioFlag == 1, na.rm = TRUE),
-      Plaque_enriched = sum(RatioFlag == -1, na.rm = TRUE)
-    ) 
-  
-  # Pull the top taxa 
-  df_summary <- df_summary[match(top10$Taxa_clean, df_summary$Taxa), ]
-  
-  print(df_summary)
-  df_summary <- df_summary %>% column_to_rownames(var="Taxa")
-  
-  mat <- as.matrix(df_summary)
-  
-  # Single-column matrices (preserve rownames)
-  mat_A <- mat[, "Abscess_enriched", drop = FALSE]
-  mat_P <- mat[, "Plaque_enriched",  drop = FALSE]
-  
-  desired_order <- rev(rownames(df_summary))
-  
-  # Color mappings (independent per column).
-  # Use the observed ranges so each legend reflects that column's scale.
-  abs_min <- min(mat[, "Abscess_enriched"],  na.rm = TRUE)
-  abs_max <- max(mat[, "Abscess_enriched"],  na.rm = TRUE)
-  plq_min <- min(mat[, "Plaque_enriched"],   na.rm = TRUE)
-  plq_max <- max(mat[, "Plaque_enriched"],   na.rm = TRUE)
-  
-  col_abscess <- colorRamp2(c(abs_min, abs_max), c("white", "#FF495C"))
-  col_plaque  <- colorRamp2(c(plq_min, plq_max), c("white", "#3185FC"))
-  
-  # Function to add raw counts inside cells
-  add_counts_A <- function(j, i, x, y, width, height, fill) {
-    grid.text(mat_A[i, j], x, y, gp = gpar(fontsize = 12, col = "black"))
-  }
-  
-  # Cell text function - white font
-  add_counts_P <- function(j, i, x, y, width, height, fill) {
-    grid.text(mat_P[i, j], x, y, gp = gpar(fontsize = 12, col = "black"))
-  }
-  
-  
-  # One heatmap per column; they’ll draw side-by-side as a single plot.
-  
-  # The first heatmap controls row clustering/order for both.
-  # Map desired order to indices for each (robust even if you subset/reorder upstream)
-  row_ord_A <- match(desired_order, rownames(mat_A))
-  row_ord_P <- match(desired_order, rownames(mat_P))
-  
-  ht_abs <- Heatmap(
-    mat_A,
-    col                 = col_abscess,
-    cluster_rows        = FALSE,
-    cluster_columns     = FALSE,
-    row_order           = row_ord_A,        #force original order
-    show_row_names      = FALSE,             
-    show_column_names = FALSE,
-    row_names_gp        = gpar(fontface="italic"),
-    column_title        = "A",
-    show_heatmap_legend = FALSE,
-    cell_fun            = add_counts_A,
-    border              = TRUE,             # draw border for each cell
-    rect_gp             = gpar(col = "black", lwd = 1) # border color & width
-  )
-  
-  ht_plq <- Heatmap(
-    mat_P,
-    col                 = col_plaque,
-    cluster_rows        = FALSE,
-    cluster_columns     = FALSE,
-    row_order           = row_ord_P,       
-    show_row_names      = FALSE,           
-    show_column_names = FALSE,
-    column_title        = "P",
-    show_heatmap_legend = FALSE,
-    cell_fun            = add_counts_P,
-    border              = TRUE,             # draw border for each cell
-    rect_gp             = gpar(col = "black", lwd = 1) # border color & width
-  )
-  
-  
-  # Draw as one unified figure with two legends
-  ht_list <- ht_abs + ht_plq
-  
-  
-  return(list(bar_plot =bar_plot, count_plot = ht_list, data = summ))
-  
-}
-
-# This is the one I actually used! 
-# The new function that plots the taxa trends with bubbles
+# Plot the taxa trends with bubbles
 plot_taxa_shifts <- function(top_number = 10,
                              input_df = ps_fs_genus_csv,
                              bubble_max_size = 10,
@@ -809,9 +550,6 @@ plot_taxa_shifts <- function(top_number = 10,
 
 # ---- Ordinations ----
 
-
-
-
 ## ---- Compare methods ----
 
 #BIG function to compare different ordination methods 
@@ -825,7 +563,6 @@ compare_ordination_methods <- function(phyloseq_obj,
   
   #Create a parameter hash so that you can just load results if they've already been run in an identical way
   param_hash <- digest(list(
-    study = cfg$study,
     phyloseq_obj = phyloseq_obj,
     rank_transformations = rank_transformations,
     trans_types = trans_types,
@@ -1707,7 +1444,7 @@ iterate_maaslin2_picrust2 <- function(counts_input, metadata, iterative_methods,
 run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold){
   
   # Create a unique hash for the parameters
-  param_hash <- digest(list(cfg$study, ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold))
+  param_hash <- digest(list(ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold))
   # File path for the analysis results
   result_file <- file.path("../saved_analysis_files/", paste0("maaslin2_result_", param_hash, ".rds"))
   
@@ -1900,7 +1637,7 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
 runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved_results=NULL, plot_type, plot_colors){
   
   # Create a unique hash for the parameters
-  param_hash <- digest(list(cfg$study, ps_obj, tax_level, group, Log2FC_cutoff=NULL))
+  param_hash <- digest(list(ps_obj, tax_level, group, Log2FC_cutoff=NULL))
   # File path for the analysis results
   result_file <- file.path("../saved_analysis_files/", paste0("ancombc2_result_", param_hash, ".rds"))
   
@@ -2197,7 +1934,7 @@ iterate_aldex2 <- function(ps_obj, iterative_methods, resolutions, group, plot_c
 
 
   # Create a unique hash for the parameters
-  param_hash <- digest(list(cfg$study, ps_obj, resolutions, group))
+  param_hash <- digest(list( ps_obj, resolutions, group))
   # File path for the analysis results
   result_file <- file.path("../saved_analysis_files/", paste0("iterative_aldex2_result_", param_hash, ".rds"))
 

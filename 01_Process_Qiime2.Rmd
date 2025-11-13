@@ -1,5 +1,5 @@
 ---
-title: "Process reads: Pediatric"
+title: "Process Qiime2 Data"
 author: "Madeline Krieger"
 date: "`r Sys.Date()`"
 output:
@@ -22,7 +22,6 @@ knitr::opts_chunk$set(message = FALSE,
                       cache.lazy = FALSE)
 ```
 
-
 # 1.0 Load and Define
 
 ## 1.1 Load packages and presets
@@ -31,8 +30,11 @@ knitr::opts_chunk$set(message = FALSE,
 library("pacman")
 pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "microViz")
 
-here::i_am("00_process_pediatric_cohort.Rmd")
+#Create directories for output
+output_path = "output/data/"
 
+# Create these directories
+dir.create(output_path, showWarnings = FALSE, recursive = TRUE)
 ``` 
 
 ### 1.1.2 My packages
@@ -136,5 +138,5 @@ plot <- hist(counts, main="Histogram of Counts", xlab="Counts", ylab="Frequency"
 ```{r}
 saveRDS(list(ps_f=ps_f, 
              ps_fs= ps_fs), 
-             file = paste0("00data_Pediatric.rds"))
+             file = paste0(output_path, "00data.rds"))
 ```

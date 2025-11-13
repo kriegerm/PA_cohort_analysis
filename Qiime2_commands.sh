@@ -1,3 +1,4 @@
+# The following commands are for processing 16S rRNA gene sequencing data using QIIME 2 (version 2022.2).
 
 conda activate /opt/miniconda3/envs/qiime2-2022.2
 
@@ -58,55 +59,7 @@ qiime tools export \
 
 
 
-
-#######NATIVE BAYES METHOD################
-
-qiime feature-classifier classify-sklearn \
-  --i-classifier ../../HOMD_classifier_MK/rescript_V3V4_classifier.qza \
-  --i-reads ./Qiime2/Trimmed/representative_sequences.qza  \
-  --o-classification ./Qiime2/rescript_nativebayes/taxonomy.qza
-  
-qiime metadata tabulate \
-  --m-input-file ./Qiime2/rescript_nativebayes/taxonomy.qza \
-  --o-visualization ./Qiime2/rescript_nativebayes/taxonomy.qzv
-  
- qiime taxa barplot \
-  --i-table ./Qiime2/Trimmed/table.qza \
-  --i-taxonomy ./Qiime2/rescript_nativebayes/taxonomy.qza \
-  --m-metadata-file ./metadata.tsv \
-  --output-dir ./Qiime2/rescript_nativebayes/Barplot
-  
-qiime tools view ./Qiime2/rescript_nativebayes/Barplot/visualization.qzv
-
-#EXPORT THE (unfiltered) TABLE
-qiime tools export \
---input-path ./Qiime2/Trimmed/table.qza \
---output-path ./Qiime2/Files_For_Phyloseq
-
-#Take the taxonomy.qza and open in text editor (BBedit) and access data/.tsv Change headers to [#OTUID taxonomy confidence] and save in the "Files_for_phyloseq" folder. use that as the observation-#metadata-fp input and use the mapping file for the –m input for the biom add-metadata plugin! 
-
-
-#Add Taxonomy to .biom file
-biom add-metadata \
- 	-i ./Qiime2/Files_For_Phyloseq/feature-table.biom \
-  	-m ./metadata.tsv \
- 	--observation-metadata-fp ./Qiime2/Files_For_Phyloseq/taxonomy.tsv \
-  	-o ./Qiime2/Files_For_Phyloseq/feature_table_w_taxonomy.biom \
-  	--sc-separated taxonomy \
-  	--observation-header OTUID,taxonomy
-
-#This next step is optional to ensure that the taxonomic ranks were correctly added to the sequences.
-biom convert \
--i ./Qiime2/Files_For_Phyloseq/feature_table_w_taxonomy.biom \
--o ./Qiime2/Files_For_Phyloseq/feature_table_w_taxonomy.tsv \
---to-tsv \
---header-key taxonomy 
-
-
-
-
-##############BLAST METHOD########################
-
+#BLAST to Reference
 
 qiime feature-classifier classify-consensus-blast \
   --i-query ./Qiime2/Trimmed/representative_sequences.qza  \
