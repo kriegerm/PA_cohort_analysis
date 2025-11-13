@@ -21,7 +21,7 @@ This contains all of the analyses done to produce the manuscript figures, includ
 knitr::opts_chunk$set(message = FALSE,
                       warning = FALSE,
                       error = FALSE,
-                      fig.keep = none,
+                      fig.keep = FALSE,
                       cache = FALSE,
                       cache.lazy = FALSE)
 ```

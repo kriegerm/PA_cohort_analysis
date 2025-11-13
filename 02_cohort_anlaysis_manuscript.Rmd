@@ -221,6 +221,38 @@ write_csv(count_data_species, "output/taxa_trends_species_count_data.csv")
 ggsave("output/Species_Taxa_Shifts.png", taxa_shifts_species$combined_plot, width = 12, height = 5, dpi=600)
 ```
 
+## 4.2 Figure 2C: Clustering
+```{r, fig.height=5, fig.width=6.5}
+df <- ps_fs_genus_csv %>% select(-Type) %>% column_to_rownames(var="Sample") %>% as.matrix %>% t()
+#df <- df[order(rowSums(df), decreasing = TRUE)[1:50], ] #select top 50
+
+# Extract Type information from sample_data
+type_annot <- data.frame(Type = ps_fs_genus_csv$Type, Sample = ps_fs_genus_csv$Sample) %>% column_to_rownames(var="Sample")
+rownames(type_annot) <- colnames(df)  # Ensure match to colnames of otu_mat
+
+# Manually define annotation colors
+ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
+
+my_colors <- viridis(100, option = "inferno")
+
+# Plot heatmap with annotation
+pheatmap(log(df),
+         scale = "none",
+         clustering_distance_rows = "correlation",
+         clustering_distance_cols = "correlation",
+         clustering_method = "complete",
+         fontsize_row = 8,
+         fontsize_col = 8,
+         show_rownames = FALSE,
+         show_colnames = FALSE,
+         annotation_col = type_annot,
+         annotation_colors = ann_colors,
+         color = my_colors,
+         border_color = NA)
+
+ggsave("output/Genus_Clustering_Heatmap.png", width = 6.5, height = 5, dpi=600)
+```
+
 
 # Ordinations
 
