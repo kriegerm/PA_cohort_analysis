@@ -5,12 +5,12 @@ date: "2025-09-05"
 output: html_document
 ---
 
+Script for analyzing Picrust2 results. These were generated with the shell script shown in "Picrust2_commands.sh"
+
 
 ```{r 1.1_load-packages}
 library("pacman")
 pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "phyloseq", "ALDEx2", "SummarizedExperiment", "Biobase", "devtools","ComplexHeatmap", "BiocGenerics", "BiocManager", "metagenomeSeq","Maaslin2", "edgeR", "lefser", "limma", "KEGGREST", "DESeq2", "ggpicrust2", "Polychrome")
-
-here::i_am("picrust2_analysis.Rmd")
 ``` 
 
 
@@ -18,10 +18,7 @@ here::i_am("picrust2_analysis.Rmd")
 # Load data
 ```{r}
 # Load necessary data: abundance data and metadata
-KO_file <- "picrust2_pipeline_output/KO_metagenome_out/pred_metagenome_unstrat_descrip.tsv"
-EC_file <- "picrust2_pipeline_output/EC_metagenome_out/pred_metagenome_unstrat_descrip.tsv"
 pathways_file <- "picrust2_pipeline_output/pathways_out/path_abun_unstrat_descrip.tsv"
-
 
 metadata <- read_delim(
     "../Pediatric_cohort/Qiime2/Files_For_Phyloseq/metadata_phyloseq.tsv",
@@ -31,32 +28,6 @@ metadata <- read_delim(
 )
 
 metadata <- metadata %>% as.data.frame() %>% filter(Type %in% c("Plaque", "Abscess")) 
-
-
-KO_file_read <- read_delim(
-    KO_file,
-    delim = "\t",
-    escape_double = FALSE,
-    trim_ws = TRUE
-    ) %>% as.data.frame()  %>%
-    rename_with(~ ifelse(.x == "function", "func", .x)) %>%
-    mutate(funct = paste(func, description, sep = "_")) %>%
-    dplyr::select(-description, -func) %>%
-    column_to_rownames(var="funct") %>%
-    dplyr::select(dplyr::all_of(metadata$SampleID)) 
-
-
-EC_file_read <- read_delim(
-    EC_file,
-    delim = "\t",
-    escape_double = FALSE,
-    trim_ws = TRUE
-    ) %>% as.data.frame() %>%
-    rename_with(~ ifelse(.x == "function", "func", .x)) %>%
-    mutate(funct = paste(func, description, sep = "_")) %>%
-    dplyr::select(-description, -func)%>%
-    column_to_rownames(var="funct") %>%
-    dplyr::select(dplyr::all_of(metadata$SampleID))
 
 pathway_file_read <- read_delim(
     pathways_file,
@@ -69,12 +40,11 @@ pathway_file_read <- read_delim(
     column_to_rownames(var="funct") %>%
     dplyr::select(dplyr::all_of(metadata$SampleID)) 
 
-
 metadata <- metadata %>% column_to_rownames(var="SampleID")
 ```
 
 
-# Pathway
+# Pathway Analysis
 ```{r, eval=FALSE}
 iterate_maaslin2_picrust2(counts_input = pathway_file_read, 
                  metadata= metadata,
@@ -97,30 +67,3 @@ write_csv(maaslin2_pathway_res, "picrust2_pipeline_output/maaslin2_pathway_res.c
 ```
 
 
-# EC
-```{r}
-maaslin2_EC <- Maaslin2(input_data = EC_file_read,
-                     input_metadata = metadata,
-                     fixed_effects = "Type",
-                     output = "test",
-                     normalization = "CLR",
-                     transform = "NONE")
-
-maaslin2_EC_res <- maaslin2_EC$results %>% filter(qval < .05)
-write_csv(maaslin2_EC_res, "picrust2_pipeline_output/maaslin2_EC_res.csv")
-
-```
-
-# KO
-```{r}
-maaslin2_KO <- Maaslin2(input_data = KO_file_read,
-                     input_metadata = metadata,
-                     fixed_effects = "Type",
-                     output = "test",
-                     normalization = "CLR",
-                     transform = "NONE")
-
-maaslin2_KO_res <- maaslin2_KO$results %>% filter(qval < .05)
-write_csv(maaslin2_KO_res, "picrust2_pipeline_output/maaslin2_KO_res.csv")
-
-```
