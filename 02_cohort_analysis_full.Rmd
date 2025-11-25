@@ -149,6 +149,41 @@ df_sorted %>% filter(rho_rank == 1 | rho_rank == 2 ) %>% kable()
 ```
 
 
+## PCoA Species relab bray
+```{r, fig.width=5, fig.height=3.5}
+Species_PCoA_res <- run_ordination_with_validation(
+  phyloseq_obj = ps_f,
+  rank_transformation = "Species",
+  trans_type = "relab",
+  ord_calc_method = "PCoA",
+  dist_cal_type = "bray", 
+  component_num = 2,
+  variable = "Type",
+  Axis_1 = "Axis1",
+  Axis_2 = "Axis2",
+  colors_list = colors_all
+)
+
+Species_PCoA_res$plot
+Species_PCoA_res$lib_size_with_Axis1_corr
+
+ggsave("output/Species_PCoA_relab_bray_plot.png", Species_PCoA_res$plot, width = 5, height = 3.5, dpi=600)
+
+```
+
+```{r, fig.width=3, fig.height=3}
+Species_PCoA_res_scores_df <- as.data.frame(Species_PCoA_res$scores)
+
+Species_PCoA_res_scores_df <- analyze_type_clustering_on_pca(Species_PCoA_res_scores_df,                                           
+                                          component_num = 2,
+                                          colors_list = colors_all)
+Species_PCoA_res_scores_df$sil_plot
+ggsave("output/Species_PCoA_relab_bray_sil_scores.png",Species_PCoA_res_scores_df$sil_plot, width = 3, height = 3, dpi=600)
+
+```
+
+
+
 ## PCoA Genus relab bray
 ```{r, fig.width=5, fig.height=3.5}
 Genus_PCoA_res <- run_ordination_with_validation(
@@ -1071,7 +1106,7 @@ ggsave("output/Selected_Species_CLR_Fusobacterium_Dotplot.png", sp_fuso_clr, wid
 
 
 
-# 7.0 Random Forest
+# 7.0 Random Forest: Genus
 ```{r}
 set.seed(1234)
 
@@ -1225,6 +1260,171 @@ kable(top_features, format = "html") %>%
                 full_width = F, 
                 position = "center")
 ```
+
+
+
+
+# 7.0 Random Forest: Species
+```{r}
+set.seed(1234)
+
+df <- ps_fs_species_csv %>% column_to_rownames(var="Sample")
+k <- 4
+
+# Create stratified folds (list of test indices for each fold)
+folds <- createFolds(df$Type, k = k, returnTrain = TRUE)
+
+# View class distribution in each fold
+for (i in seq_along(folds)) {
+  cat("Fold", i)
+  print(table(df[folds[[i]], "Type"]))
+  cat("\n")
+}
+
+# Set up trainControl with custom indices
+fitControl <- trainControl(
+  method = "cv",
+  number = k,
+  index = folds,  # custom folds for training
+  classProbs = TRUE,
+  savePredictions = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+# Train the random forest model
+set.seed(123)
+model <- caret::train(
+  Type ~ .,
+  data = df,
+  method = "rf",
+  trControl = fitControl,
+  metric = "ROC"
+)
+
+
+```
+
+
+### Rank features by fold and create heatmap
+```{r, fig.width=5, fig.height=5}
+
+if ("package:plyr" %in% search()) {
+  detach("package:plyr", unload = TRUE, character.only = TRUE)
+}
+
+set.seed(123) 
+rank_table <- rank_rf_feature_table(df, folds, top_n = 10, add_mean = TRUE)%>%
+  mutate(
+    Feature = str_remove_all(Feature, "g__"),
+    Feature = str_replace_all(Feature, "_", " "),
+    Feature = str_remove_all(Feature, "\\[|\\]"),
+    Feature  = str_replace_all(Feature, " s  ", " "))
+
+
+# Example: show the first few rows
+rank_table %>% kable()
+
+
+mat <- rank_table %>%
+  select(-Feature, -MeanRank) %>%
+  as.data.frame() 
+
+
+rownames(mat) <- rank_table$Feature
+rownames(mat) <- sub("`","", rownames(mat)) #Need this here twice
+rownames(mat) <- sub("`","", rownames(mat)) 
+
+rownames(mat) <- sub("^g__","", rownames(mat))
+
+labs <- rownames(mat)
+
+# Make taxa labels italics
+labs_expr <- parse(text = sprintf("italic('%s')",
+                                  gsub("'", "\\\\'", labs, fixed = TRUE)))
+
+p <- pheatmap(
+  log(mat),
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  labels_row = labs_expr,
+  color = colorRampPalette(c("#752ACB", "white", "#C0E6DE"))(50),
+  display_numbers = round(as.matrix(mat), 1),
+  fontsize_number = 10,
+  main = "Feature Ranks per Fold",
+  filename = "output/RF_Feature_Ranks_per_Fold_Heatmap_species.png",
+  width = 5,
+  height = 5
+)
+
+p
+```
+
+
+
+```{r, fig.width=4, fig.height=3}
+#Plot ROC Curve for each fold of the model
+for_lift <- data.frame(Class = model$pred$obs, rf = model$pred$Plaque, resample = model$pred$Resample)
+lift_df <-  data.frame()
+
+for (fold in unique(for_lift$resample)) {
+  fold_df <- dplyr::filter(for_lift, resample == fold)
+  lift_obj_data <- lift(Class ~ rf, data = fold_df, class = "Plaque")$data
+  lift_obj_data$fold = fold
+  lift_df = rbind(lift_df, lift_obj_data)
+}
+
+lift_obj <- lift(Class ~ rf, data = for_lift, class = "Plaque")
+
+roc_p <- ggplot(lift_df) +
+  geom_line(aes(x = 1 - Sp, y = Sn, color = fold)) +
+  scale_color_manual(
+    name = "Fold",
+    values = c("#DD1155", "#00CC99", "#F4B942", "#3399FF")
+  ) +
+  theme_bw()
+roc_p
+
+ggsave("output/RF_ROC_Curve_per_Fold_species.png", roc_p, width = 4, height = 3, dpi=600)
+```
+
+
+
+### Print AUC Values
+```{r}
+library("plyr")
+AUC_score <-ddply(model$pred, "Resample", summarise,
+      accuracy = Accuracy(pred, obs))
+
+AUC_score %>% kbl() %>%
+  kable_minimal()
+
+
+if ("package:plyr" %in% search()) {
+  detach("package:plyr", unload = TRUE, character.only = TRUE)
+}
+```
+
+
+### Print out top features
+```{r}
+# Extract variable importance
+importance <- varImp(model, scale = FALSE)
+
+# Convert to data frame for easier manipulation
+importance_df <- as.data.frame(importance$importance)
+importance_df$Feature <- rownames(importance_df)
+
+# Print top 10 most important features
+top_features <- importance_df %>%
+  arrange(dplyr::desc(Overall)) %>%
+  filter(Overall > 0 )
+
+kable(top_features, format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+                full_width = F, 
+                position = "center")
+```
+
 
 
 # 8.0 Core microbiome
@@ -1470,28 +1670,12 @@ p_genus
 ggsave("output/Topic_Model_Beta_Barplots_Genus.png", p_genus, width = 20, height = 3, dpi=600)
 ```
 
-```{r, fig.height=3, fig.width=6}
-p2 <- plot_beta_heatmaps(result_genus, n_topics=6, 15, result_genus$b_df, normalized_count_table = ps_fs_genus_csv, fill_colors = my_colors)
-p2[1]
-p2[4]
-p2[6]
-
-p2[3]
-p2[5]
-
-#ggsave("output/Topic_Model_Beta_Heatmap_Topic1_Genus.png", p2[[1]], width = 6, height = 3, dpi=600)
-#ggsave("output/Topic_Model_Beta_Heatmap_Topic4_Genus.png", p2[[4]], width = 6, height = 3, dpi=600)
-#ggsave("output/Topic_Model_Beta_Heatmap_Topic6_Genus.png", p2[[6]], width = 6, height = 3, dpi=600)
-#ggsave("output/Topic_Model_Beta_Heatmap_Topic3_Genus.png", p2[[3]], width = 6, height = 3, dpi=600)
-#ggsave("output/Topic_Model_Beta_Heatmap_Topic5_Genus.png", p2[[5]], width = 6, height = 3, dpi=600)
-
-```
 
 
 ## Heatmap of gamma scores 
 ```{r, fig.height=2.7, fig.width=9}
 heatmap_gamma_genus <- heatmap_gamma(result_genus, "Type", result_genus$g_df)
-png("output/Topic_Model_Gamma_Heatmap_Species.png",
+png("output/Topic_Model_Gamma_Heatmap_Genus.png",
     width = 9, height = 2, units = "in", res = 600)
 
 ComplexHeatmap::draw(heatmap_gamma_genus)  # <- explicitly use this one
@@ -1503,7 +1687,7 @@ dev.off()
 ```{r fig.height=6, fig.width=6}
 UMAP_res_genus <- plot_gamma_umap(results_genus, "Type", colors_all, result_genus$g_df)
 
-ggsave("output/Topic_Model_Gamma_UMAP_Genus.png", UMAP_res_genus$umap_plot, width = 6, height = 6, dpi=600)
+ggsave("output/Topic_Model_Gamma_UMAP_Genus.png", UMAP_res_genus$umap, width = 5, height = 4, dpi=600)
 ```
 
 ```{r, fig.width=3, fig.height=3}
@@ -1515,25 +1699,108 @@ ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Genus.png", UMAP_res_genus$sil_
 
 ## Relab heatmaps by topic
 
-```{r, fig.height=3, fig.width=6.3}
-topic2_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 15, topic = 2)
-topic2_res_genus
+
+
+```{r, fig.height=2, fig.width=7}
+
+topic1_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 1)
+
+
+png("output/Topic_Model_RelAb_Heatmap_Topic1_genus.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic1_res_genus$heatmap)
+
+dev.off()
+
+topic1_res_genus$heatmap
+```
+
+```{r, fig.height=2, fig.width=7.5}
+
+
+topic2_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 2)
+
+
+png("output/Topic_Model_RelAb_Heatmap_Topic2_genus.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic2_res_genus$heatmap)  # <- explicitly use this one
+
+dev.off()
+
+topic2_res_genus$heatmap
 
 ```
 
-```{r, fig.height=3, fig.width=6.5}
-topic3_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 15, topic = 3)
-topic3_res_genus
+```{r, fig.height=2.5, fig.width=6.5}
+topic3_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 3)
+
+png("output/Topic_Model_RelAb_Heatmap_Topic3_genus.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic3_res_genus$heatmap)  # <- explicitly use this one
+
+dev.off()
+
+topic3_res_genus$heatmap
+```
+
+```{r, fig.height=2, fig.width=7}
+topic4_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 4)
+
+png("output/Topic_Model_RelAb_Heatmap_Topic4_genus.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic4_res_genus$heatmap)  # <- explicitly use this one
+
+dev.off()
+
+topic4_res_genus$heatmap
 
 ```
 
-```{r, fig.height=3, fig.width=6.3}
-topic4_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 15, topic = 4)
-topic4_res_genus
+```{r, fig.height=2, fig.width=7}
+topic5_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 5)
+
+
+png("output/Topic_Model_RelAb_Heatmap_Topic5_genus.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic5_res_genus$heatmap)
+
+dev.off()
+
+topic5_res_genus$heatmap
 ```
 
+```{r, fig.height=2, fig.width=7}
+topic6_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 6)
 
 
+png("output/Topic_Model_RelAb_Heatmap_Topic6_genus.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic6_res_genus$heatmap)
+
+dev.off()
+
+topic6_res_genus$heatmap
+```
+
+```{r, fig.height=2, fig.width=7}
+topic7_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 7)
+
+
+png("output/Topic_Model_RelAb_Heatmap_Topic7_genus.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic7_res_genus$heatmap)
+
+dev.off()
+
+topic_res_genus$heatmap
+```
 
 
 # 9.0 Topic modeling: Species
@@ -1681,8 +1948,6 @@ ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Species.png", UMAP_res_species$
 
 
 ```{r, fig.height=2, fig.width=7}
-
-source("MK_Microbiome_Functions.R")
 
 topic1_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic = 1)
 

@@ -3745,6 +3745,7 @@ data <- data %>% mutate(
   
   italic_labels <- parse(text = paste0("italic('", rownames(data), "')"))
   
+
   # Create the heatmap
   p <- pheatmap(log(data),
                 main = paste0("Topic ", topic_no),
@@ -3757,7 +3758,7 @@ data <- data %>% mutate(
                 show_rownames = TRUE,        # Show row names
                 show_colnames = FALSE,         # Show column names
                 labels_row = italic_labels,       
-                annotation_colors = ann_colors 
+                annotation_colors = ann_colors
   )
   return(list(heatmap = p, data =data)) 
 }
