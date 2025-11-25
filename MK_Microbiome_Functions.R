@@ -3283,6 +3283,7 @@ RunFindTopicsNumber <- function(counts_data, topics, method){
   ) 
   
   FindTopicsNumber_plot(result)
+  p <- FindTopicsNumber_plot(result)
 
   # Combine each metric into a named row of a data frame
   topic_numbers <- result$topics
@@ -3343,7 +3344,7 @@ RunFindTopicsNumber <- function(counts_data, topics, method){
   cat("Best number of topics (overall balance):", best_k, "\n")
   k_number <- as.numeric(gsub("k", "", best_k))
   
-  return(list(full_results = result, metrics_df = df_combined, best_k_number = k_number))
+  return(list(full_results = result, plot = p, metrics_df = df_combined, best_k_number = k_number))
 }
 
 
@@ -3388,7 +3389,11 @@ plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
       term  = gsub("^g__", "", term),
       term  = str_replace_all(term, "\\.", ""),
       term  = str_replace_all(term, "_", " "),
-      term  = str_replace_all(term, "__(1|2|3)$", "")
+      term  = str_replace_all(term, "__(1|2|3)$", ""),
+      term  = str_replace_all(term, " s  ", " "), 
+      term  = gsub("Streptococcus oralis subsp dentisani clade 058", "Streptococcus oralis subsp dentisani", term),
+      term  = gsub(" bacterium ", " ", term)
+      
     )
   
   # ----- Barplots
@@ -3398,10 +3403,10 @@ plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
     fill = topic
   )) +
     geom_col(show.legend = FALSE) +
-    facet_wrap(~ topic, scales = "free", labeller = labeller(topic = ~ paste0("Topic ", .x))) +
+    facet_wrap(~ topic, scales = "free", labeller = labeller(topic = ~ paste0("Topic ", .x)), nrow=1) +
     scale_x_reordered() +
     coord_flip() +
-    theme_bw(base_size = 12) +
+    theme_bw(base_size = 13) +
     theme(
       strip.background = element_rect(fill = "white", color = "black"),
       strip.text = element_text(face = "bold", size = 14),
@@ -3422,7 +3427,7 @@ plot_beta <- function(lda_result, n_top_topics, b_df, fill_colors = NULL) {
 }
 
 # Heatmap of the relab of the top terms in each topic
-plot_beta_heatmaps <- function(lda_result, n_top_topics, normalized_count_table, b_df, fill_colors = NULL) {
+plot_beta_heatmaps <- function(lda_result, n_topics, n_top_topics, normalized_count_table, b_df, fill_colors = NULL) {
   
   # ----- One heatmap per topic
   build_heatmap_for_topic <- function(topic_no, n_top = 10) {
@@ -3437,7 +3442,10 @@ plot_beta_heatmaps <- function(lda_result, n_top_topics, normalized_count_table,
         term  = gsub("^g__", "", term),
         term  = str_replace_all(term, "\\.", ""),
         term  = str_replace_all(term, "_", " "),
-        term  = str_replace_all(term, "__(1|2|3)$", "")
+        term  = str_replace_all(term, "__(1|2|3)$", ""),
+        term  = str_replace_all(term, " s  ", " "), 
+        term  = gsub("Streptococcus oralis subsp dentisani clade 058", "Streptococcus oralis subsp dentisani", term),
+        term  = gsub(" bacterium ", " ", term)
       )
     
     # ---- Matrix for heatmap (with duplicate-handling)
@@ -3500,7 +3508,7 @@ plot_beta_heatmaps <- function(lda_result, n_top_topics, normalized_count_table,
   }
   
   # Build heatmaps for topics 1, 2, 3 using n_top_topics
-  hm_list <- lapply(1:3, build_heatmap_for_topic, n_top = n_top_topics)
+  hm_list <- lapply(1:n_topics, build_heatmap_for_topic, n_top = n_top_topics)
   
   return(hm_list)
   
@@ -3555,71 +3563,93 @@ heatmap_gamma <- function(lda_results, type_column, g_df){
 
 
 plot_gamma_umap <- function(lda_results, type_column, type_colors, g_df ){
-    topics_wide <- g_df %>%
-          pivot_wider(names_from = topic,
-                      values_from = gamma) 
-    
-    res_with_annotations <- meta_data %>% select(type_column) %>% 
-          rownames_to_column(var="document") %>% 
-          merge.data.frame(topics_wide, by="document") 
-    
-    #Set UMAP seed
-    custom.config <- umap.defaults
-    custom.config$random_state <- 1234
-    
-    # Run UMAP
-    umap_result <- res_with_annotations %>% select(-type_column) %>% column_to_rownames(var="document") %>% umap(., config=custom.config)
-    
-    # Convert the annotations to numeric for coloring
-    annotations <- res_with_annotations %>% column_to_rownames(var="document") %>%  pull(type_column)  # Extract "Type" as a vector
-    
-    # Assign colors to each type
-    colors <- type_colors[annotations]  # Match colors to each sample
-    
-    # Plot UMAP
-    umap_plot <- plot(umap_result$layout, 
-         col = colors,
-         pch = 19,           # Point type
-         xlab = "UMAP 1", 
-         ylab = "UMAP 2", 
-         main = "UMAP Visualization")
-    
-    # Extract PCA axes
-    pca_matrix <- umap_result$layout
-    
-    # Ensure 'Type' is a factor
-    meta_data$Type <- factor(meta_data$Type)
-    
-    # Calculate distance matrix and silhouette scores using "Type" as cluster labels
-    dist_matrix <- dist(pca_matrix)
-    cluster_labels <- as.integer(meta_data$Type)  # silhouette() needs numeric cluster labels
-    
-    sil <- silhouette(cluster_labels, dist_matrix)
-    
-    sil_df <- as.data.frame(sil[, 1:3])
-    sil_df$Type <- meta_data$Type
-    colnames(sil_df) <- c("Cluster", "Neighbor", "Silhouette", "Type")
-    
-    # Boxplot of silhouette scores by Type
-    sil_plot <- ggplot(sil_df, aes(x = Type, y = Silhouette, fill = Type)) +
-      geom_boxplot(outlier.shape = NA, alpha = 0.9) +
-      geom_jitter(width = 0.2, size = 1, alpha = 0.5) +
-      stat_summary(fun = median, geom = "text", aes(label = round(..y.., 2)),
-                   vjust = .9, color = "white", fontface = "bold", size = 4.5) +
-      labs(title = "Silhouette Scores by Type",
-           x = "Type",
-           y = "Silhouette Score") +
-      theme_bw() + 
-      theme(panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank())
-    
-    if (!is.null(type_colors)) {
-      sil_plot <- sil_plot + scale_fill_manual(values = type_colors)
-    }
-    
-    return(list(umap = umap_plot, sil_plot=sil_plot))
-}
+  # Wide gamma matrix
+  topics_wide <- g_df %>%
+    tidyr::pivot_wider(
+      names_from  = topic,
+      values_from = gamma
+    )
+  
+  # Join metadata (assumes meta_data has rownames = document IDs)
+  res_with_annotations <- meta_data %>%
+    tibble::rownames_to_column(var = "document") %>%
+    dplyr::select(document, {{ type_column }}) %>%
+    merge.data.frame(topics_wide, by = "document")
+  
+  
+  # UMAP config
+  custom.config <- umap::umap.defaults
+  custom.config$random_state <- 1234
+  
+  # Run UMAP on topics only
+  umap_result <- res_with_annotations %>%
+    dplyr::select(-document, -{{ type_column }}) %>%
+    umap::umap(config = custom.config)
 
+  # Build a data.frame for ggplot
+  umap_df <- as.data.frame(umap_result$layout)
+  colnames(umap_df) <- c("UMAP1", "UMAP2")
+  umap_df$document <- res_with_annotations$document
+  umap_df$Type     <- res_with_annotations %>% dplyr::pull({{ type_column }})
+  
+  # ggplot UMAP
+  umap_plot <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = Type)) +
+    geom_point(size = 2, alpha = 0.9) +
+    labs(
+      title = "UMAP Visualization",
+      x     = "UMAP 1",
+      y     = "UMAP 2"
+    ) +
+    theme_bw() +
+    theme(
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
+    )
+  
+  if (!is.null(type_colors)) {
+    umap_plot <- umap_plot + scale_color_manual(values = type_colors)
+  }
+  
+  # For silhouette, use the same matrix used for UMAP
+  pca_matrix <- umap_result$layout
+  
+  # Use the same Type as in umap_df to stay aligned
+  type_factor <- factor(umap_df$Type)
+  dist_matrix <- dist(pca_matrix)
+  cluster_labels <- as.integer(type_factor)
+  
+  sil <- cluster::silhouette(cluster_labels, dist_matrix)
+  
+  sil_df <- as.data.frame(sil[, 1:3])
+  sil_df$Type <- type_factor
+  colnames(sil_df) <- c("Cluster", "Neighbor", "Silhouette", "Type")
+  
+  sil_plot <- ggplot(sil_df, aes(x = Type, y = Silhouette, fill = Type)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.9) +
+    geom_jitter(width = 0.2, size = 1, alpha = 0.5) +
+    stat_summary(
+      fun = median, geom = "text",
+      aes(label = round(..y.., 2)),
+      vjust = .9, color = "white",
+      fontface = "bold", size = 4.5
+    ) +
+    labs(
+      title = "Silhouette Scores by Type",
+      x     = "Type",
+      y     = "Silhouette Score"
+    ) +
+    theme_bw() +
+    theme(
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
+    )
+  
+  if (!is.null(type_colors)) {
+    sil_plot <- sil_plot + scale_fill_manual(values = type_colors)
+  }
+  
+  return(list(umap = umap_plot, sil_plot = sil_plot))
+}
 
 ###Membership of topic by Type
 
@@ -3652,7 +3682,7 @@ topic_membership <- function(lda_result, type_column, colors, g_df){
     plot <- ggplot(topics_long_type, aes(x = Type, y = gamma, fill = Type)) +
       geom_boxplot() +
       scale_fill_manual(values = colors) +
-      facet_wrap(~ topic, labeller = labeller(topic = ~ paste0("Topic ", .x))) +
+      facet_wrap(~ topic, labeller = labeller(topic = ~ paste0("Topic ", .x)), nrow=1) +
       labs(x = "Type", y = expression(gamma)) +
       theme_bw() +
       theme(
@@ -3671,52 +3701,64 @@ topic_membership <- function(lda_result, type_column, colors, g_df){
 ### Heatmap of rel abundance in original data of top taxa
 heatmap_by_topic <- function(b_df = result$b_df, normalized_count_table = ps_fs_genus_csv, n_top = 15, topic_no = 1){
   
+  # Get top terms ordered by beta (desc)
   top_terms <- b_df %>% 
     dplyr::filter(topic == topic_no) %>%
-    top_n(n_top, beta) %>%
-    ungroup() %>%
+    dplyr::arrange(desc(beta)) %>%      # <-- order by beta
+    dplyr::slice_head(n = n_top) %>%   # safer than top_n()
+    dplyr::ungroup() %>%
     mutate(
-      topic = factor(topic),
-      # remove leading g__ and trailing _1/_2/_3
-      term = gsub("^g__", "", term),
-      term = str_replace_all(term, "\\.", ""),
-      term = str_replace_all(term, "_", " "),
-      term = str_replace_all(term, "__(1|2|3)$", "")
-    ) 
+      topic = factor(topic))
+
   
   data <- normalized_count_table %>%
     dplyr::arrange(Type) %>%
-    mutate(Type := as.character(Type)) %>%  # Convert to character to ensure alphabetical sorting
+    mutate(Type = as.character(Type)) %>%    # <- fix `:=` here
     dplyr::arrange(Type) %>% 
-    select(-Type) %>% 
-    column_to_rownames(var="Sample") %>% 
-    as.matrix() %>% t() %>% as.data.frame() %>%
-    rownames_to_column(var="term") %>%
-    mutate(term = gsub("^g__", "", term),
-           term = str_replace_all(term, "\\.", ""),
-           term = str_replace_all(term, "_", " "),
-           term = str_replace_all(term, "__(1|2|3)$", "")
-    ) %>%
-    filter(term %in% top_terms$term) %>%
-    column_to_rownames(var="term")
+    dplyr::select(-Type) %>% 
+    column_to_rownames(var = "Sample") %>% 
+    as.matrix() %>% 
+    t() %>% 
+    as.data.frame() %>%
+    rownames_to_column(var = "term") %>%
+    dplyr::filter(term %in% top_terms$term) %>%
+    # bring in beta and sort by it
+    dplyr::left_join(top_terms %>% dplyr::select(term, beta), by = "term") %>%
+    dplyr::arrange(desc(beta)) %>%
+    dplyr::select(-beta) 
   
+data <- data %>% mutate(
+  term  = gsub("^g__", "", term),
+  term  = str_replace_all(term, "\\.", ""),
+  term  = str_replace_all(term, "_", " "),
+  term  = str_replace_all(term, "__(1|2|3)$", ""),
+  term  = str_replace_all(term, " s  ", " "),
+  term  = gsub("Streptococcus oralis subsp dentisani clade 058", "Streptococcus oralis", term),
+  term  = gsub(" bacterium ", " ", term)
+  )%>%
+  column_to_rownames(var = "term")
   
   type_annot <- ps_fs_genus_csv %>%
     select(c(Type, Sample)) %>% column_to_rownames(var="Sample")
   
   ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
   
+  italic_labels <- parse(text = paste0("italic('", rownames(data), "')"))
+  
   # Create the heatmap
   p <- pheatmap(log(data),
+                main = paste0("Topic ", topic_no),
                 annotation_col = type_annot,  # Add column annotations
                 scale = "none",               # Scale rows (optional)
+                fontsize_row = 12,
                 cluster_rows = FALSE,         # Cluster rows
                 cluster_cols = FALSE,         # Cluster columns
                 color = colorRampPalette(c( "#564592", "white", "#D7CF07"))(100),  # Custom color palette
                 show_rownames = TRUE,        # Show row names
                 show_colnames = FALSE,         # Show column names
+                labels_row = italic_labels,       
                 annotation_colors = ann_colors 
   )
-  return(heatmap = p)
+  return(list(heatmap = p, data =data)) 
 }
 

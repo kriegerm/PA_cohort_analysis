@@ -1360,7 +1360,7 @@ ggsave("output/Core_Genera_Heatmap.png", plot, width = 5, height = 5, dpi=600)
 
 ```
 
-# 9.0 Topic modeling
+# 9.0 Topic modeling: Genus
 
 ## Iterate through scaling factors and topic numbers to choose the ideal combination
 ```{r, eval=F}
@@ -1386,83 +1386,56 @@ iterate_res$results %>%
 
 ## Prep and scale input
 ```{r}
-results_scaling <- prep_data_scale(ps_fs, "Genus", 1000, "Type")
-meta_data <- results_scaling$meta_data
-counts_data <- results_scaling$counts_data
+results_scaling_genus <- prep_data_scale(ps_fs, "Genus", 1000, "Type")
+meta_data <- results_scaling_genus$meta_data
+counts_data_genus <- results_scaling_genus$counts_data
 ```
 
 ## Use FindTopicsNumber() 
 Note: There is no alpha value here
-```{r}
+```{r, fig.widht=4, fig.height=4}
 topics <- seq(from = 2, to = 10, by = 1)
-res <- RunFindTopicsNumber(counts_data, topics, "Gibbs")
-res$metrics_df
+res_genus <- RunFindTopicsNumber(counts_data_genus, topics, "Gibbs")
+
+metric_plot_genus <- res_genus$plot + 
+  geom_vline(xintercept = 7, linetype = "dashed", linewidth = 0.8, color = "red") +
+  theme_bw(base_size=13) +
+  theme(
+  axis.text.x = element_text(size=13, color="black"),
+  strip.background = element_rect(fill = "white", color = "black"),
+  strip.text = element_text(size = 14, face = "bold"), 
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank()) + 
+ labs(title = "Genus Level Metrics") +
+  theme(
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5)
+  )
+
+
+
+ggsave("output/Topic_Model_FindTopicsNumber_Genus.png", metric_plot_genus, width = 6, height = 4, dpi=600)
+
+res_genus$metrics_df
 ```
 
 
 ## LDA: Create the model
 You can use the info from the optimum topic numbers printed out in the above function, or adjust as needed.
 
-I chose 3 for interprebility and because of the metrics.
 ```{r}
-result <- create_topic_model(counts_data, 3, TRUE, "Gibbs")
-model <- result$lda_model
+result_genus <- create_topic_model(counts_data_genus, 7, TRUE, "Gibbs")
+model_genus <- result_genus$lda_model_genus
 ```
 
-## Plot beta
-```{r, fig.height=3, fig.width=9}
-### Plot beta
-#plot_beta(result, 15)
-#Plot beta, or the numbers that are assigned to each word in a topic. If the beta score is higher, the word matters more in that topic.
-
-my_colors <- c("1" = "#3185FC", "2" = "#FF495C", "3" = "#c7defe")
-p <- plot_beta(result, 10, result$b_df,  fill_colors = my_colors)
-p
-
-ggsave("output/Topic_Model_Beta_Barplots.png", p, width = 9, height = 3, dpi=600)
-```
-
-```{r, fig.height=3, fig.width=6}
-p2 <- plot_beta_heatmaps(result, 10, result$b_df, normalized_count_table = ps_fs_genus_csv, fill_colors = my_colors)
-p2[1]
-p2[2]
-p2[3]
-
-ggsave("output/Topic_Model_Beta_Heatmap_Topic1.png", p2[[1]], width = 6, height = 3, dpi=600)
-ggsave("output/Topic_Model_Beta_Heatmap_Topic2.png", p2[[2]], width = 6, height = 3, dpi=600)
-ggsave("output/Topic_Model_Beta_Heatmap_Topic3.png", p2[[3]], width = 6, height = 3, dpi=600)
-
-```
-
-
-## Heatmap of gamma scores 
-```{r, fig.height=1.5, fig.width=9}
-heatmap_gamma(result, "Type", result$g_df)
-
-ggsave("output/Topic_Model_Gamma_Heatmap.png", last_plot(), width = 9, height = 1.5, dpi=600)
-```
-
-## UMAP of gamma scores
-```{r fig.height=6, fig.width=6}
-UMAP_res <- plot_gamma_umap(results, "Type", colors_all, result$g_df)
-
-ggsave("output/Topic_Model_Gamma_UMAP.png", UMAP_res$umap_plot, width = 6, height = 6, dpi=600)
-```
-
-```{r, fig.width=3, fig.height=3}
-UMAP_res$sil_plot
-
-ggsave("output/Topic_Model_Gamma_UMAP_Silhouette.png", UMAP_res$sil_plot, width = 3, height = 3, dpi=600)
-```
 
 ##Membership of topic by Type
-```{r, fig.height=2.5, fig.width=4}
+```{r, fig.height=2.5, fig.width=8.4}
 
-topic_membership_res <- topic_membership(result, "Type", colors_all, result$g_df)
+topic_membership_res_genus <- topic_membership(result_genus, "Type", colors_all, result_genus$g_df)
 
-hist(result$g_df$gamma)
+hist(result_genus$g_df$gamma)
 
-plot <- topic_membership_res$plot + 
+plot_genus <- topic_membership_res_genus$plot + 
   stat_compare_means(
     comparisons = list(c("Abscess", "Plaque")),
     method = "wilcox.test",
@@ -1470,28 +1443,330 @@ plot <- topic_membership_res$plot +
     vjust = .45,
     label = "p.signif")+ 
     ylim(0, 1.1)
-plot
 
-ggsave("output/Topic_Model_Topic_Membership_by_Type.png", plot, width = 4, height = 2.5, dpi=600)
+plot_genus <- plot_genus + scale_x_discrete(labels = c("Abscess" = "A", "Plaque" = "P")) + 
+  theme (
+    axis.text=element_text(size=13, color="black"),
+  )
+
+plot_genus
+
+ggsave("output/Topic_Model_Topic_Membership_by_Type_Genus.png", plot_genus, width = 8.4, height = 2.5, dpi=600)
 ```
+
+
+## Plot beta
+```{r, fig.height=3, fig.width=20}
+### Plot beta
+#plot_beta(result, 15)
+#Plot beta, or the numbers that are assigned to each word in a topic. If the beta score is higher, the word matters more in that topic.
+result_genus$b_df$topic <- factor(result_genus$b_df$topic, levels = c("1", "4", "6", "3", "5", "2", "7"))
+
+
+my_colors <- c("1" = "#3185FC", "4" = "#3185FC","6" = "#3185FC","3" = "#FF495C", "5" = "#FF495C")
+p_genus <- plot_beta(result_genus, 10, result_genus$b_df,  fill_colors = my_colors)
+p_genus
+
+ggsave("output/Topic_Model_Beta_Barplots_Genus.png", p_genus, width = 20, height = 3, dpi=600)
+```
+
+```{r, fig.height=3, fig.width=6}
+p2 <- plot_beta_heatmaps(result_genus, n_topics=6, 15, result_genus$b_df, normalized_count_table = ps_fs_genus_csv, fill_colors = my_colors)
+p2[1]
+p2[4]
+p2[6]
+
+p2[3]
+p2[5]
+
+#ggsave("output/Topic_Model_Beta_Heatmap_Topic1_Genus.png", p2[[1]], width = 6, height = 3, dpi=600)
+#ggsave("output/Topic_Model_Beta_Heatmap_Topic4_Genus.png", p2[[4]], width = 6, height = 3, dpi=600)
+#ggsave("output/Topic_Model_Beta_Heatmap_Topic6_Genus.png", p2[[6]], width = 6, height = 3, dpi=600)
+#ggsave("output/Topic_Model_Beta_Heatmap_Topic3_Genus.png", p2[[3]], width = 6, height = 3, dpi=600)
+#ggsave("output/Topic_Model_Beta_Heatmap_Topic5_Genus.png", p2[[5]], width = 6, height = 3, dpi=600)
+
+```
+
+
+## Heatmap of gamma scores 
+```{r, fig.height=2.7, fig.width=9}
+heatmap_gamma_genus <- heatmap_gamma(result_genus, "Type", result_genus$g_df)
+png("output/Topic_Model_Gamma_Heatmap_Species.png",
+    width = 9, height = 2, units = "in", res = 600)
+
+ComplexHeatmap::draw(heatmap_gamma_genus)  # <- explicitly use this one
+
+dev.off()
+```
+
+## UMAP of gamma scores
+```{r fig.height=6, fig.width=6}
+UMAP_res_genus <- plot_gamma_umap(results_genus, "Type", colors_all, result_genus$g_df)
+
+ggsave("output/Topic_Model_Gamma_UMAP_Genus.png", UMAP_res_genus$umap_plot, width = 6, height = 6, dpi=600)
+```
+
+```{r, fig.width=3, fig.height=3}
+UMAP_res_genus$sil_plot
+
+ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Genus.png", UMAP_res_genus$sil_plot, width = 3, height = 3, dpi=600)
+```
+
 
 ## Relab heatmaps by topic
 
 ```{r, fig.height=3, fig.width=6.3}
-topic1_res <- heatmap_by_topic(result$b_df, ps_fs_genus_csv, n_top = 15, topic = 1)
-topic1_res
+topic2_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 15, topic = 2)
+topic2_res_genus
 
 ```
 
 ```{r, fig.height=3, fig.width=6.5}
-topic2_res <- heatmap_by_topic(result$b_df, ps_fs_genus_csv, n_top = 15, topic = 2)
-topic2_res
+topic3_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 15, topic = 3)
+topic3_res_genus
 
 ```
 
 ```{r, fig.height=3, fig.width=6.3}
-topic3_res <- heatmap_by_topic(result$b_df, ps_fs_genus_csv, n_top = 15, topic = 3)
-topic3_res
+topic4_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 15, topic = 4)
+topic4_res_genus
+```
+
+
+
+
+
+# 9.0 Topic modeling: Species
+
+## Iterate through scaling factors and topic numbers to choose the ideal combination
+```{r, eval=F}
+iterate_res <- iterate_scaling_factors(ps_fs, 
+                        "Species",
+                        scale_factors = c(10, 100, 1000), 
+                        k_values= c(2, 3, 4, 5, 6), 
+                        auto_chose_k = FALSE, 
+                        type_column = "Type", 
+                        method = "Gibbs")
+
+iterate_res$results %>%
+  mutate(
+    sil_sum = sil_median_Abscess + sil_median_Plaque,
+    sil_rank = min_rank(dplyr::desc(sil_sum))) %>% # Rank from highest to lowest
+    arrange(sil_rank) %>% kable() 
+
+# %>%
+#     kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+#                 full_width = F,
+#                 position = "center")
+```
+
+## Prep and scale input
+```{r}
+results_scaling_species <- prep_data_scale(ps_fs, "Species", 1000, "Type")
+meta_data <- results_scaling_species$meta_data
+counts_data_species <- results_scaling_species$counts_data
+```
+
+## Use FindTopicsNumber() 
+Note: There is no alpha value here
+```{r}
+topics <- seq(from = 2, to = 10, by = 1)
+res_species <- RunFindTopicsNumber(counts_data_species, topics, "Gibbs")
+
+metric_plot_species <- res_species$plot +
+  geom_vline(xintercept = 6, linetype = "dashed", linewidth = 0.8, color = "red") +
+  theme_bw(base_size=13) +
+  theme(
+  axis.text.x = element_text(size=13, color="black"),
+  strip.background = element_rect(fill = "white", color = "black"),
+  strip.text = element_text(size = 14, face = "bold"), 
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank()) + 
+ labs(title = "Species Level Metrics") +
+  theme(
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5)
+  )
+metric_plot_species
+
+ggsave("output/Topic_Model_FindTopicsNumber_Species.png", metric_plot_species, width = 6, height = 4, dpi=600)
+
+res_species$metrics_df
+```
+
+
+## LDA: Create the model
+You can use the info from the optimum topic numbers printed out in the above function, or adjust as needed.
+
+```{r}
+result_species <- create_topic_model(counts_data_species, 6, TRUE, "Gibbs")
+model_species <- result_species$lda_model
+```
+
+##Membership of topic by Type
+```{r, fig.height=2.5, fig.width=7.4}
+
+topic_membership_res_species <- topic_membership(result_species, "Type", colors_all, result_species$g_df)
+
+hist(result_species$g_df$gamma)
+
+plot_species <- topic_membership_res_species$plot + 
+  stat_compare_means(
+    comparisons = list(c("Abscess", "Plaque")),
+    method = "wilcox.test",
+    label.y = c(1), 
+    vjust = .45,
+    label = "p.signif")+ 
+    ylim(0, 1.1)
+
+plot_species <- plot_species + scale_x_discrete(labels = c("Abscess" = "A", "Plaque" = "P")) + 
+  theme (
+    axis.text=element_text(size=13, color="black"),
+  )
+plot_species
+
+ggsave("output/Topic_Model_Topic_Membership_by_Type_Species.png", plot_species, width = 7.4, height = 2.5, dpi=600)
+```
+
+## Plot beta
+```{r, fig.height=3, fig.width=25}
+
+### Plot beta
+#Plot beta, or the numbers that are assigned to each word in a topic. If the beta score is higher, the word matters more in that topic.
+my_colors <- c("1" = "grey", "2" = "#3185FC", "3" = "#FF495C", "4"= "#3185FC", "5" = "grey", "6" = "grey")
+
+
+result_species$b_df$topic <- factor(result_species$b_df$topic, levels = c("2", "4", "3", "1", "5", "6"))
+
+#my_colors <- c("1" = "#3185FC", "2" = "#3185FC", "3" = "#FF495C", "4" ="#FF495C" , "5" = "grey")
+p <- plot_beta(result_species, 10, result_species$b_df,  fill_colors = my_colors)
+p 
+
+ggsave("output/Topic_Model_Beta_Barplots_Species.png", p, width = 25, height = 3, dpi=600)
+```
+
+```{r, fig.height=3, fig.width=6}
+p2 <- plot_beta_heatmaps(result_species, n_topics=6, 10, result_species$b_df, normalized_count_table = ps_fs_species_csv, fill_colors = my_colors)
+```
+
+
+## Heatmap of gamma scores 
+```{r, fig.height=2.3, fig.width=9}
+heatmap_gamma_species <- heatmap_gamma(result_species, "Type", result_species$g_df)
+
+png("output/Topic_Model_Gamma_Heatmap_Species.png",
+    width = 9, height = 2.3, units = "in", res = 600)
+
+ComplexHeatmap::draw(heatmap_gamma_species)  # <- explicitly use this one
+
+dev.off()
+```
+
+## UMAP of gamma scores
+```{r fig.height=4, fig.width=5}
+
+UMAP_res_species <- plot_gamma_umap(results_species, "Type", colors_all, result_species$g_df)
+UMAP_res_species$umap
+
+ggsave("output/Topic_Model_Gamma_UMAP_Species.png", UMAP_res_species$umap, width = 5, height = 4, dpi=600)
+```
+
+```{r, fig.width=3, fig.height=3}
+UMAP_res_species$sil_plot
+
+ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Species.png", UMAP_res_species$sil_plot, width = 3, height = 3, dpi=600)
+```
+
+
+## Relab heatmaps by topic
+
+
+```{r, fig.height=2, fig.width=7}
+
+source("MK_Microbiome_Functions.R")
+
+topic1_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic = 1)
+
+
+png("output/Topic_Model_RelAb_Heatmap_Topic1_Species.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic1_res_species$heatmap)
+
+dev.off()
+
+topic1_res_species$heatmap
+```
+
+```{r, fig.height=2, fig.width=7.5}
+
+
+topic2_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 12, topic = 2)
+
+
+png("output/Topic_Model_RelAb_Heatmap_Topic2_Species.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic2_res_species$heatmap)  # <- explicitly use this one
+
+dev.off()
+
+topic2_res_species$heatmap
+
+```
+
+```{r, fig.height=2.5, fig.width=6.5}
+topic3_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 12, topic = 3)
+
+png("output/Topic_Model_RelAb_Heatmap_Topic3_Species.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic3_res_species$heatmap)  # <- explicitly use this one
+
+dev.off()
+
+topic3_res_species$heatmap
+```
+
+```{r, fig.height=2, fig.width=7}
+topic4_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic = 4)
+
+png("output/Topic_Model_RelAb_Heatmap_Topic4_Species.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic4_res_species$heatmap)  # <- explicitly use this one
+
+dev.off()
+
+topic4_res_species$heatmap
+
+```
+
+```{r, fig.height=2, fig.width=7}
+topic5_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic = 5)
+
+
+png("output/Topic_Model_RelAb_Heatmap_Topic5_Species.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic5_res_species$heatmap)
+
+dev.off()
+
+topic5_res_species$heatmap
+```
+
+```{r, fig.height=2, fig.width=7}
+topic6_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic = 6)
+
+
+png("output/Topic_Model_RelAb_Heatmap_Topic6_Species.png",
+    width = 6.5, height = 2.5, units = "in", res = 600)
+
+ComplexHeatmap::draw(topic6_res_species$heatmap)
+
+dev.off()
+
+topic6_res_species$heatmap
 ```
 
 # 10.0 Wilcoxon Test
@@ -1511,7 +1786,6 @@ res_phy <- wilcox_tests(ps_fs_phylum_csv)
 head(res_phy)
 
 write_csv(res_phy, "output/wilcox_phylum_results.csv")
-
 
 ```
 
