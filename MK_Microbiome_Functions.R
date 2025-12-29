@@ -2392,8 +2392,6 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
     df_plot_plaque <- df_plot_plaque %>%
       dplyr::mutate(taxon = forcats::fct_rev(factor(taxon, levels = y_levels_plaque)))
 
-    print(df_plot_plaque %>% filter(confidence == "Low"))
-    
     
      #I guess you have to do this to get the ordering correct! So annoying.
     scaffold_plaque <- df_plot_plaque %>% distinct(confidence, taxon)

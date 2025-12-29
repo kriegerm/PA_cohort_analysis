@@ -1,0 +1,428 @@
+---
+title: "functional_analysis"
+author: "Madeline Krieger"
+date: "2025-09-05"
+output: html_document
+---
+
+Script for analyzing Picrust2 results. These were generated with the shell script shown in "Picrust2_commands.sh"
+
+
+```{r 1.1_load-packages}
+library("pacman")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "phyloseq", "ALDEx2", "SummarizedExperiment", "Biobase", "devtools","ComplexHeatmap", "BiocGenerics", "BiocManager", "metagenomeSeq","Maaslin2", "edgeR", "lefser", "limma", "KEGGREST", "dplyr", "ggpicrust2", "Polychrome")
+``` 
+
+
+## Pathways
+```{r}
+# Load necessary data: abundance data and metadata
+pathways_file <- "picrust2_pipeline_output/pathways_out/path_abun_unstrat_descrip.tsv"
+
+metadata <- read_delim(
+    "../Pediatric_cohort/Qiime2/Files_For_Phyloseq/metadata_phyloseq.tsv",
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE
+)
+
+metadata <- metadata %>% as.data.frame() %>% filter(Type %in% c("Plaque", "Abscess")) 
+
+pathway_file_read <- read_delim(
+    pathways_file,
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE
+    ) %>% as.data.frame()  %>%
+    dplyr::mutate(funct = paste(pathway, description, sep = "_")) %>%
+    dplyr::select(-description, -pathway)%>%
+    column_to_rownames(var="funct") %>%
+    dplyr::select(dplyr::all_of(metadata$SampleID)) 
+
+metadata <- metadata %>% column_to_rownames(var="SampleID")
+```
+
+
+```{r}
+maaslin2_pathway <- Maaslin2(input_data = pathway_file_read,
+                     input_metadata = metadata,
+                     fixed_effects = "Type",
+                     output = "test",
+                     normalization = "CLR",
+                     transform = "NONE")
+
+maaslin2_pathway_res <- maaslin2_pathway$results %>% filter(qval < .05)
+write_csv(maaslin2_pathway_res, "picrust2_pipeline_output/maaslin2_pathway_res.csv")
+```
+
+
+## KO
+```{r}
+# Load necessary data: abundance data and metadata
+ko_file <- "picrust2_pipeline_output/KO_metagenome_out/pred_metagenome_unstrat.tsv"
+metadata <- read_delim(
+    "../Pediatric_cohort/Qiime2/Files_For_Phyloseq/metadata_phyloseq.tsv",
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE
+)
+
+metadata <- metadata %>% as.data.frame() %>% filter(Type %in% c("Plaque", "Abscess")) 
+
+ko_file_read <- read_delim(
+    ko_file,
+    delim = "\t",
+    escape_double = FALSE,
+    trim_ws = TRUE
+    ) %>% as.data.frame()  %>%
+    column_to_rownames(var="function") %>%
+    dplyr::select(dplyr::all_of(metadata$SampleID)) 
+
+metadata <- metadata %>% column_to_rownames(var="SampleID")
+```
+
+### Maaslin2
+```{r}
+maaslin2_ko <- Maaslin2(input_data = ko_file_read,
+                     input_metadata = metadata,
+                     fixed_effects = "Type",
+                     output = "test",
+                     normalization = "CLR",
+                     transform = "NONE", 
+                     plot_scatter = FALSE,
+                     plot_heatmap = TRUE)
+
+maaslin2_KO_res <- maaslin2_ko$results %>% filter(qval < .05)
+write_csv(maaslin2_KO_res, "picrust2_pipeline_output/maaslin2_KO_res.csv")
+```
+
+
+
+
+### Clusterprofiler
+```{r}
+library(clusterProfiler)
+
+KO_list_pl <- maaslin2_KO_res %>% 
+    filter(coef > 0) 
+
+KO_list_pl$feature <- sub("^ko\\.", "", KO_list_pl$feature)
+
+KO_list_pl <- KO_list_pl$feature
+
+KEGG_enrich_pl <- enrichKEGG(gene = KO_list_pl, keyType = "kegg", organism = "ko")
+
+KEGG_enrich_pl <- KEGG_enrich_pl@result %>%
+      arrange(dplyr::desc(Count)) 
+  
+KEGG_enrich_pl %>% 
+    filter(qvalue <= 0.1) %>%
+    kable()
+
+```
+
+```{r}
+KO_list_ab <- maaslin2_KO_res %>% 
+    filter(coef < 0) 
+
+KO_list_ab$feature <- sub("^ko\\.", "", KO_list_ab$feature)
+
+KO_list_ab <- KO_list_ab$feature
+
+KEGG_enrich_ab <- enrichKEGG(gene = KO_list_ab, keyType = "kegg", organism = "ko")
+
+KEGG_enrich_ab <- KEGG_enrich_ab@result %>%
+      arrange(dplyr::desc(Count)) 
+  
+KEGG_enrich_ab %>% 
+    filter(qvalue <= 0.1) %>%
+    kable()
+```
+
+
+```{r}
+# Add a group label to each result
+pl_df <- KEGG_enrich_pl %>%
+  mutate(group = "Plaque")
+
+ab_df <- KEGG_enrich_ab %>%
+  mutate(group = "Abscess")
+
+# Bind rows
+kegg_combined <- bind_rows(pl_df, ab_df)
+
+write.csv(kegg_combined, "output/KEGG_results_combined_picrust2.csv")
+
+
+kegg_sig <- kegg_combined %>%
+  #group_by(Description) %>%
+  #filter(any(qvalue < 0.25)) %>%    # drop rows where both groups are non-sig
+  #ungroup() %>%
+  filter(qvalue < 0.05) %>%
+  mutate(
+    Description = str_trunc(Description, 60))
+
+
+url <- "https://rest.kegg.jp/list/ko"
+map_file  <- read_tsv(url, show_col_types = FALSE) %>% as.data.frame() %>%
+        rename(Feature = 1, Description = 2) %>%
+        mutate(Feature = str_remove(Feature, "ko:")) 
+
+kegg_sig_annotated <- kegg_sig %>%
+  select(Description, ID, geneID, group) %>%
+  separate_rows(geneID, sep = "/") %>%
+  rename(Feature = geneID) %>%
+  left_join(map_file, by = "Feature") 
+
+write.csv(kegg_sig_annotated, "output/KEGG_significant_pathways_KO-annotated_picrust2.csv")
+```
+
+
+### Fig 8: Dumbell plot
+```{r, fig.height=8, fig.width=6}
+
+library(scales)
+
+sum_df <- kegg_sig %>%
+  select(Description, group, FoldEnrichment, qvalue, Count) %>%
+  pivot_wider(
+    names_from = group,
+    values_from = c(FoldEnrichment, qvalue, Count),
+    names_sep = "_"
+  ) %>%
+  mutate(
+    max_FE = pmax(FoldEnrichment_Plaque, FoldEnrichment_Abscess, na.rm = TRUE),
+    Description = fct_reorder(Description, max_FE)
+  )
+
+#Dumbell plot stuff 
+pts_df <- sum_df %>%
+  select(Description,
+         FoldEnrichment_Plaque, FoldEnrichment_Abscess,
+         qvalue_Plaque,        qvalue_Abscess,
+         Count_Plaque,         Count_Abscess) %>%
+  pivot_longer(
+    cols = -Description,
+    names_to = c("measure", "group"),
+    names_sep = "_",
+    values_to = "value"
+  ) %>%
+  pivot_wider(
+    names_from = measure,
+    values_from = value
+  ) %>%
+  # group is now "Plaque"/"Abscess"
+  mutate(
+    base_color = ifelse(group == "Plaque", "#3185FC", "#FF495C"),
+    fill_color = ifelse(qvalue < 0.05, base_color, "white"),
+    size_val   = rescale(Count, to = c(1, 10))   # size by Count (optional)
+  )
+
+library(ggbreak)
+
+ggplot() +
+  # grey line between Abscess and Plaque FE
+  geom_segment(
+    data = sum_df,
+    aes(x = FoldEnrichment_Abscess,
+        xend = FoldEnrichment_Plaque,
+        y = Description,
+        yend = Description),
+    color = "grey80",
+    linewidth = 0.6
+  ) +
+  # endpoints for each group
+  geom_point(
+    data = pts_df,
+    aes(x = FoldEnrichment,
+        y = Description,
+        fill = fill_color,
+        size = Count),
+    shape  = 21,           # circle with border
+    color  = "black",      # black ring
+    stroke = 0.6,
+    alpha  = 0.9
+  ) +
+  scale_fill_identity() +
+  scale_size_continuous(range = c(2, 6),  # << control min/max size here
+                      name = "Count") +
+ scale_x_break(c(12, 17)) +   
+   scale_x_continuous(
+    limits = c(0, 22),
+    breaks = seq(0, 25, by = 2),     # << labels every 2 units
+    expand = c(0, 0)
+  ) +
+  labs(
+    x = "Fold Enrichment",
+    y = NULL,
+    title = "KEGG pathway fold enrichment"
+  ) +
+  theme_bw(base_size = 14) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.text.y = element_text(size = 12),
+        axis.ticks.x.top = element_blank(),
+    axis.text.x.top = element_blank()
+  ) 
+
+
+ggsave("output/kegg_dumbell_plot.png", width = 8, height = 8)
+```
+
+# Anvio KEGG enrichment
+```{r}
+anvio_res <- read_delim("DAspecies_anvio/dbs/functional-enrichment_KOfam.txt", delim="\t")
+
+anvio_res_sig <- anvio_res %>%
+  filter(`adjusted_q_value` < 0.05)
+
+anvio_res_sig_pl <- anvio_res_sig %>%
+  filter(`associated_groups` == "Plaque")
+
+anvio_res_sig_ab <- anvio_res_sig %>%
+  filter(`associated_groups` == "Abscess")
+
+
+anvio_KEGG_enrich_pl <- enrichKEGG(gene = anvio_res_sig_pl$accession, keyType = "kegg", organism = "ko")
+
+anvio_KEGG_enrich_pl <- anvio_KEGG_enrich_pl@result %>%
+      arrange(dplyr::desc(Count)) 
+  
+anvio_KEGG_enrich_pl %>% 
+    filter(qvalue <= 0.1) %>%
+    kable()
+
+anvio_KEGG_enrich_ab <- enrichKEGG(gene = anvio_res_sig_ab$accession, keyType = "kegg", organism = "ko")
+
+anvio_KEGG_enrich_ab <- anvio_KEGG_enrich_ab@result %>%
+      arrange(dplyr::desc(Count)) 
+  
+anvio_KEGG_enrich_ab %>% 
+    filter(qvalue <= 0.1) %>%
+    kable()
+```
+
+```{r}
+# Add a group label to each result
+pl_df <- anvio_KEGG_enrich_pl %>%
+  mutate(group = "Plaque")
+
+ab_df <- anvio_KEGG_enrich_ab %>%
+  mutate(group = "Abscess")
+
+# Bind rows
+kegg_combined <- bind_rows(pl_df, ab_df)
+write.csv(kegg_combined, "output/KEGG_results_combined_anvio.csv")
+
+kegg_sig <- kegg_combined %>%
+  #group_by(Description) %>%
+  #filter(any(qvalue < 0.25)) %>%    # drop rows where both groups are non-sig
+  #ungroup() %>%
+  filter(qvalue < 0.05) %>%
+  mutate(
+    Description = str_trunc(Description, 60))
+  
+kegg_sig_annotated <- kegg_sig %>%
+  select(Description, ID, geneID, group) %>%
+  separate_rows(geneID, sep = "/") %>%
+  rename(Feature = geneID) %>%
+  left_join(map_file, by = "Feature") 
+
+write.csv(kegg_sig_annotated, "output/KEGG_significant_pathways_KO-annotated_anvio.csv")
+
+sum_df <- kegg_sig %>%
+  select(Description, group, FoldEnrichment, qvalue, Count) %>%
+  pivot_wider(
+    names_from = group,
+    values_from = c(FoldEnrichment, qvalue, Count),
+    names_sep = "_"
+  ) %>%
+  mutate(
+    max_FE = pmax(FoldEnrichment_Plaque, FoldEnrichment_Abscess, na.rm = TRUE),
+    Description = fct_reorder(Description, max_FE)
+  )
+
+
+#Dumbell plot stuff 
+pts_df <- sum_df %>%
+  select(Description,
+         FoldEnrichment_Plaque, FoldEnrichment_Abscess,
+         qvalue_Plaque,        qvalue_Abscess,
+         Count_Plaque,         Count_Abscess) %>%
+  pivot_longer(
+    cols = -Description,
+    names_to = c("measure", "group"),
+    names_sep = "_",
+    values_to = "value"
+  ) %>%
+  pivot_wider(
+    names_from = measure,
+    values_from = value
+  ) %>%
+  # group is now "Plaque"/"Abscess"
+  mutate(
+    base_color = ifelse(group == "Plaque", "#3185FC", "#FF495C"),
+    fill_color = ifelse(qvalue < 0.05, base_color, "white"),
+    size_val   = rescale(Count, to = c(1, 10))   # size by Count (optional)
+  )
+```
+
+## Fig S10: Dumbell plot
+```{r, fig.height=7, fig.width=6}
+ggplot() +
+  # grey line between Abscess and Plaque FE
+  geom_segment(
+    data = sum_df,
+    aes(x = FoldEnrichment_Abscess,
+        xend = FoldEnrichment_Plaque,
+        y = Description,
+        yend = Description),
+    color = "grey80",
+    linewidth = 0.6
+  ) +
+  # endpoints for each group
+  geom_point(
+    data = pts_df,
+    aes(x = FoldEnrichment,
+        y = Description,
+        fill = fill_color,
+        size = Count),
+    shape  = 21,           # circle with border
+    color  = "black",      # black ring
+    stroke = 0.6,
+    alpha  = 0.9
+  ) +
+  scale_fill_identity() +
+  scale_size_continuous(range = c(2, 6),  # << control min/max size here
+                      name = "Count") +
+  scale_x_break(c(32, 70)) +   
+   scale_x_continuous(
+    limits = c(0, 120),
+    breaks = seq(0, 120, by = 10),     # << labels every 2 units
+    expand = c(0, 0)
+  ) +
+  labs(
+    x = "Fold Enrichment",
+    y = NULL,
+    title = "Anvio results"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.text.y = element_text(size = 12), 
+        axis.text.x = element_text(angle = 45, hjust=1),
+        axis.ticks.x.top = element_blank(),
+    axis.text.x.top = element_blank()
+  )
+
+
+ggsave("output/anvio_kegg_dumbell_plot.png", width = 7, height = 7)
+```
+
+
