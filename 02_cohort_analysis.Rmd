@@ -1487,7 +1487,7 @@ model_genus <- result_genus$lda_model_genus
 ```
 
 
-## Fig 7C: Membership of topic by Type
+## Fig S8A: Membership of topic by Type
 ```{r, fig.height=2.5, fig.width=8.4}
 
 topic_membership_res_genus <- topic_membership(result_genus, "Type", colors_all, result_genus$g_df)
@@ -1514,7 +1514,7 @@ ggsave("output/Topic_Model_Topic_Membership_by_Type_Genus.png", plot_genus, widt
 ```
 
 
-## Fig 7E: Plot beta
+## Fig S8C: Plot beta
 ```{r, fig.height=3, fig.width=20}
 ### Plot beta
 #plot_beta(result, 15)
@@ -1531,7 +1531,7 @@ ggsave("output/Topic_Model_Beta_Barplots_Genus.png", p_genus, width = 20, height
 
 
 
-## Fig 7B: Heatmap of gamma scores 
+## Fig S8B: Heatmap of gamma scores 
 ```{r, fig.height=2.7, fig.width=9}
 heatmap_gamma_genus <- heatmap_gamma(result_genus, "Type", result_genus$g_df)
 png("output/Topic_Model_Gamma_Heatmap_Genus.png",
@@ -1542,9 +1542,10 @@ ComplexHeatmap::draw(heatmap_gamma_genus)  # <- explicitly use this one
 dev.off()
 ```
 
-## Fig 7D: UMAP of gamma scores
+## UMAP of gamma scores
 ```{r fig.height=6, fig.width=6}
 UMAP_res_genus <- plot_gamma_umap(results_genus, "Type", colors_all, result_genus$g_df)
+UMAP_res_genus$umap
 
 ggsave("output/Topic_Model_Gamma_UMAP_Genus.png", UMAP_res_genus$umap, width = 5, height = 4, dpi=600)
 ```
@@ -1556,7 +1557,7 @@ ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Genus.png", UMAP_res_genus$sil_
 ```
 
 
-## Fig S6, S7: Relab heatmaps by topic
+## Fig S9: Relab heatmaps by topic
 ```{r, fig.height=2, fig.width=7}
 topic1_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 1)
 
@@ -1719,7 +1720,7 @@ result_species <- create_topic_model(counts_data_species, 6, TRUE, "Gibbs")
 model_species <- result_species$lda_model
 ```
 
-## Fig S8A: Membership of topic by Type
+## Fig 7C: Membership of topic by Type
 ```{r, fig.height=2.5, fig.width=7.4}
 
 topic_membership_res_species <- topic_membership(result_species, "Type", colors_all, result_species$g_df)
@@ -1744,7 +1745,7 @@ plot_species
 ggsave("output/Topic_Model_Topic_Membership_by_Type_Species.png", plot_species, width = 7.4, height = 2.5, dpi=600)
 ```
 
-## Fig S8C: Plot beta
+## Fig 7E: Plot beta
 ```{r, fig.height=3, fig.width=25}
 
 ### Plot beta
@@ -1761,7 +1762,7 @@ p
 ggsave("output/Topic_Model_Beta_Barplots_Species.png", p, width = 25, height = 3, dpi=600)
 ```
 
-## Fig S8B: Heatmap of gamma scores 
+## Fig 7B: Heatmap of gamma scores 
 ```{r, fig.height=2.3, fig.width=9}
 heatmap_gamma_species <- heatmap_gamma(result_species, "Type", result_species$g_df)
 
@@ -1774,7 +1775,23 @@ dev.off()
 ```
 
 
-## Fig S9: Relab heatmaps by topic
+## Fig 7D: UMAP of gamma scores
+```{r fig.height=6, fig.width=6}
+UMAP_res_sp <- plot_gamma_umap(result_species, "Type", colors_all, result_species$g_df)
+UMAP_res_sp$umap
+
+ggsave("output/Topic_Model_Gamma_UMAP_Species.png", UMAP_res_sp$umap, width = 5, height = 4, dpi=600)
+```
+
+```{r, fig.width=3, fig.height=3}
+UMAP_res_sp$sil_plot
+
+ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Species.png", UMAP_res_sp$sil_plot, width = 3, height = 3, dpi=600)
+```
+
+
+
+## Fig S6, S7: Relab heatmaps by topic
 ```{r, fig.height=2, fig.width=7}
 topic1_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic = 1)
 
