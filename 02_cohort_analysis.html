@@ -3061,7 +3061,23 @@ ALDEX_genus$result</code></pre>
 <h2>6.4 Combine results</h2>
 <div id="fig-4a-phylum" class="section level3">
 <h3>Fig 4A: Phylum</h3>
-<pre class="r"><code>DA_results_df_Phylum &lt;- combine_DA(maaslin2_results_Phylum_0.05, ancombc2_results_df_Phylum, aldex2_res_Phylum, &quot;Type&quot;, &quot;Phylum&quot;)</code></pre>
+<pre class="r"><code>DA_results_df_Phylum &lt;- combine_DA(maaslin2_results_Phylum_0.05, ancombc2_results_df_Phylum, aldex2_res_Phylum, &quot;Type&quot;, &quot;Phylum&quot;)
+
+
+DA_results_df_Phylum$results</code></pre>
+<pre><code>## # A tibble: 5 × 15
+##   taxon    Maaslin2_coef Maaslin2_pval Maaslin2_qval Maaslin2_value ANCOMBC2_DFF
+##   &lt;chr&gt;            &lt;dbl&gt;         &lt;dbl&gt;         &lt;dbl&gt; &lt;chr&gt;          &lt;lgl&gt;       
+## 1 Proteob…          1.34     0.0144         0.0467   Plaque         TRUE        
+## 2 Sacchar…         NA       NA             NA        &lt;NA&gt;           NA          
+## 3 Spiroch…         -4.15     0.0000431      0.000474 Plaque         TRUE        
+## 4 Synergi…         -2.32     0.000889       0.00489  Plaque         NA          
+## 5 Teneric…         -1.22     0.0170         0.0467   Plaque         NA          
+## # ℹ 9 more variables: ANCOMBC2_LFC &lt;dbl&gt;, ANCOMBC2_p_val &lt;dbl&gt;,
+## #   ANCOMBC2_q_val &lt;dbl&gt;, ANCOMBC2_passed_SS &lt;lgl&gt;, Aldex2_Enrichment &lt;chr&gt;,
+## #   Aldex2_EF &lt;dbl&gt;, Aldex2_padj &lt;dbl&gt;, confidence &lt;chr&gt;,
+## #   all_positive_or_negative &lt;lgl&gt;</code></pre>
+<pre class="r"><code>write_csv(DA_results_df_Phylum$results, &quot;output/phylum_DA_combined_results.csv&quot;)</code></pre>
 <pre class="r"><code>phylum_combined_bubbles_P &lt;- combine_DA_with_bubbles(da = DA_results_df_Phylum,
   CSV_formatted_relab_df = ps_fs_phylum_csv,
   group = &quot;Type&quot;,               # your contrast label used in ANCOMBC2 column names
@@ -3105,7 +3121,28 @@ write_csv(phylum_count_data, &quot;output/phylum_count_data_DA_bubbledata.csv&qu
 </div>
 <div id="fig-4b-genus" class="section level3">
 <h3>Fig 4B: Genus</h3>
-<pre class="r"><code>DA_results_df_genus &lt;- combine_DA(maaslin2_results_Genus_0.05, ancombc2_results_df_Genus, aldex2_res_Genus, &quot;Type&quot;, &quot;Genus&quot;, filter_confidence = NULL)</code></pre>
+<pre class="r"><code>DA_results_df_genus &lt;- combine_DA(maaslin2_results_Genus_0.05, ancombc2_results_df_Genus, aldex2_res_Genus, &quot;Type&quot;, &quot;Genus&quot;, filter_confidence = NULL)
+
+DA_results_df_genus$results</code></pre>
+<pre><code>## # A tibble: 39 × 15
+##    taxon   Maaslin2_coef Maaslin2_pval Maaslin2_qval Maaslin2_value ANCOMBC2_DFF
+##    &lt;chr&gt;           &lt;dbl&gt;         &lt;dbl&gt;         &lt;dbl&gt; &lt;chr&gt;          &lt;lgl&gt;       
+##  1 Abiotr…          2.67     0.000571       0.00379  Plaque         NA          
+##  2 Actino…          2.39     0.000380       0.00308  Plaque         TRUE        
+##  3 Aggreg…         NA       NA             NA        &lt;NA&gt;           NA          
+##  4 Arachn…          1.66     0.00338        0.0154   Plaque         NA          
+##  5 Bacter…         NA       NA             NA        &lt;NA&gt;           TRUE        
+##  6 Bacter…         -1.46     0.00423        0.0159   Plaque         NA          
+##  7 Capnoc…          1.66     0.00470        0.0163   Plaque         NA          
+##  8 Coryne…          2.57     0.0000356      0.000999 Plaque         TRUE        
+##  9 Dialis…         -3.72     0.0000169      0.000999 Plaque         TRUE        
+## 10 Fretib…         -2.65     0.000958       0.00538  Plaque         NA          
+## # ℹ 29 more rows
+## # ℹ 9 more variables: ANCOMBC2_LFC &lt;dbl&gt;, ANCOMBC2_p_val &lt;dbl&gt;,
+## #   ANCOMBC2_q_val &lt;dbl&gt;, ANCOMBC2_passed_SS &lt;lgl&gt;, Aldex2_Enrichment &lt;chr&gt;,
+## #   Aldex2_EF &lt;dbl&gt;, Aldex2_padj &lt;dbl&gt;, confidence &lt;chr&gt;,
+## #   all_positive_or_negative &lt;lgl&gt;</code></pre>
+<pre class="r"><code>write_csv(DA_results_df_genus$results, &quot;output/genus_DA_combined_results.csv&quot;)</code></pre>
 <pre class="r"><code>genus_combined_bubbles_P &lt;- combine_DA_with_bubbles(da = DA_results_df_genus,
   CSV_formatted_relab_df = ps_fs_genus_csv,
   group = &quot;Type&quot;,               # your contrast label used in ANCOMBC2 column names
@@ -3144,7 +3181,28 @@ write_csv(genus_count_data, &quot;output/genus_count_data_DA_bubbledata.csv&quot
 </div>
 <div id="fig-5-species" class="section level3">
 <h3>Fig 5: Species</h3>
-<pre class="r"><code>DA_results_df_sp &lt;- combine_DA(maaslin2_results_Species_0.05, ancombc2_results_df_Species, aldex2_res_Species, &quot;Type&quot;, &quot;Species&quot;)</code></pre>
+<pre class="r"><code>DA_results_df_sp &lt;- combine_DA(maaslin2_results_Species_0.05, ancombc2_results_df_Species, aldex2_res_Species, &quot;Type&quot;, &quot;Species&quot;)
+
+DA_results_df_sp$results</code></pre>
+<pre><code>## # A tibble: 70 × 15
+##    taxon   Maaslin2_coef Maaslin2_pval Maaslin2_qval Maaslin2_value ANCOMBC2_DFF
+##    &lt;chr&gt;           &lt;dbl&gt;         &lt;dbl&gt;         &lt;dbl&gt; &lt;chr&gt;          &lt;lgl&gt;       
+##  1 Abiotr…         2.77       0.000922       0.0122  Plaque         NA          
+##  2 Actino…        NA         NA             NA       &lt;NA&gt;           TRUE        
+##  3 Actino…         1.38       0.00168        0.0169  Plaque         NA          
+##  4 Actino…         2.50       0.00695        0.0315  Plaque         TRUE        
+##  5 Aggreg…        NA         NA             NA       &lt;NA&gt;           TRUE        
+##  6 Allopr…         2.37       0.00255        0.0210  Plaque         TRUE        
+##  7 Allopr…        NA         NA             NA       &lt;NA&gt;           TRUE        
+##  8 Allopr…         0.792      0.00965        0.0407  Plaque         NA          
+##  9 Allopr…        -3.32       0.000333       0.00877 Plaque         NA          
+## 10 Arachn…         1.32       0.0111         0.0444  Plaque         NA          
+## # ℹ 60 more rows
+## # ℹ 9 more variables: ANCOMBC2_LFC &lt;dbl&gt;, ANCOMBC2_p_val &lt;dbl&gt;,
+## #   ANCOMBC2_q_val &lt;dbl&gt;, ANCOMBC2_passed_SS &lt;lgl&gt;, Aldex2_Enrichment &lt;chr&gt;,
+## #   Aldex2_EF &lt;dbl&gt;, Aldex2_padj &lt;dbl&gt;, confidence &lt;chr&gt;,
+## #   all_positive_or_negative &lt;lgl&gt;</code></pre>
+<pre class="r"><code>write_csv(DA_results_df_sp$results, &quot;output/species_DA_combined_results.csv&quot;)</code></pre>
 <pre class="r"><code>sp_combined_bubbles_P &lt;- combine_DA_with_bubbles(da = DA_results_df_sp,
   CSV_formatted_relab_df = ps_fs_species_csv,
   group = &quot;Type&quot;,               

@@ -147,6 +147,11 @@ df_sorted %>% filter(rho_rank == 1 | rho_rank == 2 ) %>% kable()
 ```
 
 
+
+
+Community separation by sample type was assessed with silhouette scores and PERMANOVA (vegan::adonis2 on Bray-Curtis distances with permutations restricted within patient pairs), with betadisper/permutest used to test whether group differences reflected unequal multivariate dispersion rather than a true compositional shift.
+
+
 ## Fig S1A: PCoA Species relab bray
 ```{r, fig.width=5, fig.height=3.5}
 Species_PCoA_res <- run_ordination_with_validation(
@@ -166,6 +171,18 @@ Species_PCoA_res$plot
 Species_PCoA_res$lib_size_with_Axis1_corr
 
 ggsave("output/Species_PCoA_relab_bray_plot.png", Species_PCoA_res$plot, width = 5, height = 3.5, dpi=600)
+
+```
+
+```{r}
+Species_PCoA_permanova <- run_permanova_with_betadisper(
+  phyloseq_obj = ps_f,
+  rank_transformation = "Species",
+  trans_type = "relab",
+  dist_cal_type = "bray"
+)
+Species_PCoA_permanova$permanova
+Species_PCoA_permanova$betadisper_test
 
 ```
 
@@ -204,6 +221,18 @@ ggsave("output/Genus_PCoA_relab_bray_plot.png", Genus_PCoA_res$plot, width = 5, 
 
 ```
 
+```{r}
+Genus_PCoA_permanova <- run_permanova_with_betadisper(
+  phyloseq_obj = ps_f,
+  rank_transformation = "Genus",
+  trans_type = "relab",
+  dist_cal_type = "bray"
+)
+Genus_PCoA_permanova$permanova
+Genus_PCoA_permanova$betadisper_test
+
+```
+
 ```{r, fig.width=3, fig.height=3}
 Genus_PCoA_res_scores_df <- as.data.frame(Genus_PCoA_res$scores)
 
@@ -238,6 +267,18 @@ ggsave("output/Phylum_PCoA_relab_bray.png", Phylum_PCoA_res$plot, width = 5, hei
 
 ```
 
+```{r}
+Phylum_PCoA_permanova <- run_permanova_with_betadisper(
+  phyloseq_obj = ps_f,
+  rank_transformation = "Phylum",
+  trans_type = "relab",
+  dist_cal_type = "bray"
+)
+Phylum_PCoA_permanova$permanova
+Phylum_PCoA_permanova$betadisper_test
+
+```
+
 ```{r, fig.width=3, fig.height=3}
 Phylum_PCoA_res_scores_df <- as.data.frame(Phylum_PCoA_res$scores)
 
@@ -249,7 +290,6 @@ Phylum_PCoA_res_scores_df_sil$sil_plot
 ggsave("output/Phylum_PCoA_relab_bray_sil_scores.png", Phylum_PCoA_res_scores_df_sil$sil_plot, width = 3, height = 3, dpi=600)
 
 ```
-
 
 
 # 3.0 Fig 2C: Alpha diversity
@@ -682,6 +722,10 @@ ALDEX_sp <- run_aldex2(ps_fs,
 ```{r, fig.height=3.6, fig.width=3.2}
 DA_results_df_Phylum <- combine_DA(maaslin2_results_Phylum_0.05, ancombc2_results_df_Phylum, aldex2_res_Phylum, "Type", "Phylum")
 
+
+DA_results_df_Phylum$results
+
+write_csv(DA_results_df_Phylum$results, "output/phylum_DA_combined_results.csv")
 ```
 
 ```{r, fig.width=6.2, fig.height=3}
@@ -748,6 +792,10 @@ write_csv(phylum_count_data, "output/phylum_count_data_DA_bubbledata.csv")
 
 ```{r, fig.height=12, fig.width=3.9}
 DA_results_df_genus <- combine_DA(maaslin2_results_Genus_0.05, ancombc2_results_df_Genus, aldex2_res_Genus, "Type", "Genus", filter_confidence = NULL)
+
+DA_results_df_genus$results
+
+write_csv(DA_results_df_genus$results, "output/genus_DA_combined_results.csv")
 ```
 
 ```{r, fig.width=7.5, fig.height=8}
@@ -806,6 +854,10 @@ write_csv(genus_count_data, "output/genus_count_data_DA_bubbledata.csv")
 ### Fig 5: Species
 ```{r, fig.height=11, fig.width=5.5}
 DA_results_df_sp <- combine_DA(maaslin2_results_Species_0.05, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species")
+
+DA_results_df_sp$results
+
+write_csv(DA_results_df_sp$results, "output/species_DA_combined_results.csv")
 ```
 
 ```{r, fig.width=10.6, fig.height=11.1}

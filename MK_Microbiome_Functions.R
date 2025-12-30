@@ -1034,6 +1034,123 @@ run_ordination_with_validation <- function(phyloseq_obj,
   ))
 }
 
+
+## ---- PERMANOVA and betadisper ----
+
+run_permanova_with_betadisper <- function(phyloseq_obj,
+                                          rank_transformation = "Genus",
+                                          trans_type = "relab",
+                                          dist_cal_type = "bray",
+                                          group_var = "Type",
+                                          patient_var = NULL,
+                                          permutations = 999) {
+  
+  clr_transform <- function(mat, pseudocount = 1) {
+    mat <- mat + pseudocount
+    log_mat <- log(mat)
+    gm <- rowMeans(log_mat)
+    sweep(log_mat, 1, gm)
+  }
+  
+  phylo_trans <- tax_glom(phyloseq_obj, taxrank = rank_transformation)
+  otu_mat <- otu_table(phylo_trans)
+  if (taxa_are_rows(phylo_trans)) {
+    otu_mat <- t(otu_mat)
+  }
+  
+  if (trans_type == "identity") {
+    otu_trans <- otu_mat
+  } else if (trans_type == "log") {
+    otu_trans <- log1p(otu_mat)
+  } else if (trans_type == "relab") {
+    otu_trans <- sweep(otu_mat, 1, rowSums(otu_mat), FUN = "/")
+  } else if (trans_type == "clr") {
+    otu_trans <- clr_transform(otu_mat, pseudocount = 1)
+  } else {
+    stop("Unsupported transformation type.")
+  }
+  
+  otu_trans <- otu_trans[, apply(otu_trans, 2, var) != 0]
+  
+  dist_cal_type <- tolower(dist_cal_type)
+  if (dist_cal_type == "jaccard") {
+    dist_mat <- vegdist(otu_trans, method = "jaccard", binary = TRUE)
+  } else {
+    dist_mat <- vegdist(otu_trans, method = dist_cal_type)
+  }
+  
+  meta_df <- sample_data(phylo_trans) %>%
+    as.matrix() %>%
+    as.data.frame()
+  meta_df$SampleID <- rownames(meta_df)
+  
+  if (is.null(patient_var)) {
+    if ("Sample" %in% colnames(meta_df)) {
+      meta_df$Patient <- as.character(meta_df$Sample)
+    } else {
+      meta_df$Patient <- derive_patient_ids(meta_df$SampleID)
+    }
+    patient_var <- "Patient"
+  }
+  
+  if (!group_var %in% colnames(meta_df)) {
+    stop("The group variable '", group_var, "' is not present in sample metadata.")
+  }
+  if (!patient_var %in% colnames(meta_df)) {
+    stop("The patient variable '", patient_var, "' is not present in sample metadata.")
+  }
+  
+  meta_df <- meta_df[match(labels(dist_mat), meta_df$SampleID), , drop = FALSE]
+  meta_df[[group_var]] <- factor(meta_df[[group_var]])
+  meta_df[[patient_var]] <- factor(meta_df[[patient_var]])
+  
+  permanova_formula <- stats::as.formula(paste("dist_mat ~", group_var))
+  permanova <- vegan::adonis2(
+    permanova_formula,
+    data = meta_df,
+    permutations = permutations,
+    strata = meta_df[[patient_var]]
+  )
+  
+  bd <- vegan::betadisper(dist_mat, meta_df[[group_var]])
+  bd_test <- vegan::permutest(bd, permutations = permutations)
+  
+  analysis_label <- paste0(
+    rank_transformation, " (", trans_type, ", ", dist_cal_type,
+    "); PERMANOVA strata = ", patient_var
+  )
+  
+  header_permanova <- paste0("--- PERMANOVA: ", analysis_label, " ---")
+  header_betadisper <- paste0("--- betadisper (multivariate dispersion): ", analysis_label, " ---")
+  
+  cat("\n", header_permanova, "\n", sep = "")
+  print(permanova)
+  
+  type_row <- rownames(permanova) == group_var
+  if (any(type_row)) {
+    cat(
+      "\nSummary:", group_var,
+      "R2 =", round(permanova$R2[type_row], 4),
+      ", p =", format(permanova$`Pr(>F)`[type_row], digits = 4, scientific = TRUE),
+      "\n"
+    )
+  }
+  
+  cat("\n", header_betadisper, "\n", sep = "")
+  print(bd_test)
+  
+  list(
+    header_permanova = header_permanova,
+    header_betadisper = header_betadisper,
+    permanova = permanova,
+    betadisper = bd,
+    betadisper_test = bd_test,
+    dist_mat = dist_mat,
+    metadata = meta_df
+  )
+}
+
+
 ## ---- Analyze Silhouette Score ----
 
 # Analyze Silhouette score using "Type" as cluster label and return plot
