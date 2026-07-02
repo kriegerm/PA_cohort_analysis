@@ -10,7 +10,10 @@ Script for analyzing Picrust2 results. These were generated with the shell scrip
 
 ```{r 1.1_load-packages}
 library("pacman")
-pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "phyloseq", "ALDEx2", "SummarizedExperiment", "Biobase", "devtools","ComplexHeatmap", "BiocGenerics", "BiocManager", "metagenomeSeq","Maaslin2", "edgeR", "lefser", "limma", "KEGGREST", "dplyr", "ggpicrust2", "Polychrome")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "phyloseq", "ALDEx2", "SummarizedExperiment", "Biobase", "devtools","ComplexHeatmap", "BiocGenerics", "BiocManager", "metagenomeSeq","Maaslin2", "edgeR", "lefser", "limma", "KEGGREST", "dplyr", "ggpicrust2", "Polychrome", "conflicted")
+
+source("MK_Microbiome_Functions.R")
+prefer_analysis_conflicts()
 ``` 
 
 
@@ -169,7 +172,7 @@ map_file  <- read_tsv(url, show_col_types = FALSE) %>% as.data.frame() %>%
         mutate(Feature = str_remove(Feature, "ko:")) 
 
 kegg_sig_annotated <- kegg_sig %>%
-  select(Description, ID, geneID, group) %>%
+  dplyr::select(Description, ID, geneID, group) %>%
   separate_rows(geneID, sep = "/") %>%
   rename(Feature = geneID) %>%
   left_join(map_file, by = "Feature") 
@@ -184,7 +187,7 @@ write.csv(kegg_sig_annotated, "output/KEGG_significant_pathways_KO-annotated_pic
 library(scales)
 
 sum_df <- kegg_sig %>%
-  select(Description, group, FoldEnrichment, qvalue, Count) %>%
+  dplyr::select(Description, group, FoldEnrichment, qvalue, Count) %>%
   pivot_wider(
     names_from = group,
     values_from = c(FoldEnrichment, qvalue, Count),
@@ -197,7 +200,7 @@ sum_df <- kegg_sig %>%
 
 #Dumbell plot stuff 
 pts_df <- sum_df %>%
-  select(Description,
+  dplyr::select(Description,
          FoldEnrichment_Plaque, FoldEnrichment_Abscess,
          qvalue_Plaque,        qvalue_Abscess,
          Count_Plaque,         Count_Abscess) %>%
@@ -326,7 +329,7 @@ kegg_sig <- kegg_combined %>%
     Description = str_trunc(Description, 60))
   
 kegg_sig_annotated <- kegg_sig %>%
-  select(Description, ID, geneID, group) %>%
+  dplyr::select(Description, ID, geneID, group) %>%
   separate_rows(geneID, sep = "/") %>%
   rename(Feature = geneID) %>%
   left_join(map_file, by = "Feature") 
@@ -334,7 +337,7 @@ kegg_sig_annotated <- kegg_sig %>%
 write.csv(kegg_sig_annotated, "output/KEGG_significant_pathways_KO-annotated_anvio.csv")
 
 sum_df <- kegg_sig %>%
-  select(Description, group, FoldEnrichment, qvalue, Count) %>%
+  dplyr::select(Description, group, FoldEnrichment, qvalue, Count) %>%
   pivot_wider(
     names_from = group,
     values_from = c(FoldEnrichment, qvalue, Count),
@@ -348,7 +351,7 @@ sum_df <- kegg_sig %>%
 
 #Dumbell plot stuff 
 pts_df <- sum_df %>%
-  select(Description,
+  dplyr::select(Description,
          FoldEnrichment_Plaque, FoldEnrichment_Abscess,
          qvalue_Plaque,        qvalue_Abscess,
          Count_Plaque,         Count_Abscess) %>%

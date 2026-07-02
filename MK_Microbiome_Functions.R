@@ -15,6 +15,38 @@ if (!dir.exists(dir_path)) {
   message("Directory already exists: ", dir_path)
 }
 
+# Prefer dplyr (and other analysis defaults) over MASS/caret/plyr
+prefer_analysis_conflicts <- function() {
+  if (!requireNamespace("conflicted", quietly = TRUE)) {
+    return(invisible(NULL))
+  }
+
+  dplyr_fns <- c(
+    "select", "filter", "arrange", "mutate", "summarise", "summarize",
+    "group_by", "rename", "lag", "intersect", "setdiff", "union", "desc"
+  )
+  for (fn in dplyr_fns) {
+    conflicted::conflict_prefer(fn, "dplyr", quiet = TRUE)
+  }
+
+  conflicted::conflict_prefer("pheatmap", "pheatmap", quiet = TRUE)
+  conflicted::conflict_prefer("lift", "caret", quiet = TRUE)
+  invisible(NULL)
+}
+
+prefer_analysis_conflicts()
+
+
+draw_heatmap <- function(x) {
+  if (inherits(x, "Heatmap") || inherits(x, "HeatmapList")) {
+    return(ComplexHeatmap::draw(x))
+  }
+  if (inherits(x, "pheatmap") || !is.null(x$gtable)) {
+    grid::grid.newpage()
+    return(grid::grid.draw(x$gtable))
+  }
+  stop("Unable to draw heatmap object of class: ", paste(class(x), collapse = ", "))
+}
 
 
 # ---- Preprocessing Functions ----
@@ -952,7 +984,9 @@ run_ordination_with_validation <- function(phyloseq_obj,
   # Merge metadata
   scores_df$SampleID <- rownames(scores_df)
   
-  metadata_df <- sample_data(phylo_trans) %>% as.matrix() %>% as.data.frame() %>% select(c("SampleID", "Type"))
+  metadata_df <- sample_data(phylo_trans) %>% as.matrix() %>% as.data.frame()
+  metadata_df$SampleID <- rownames(metadata_df)
+  metadata_df <- metadata_df %>% dplyr::select(SampleID, all_of(variable))
   
   scores_df <- dplyr::left_join(scores_df, metadata_df, by = "SampleID")
 
@@ -1335,9 +1369,9 @@ iterate_maaslin2 <- function(ps_obj, iterative_methods, resolutions, group, qval
   # Return the summary table
   summary_table_features_list <- summary_table %>%
     mutate(method = paste(resolution, analysis_method, normalization, transform, sep = "_")) %>%
-    select(c("resolution", "method", "features_list"))
+    dplyr::select(c("resolution", "method", "features_list"))
   
-  summary_table <- summary_table %>% select(-c("features_list"))
+  summary_table <- summary_table %>% dplyr::select(-c("features_list"))
   
   summary_table$resolution = factor(summary_table$resolution, 
                                     levels = resolutions)
@@ -1558,10 +1592,10 @@ iterate_maaslin2_picrust2 <- function(counts_input, metadata, iterative_methods,
 #                                 qval_threshold= 0.1, 
 #                                 plot_heights = c(2, 9))
 
-run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold){
+run_Maaslin2 <- function(ps_obj, taxa_level, group, paired = TRUE, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold){
   
   # Create a unique hash for the parameters
-  param_hash <- digest(list(ps_obj, taxa_level, group, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold))
+  param_hash <- digest(list(ps_obj, taxa_level, group, paired, analysis_method, normalization, transform, plot_colors, plot_type, qval_threshold))
   # File path for the analysis results
   result_file <- file.path("../saved_analysis_files/", paste0("maaslin2_result_", param_hash, ".rds"))
   
@@ -1579,11 +1613,14 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
     
     metadata_input <- sample_data(ps_obj) %>% as.matrix() %>% as.data.frame()
     
+    if (paired == TRUE){
+    
     maaslin2_results <- tryCatch({
       Maaslin2(
         input_data = counts_input,
         input_metadata = metadata_input,
         fixed_effects = group,
+        random_effects = "Sample",
         plot_heatmap = FALSE,
         plot_scatter = FALSE,
         output = paste0("../saved_analysis_files/", Sys.Date(), "_maaslin2_output"),
@@ -1594,7 +1631,26 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
     }, error = function(e) {
       message("Maaslin2 failed: ", e$message)
       return(NULL)
-    })
+    }) }
+    else {
+      
+      maaslin2_results <- tryCatch({
+        Maaslin2(
+          input_data = counts_input,
+          input_metadata = metadata_input,
+          fixed_effects = group,
+          plot_heatmap = FALSE,
+          plot_scatter = FALSE,
+          output = paste0("../saved_analysis_files/", Sys.Date(), "_maaslin2_output"),
+          analysis_method = analysis_method,
+          normalization = normalization,
+          transform = transform
+        )
+      }, error = function(e) {
+        message("Maaslin2 failed: ", e$message)
+        return(NULL)
+      })
+    }
     
     # If run failed
     if (is.null(maaslin2_results)) {
@@ -1740,6 +1796,121 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
 
 ## ---- ANCOM ----
 
+pick_ancombc2_col <- function(df, prefix, group = NULL) {
+  if (is.null(df) || !is.data.frame(df)) {
+    return(NA_character_)
+  }
+
+  colnames_df <- colnames(df)
+  if (!is.null(group) && nzchar(group)) {
+    hits <- grep(
+      paste0("^", prefix, "_", group),
+      colnames_df,
+      value = TRUE,
+      ignore.case = TRUE
+    )
+    hits <- hits[!grepl("Intercept", hits, ignore.case = TRUE)]
+    if (length(hits) > 0) {
+      return(hits[1])
+    }
+  }
+
+  hits <- grep(paste0("^", prefix, "_"), colnames_df, value = TRUE)
+  hits <- hits[!grepl("Intercept", hits, ignore.case = TRUE)]
+  if (length(hits) > 0) {
+    return(hits[1])
+  }
+
+  NA_character_
+}
+
+get_ancombc2_columns <- function(ancombc2_results, group) {
+  if (is.null(ancombc2_results)) {
+    stop(
+      "ANCOMBC2 returned NULL. Delete the cached .rds in ../saved_analysis_files/ and re-run."
+    )
+  }
+
+  as_result_df <- function(x) {
+    if (is.null(x)) {
+      return(NULL)
+    }
+    if (is.data.frame(x)) {
+      return(x)
+    }
+    tryCatch(as.data.frame(x), error = function(e) NULL)
+  }
+
+  res_pair <- NULL
+  if (is.data.frame(ancombc2_results)) {
+    df <- ancombc2_results
+  } else if (is.list(ancombc2_results)) {
+    df <- as_result_df(ancombc2_results$res)
+    res_pair <- as_result_df(ancombc2_results$res_pair)
+
+    if (is.null(df) && !is.null(res_pair)) {
+      df <- res_pair
+      res_pair <- NULL
+    }
+
+    if (is.null(df)) {
+      df_candidates <- vapply(
+        ancombc2_results,
+        function(x) is.data.frame(x) || inherits(x, "tbl_df"),
+        logical(1)
+      )
+      if (any(df_candidates)) {
+        df <- as_result_df(ancombc2_results[[which(df_candidates)[1]]])
+      }
+    }
+  } else {
+    stop(
+      "Unrecognized ANCOMBC2 result format (class: ",
+      paste(class(ancombc2_results), collapse = ", "),
+      "). Delete the cached .rds and re-run ANCOMBC2."
+    )
+  }
+
+  if (is.null(df) || !is.data.frame(df) || nrow(df) == 0) {
+    obj_desc <- if (is.list(ancombc2_results)) {
+      paste(names(ancombc2_results), collapse = ", ")
+    } else {
+      paste(class(ancombc2_results), collapse = ", ")
+    }
+    stop(
+      "Could not extract ANCOMBC2 results table. Available elements: ", obj_desc,
+      ". Delete the cached .rds and re-run ANCOMBC2."
+    )
+  }
+
+  resolve_cols <- function(target_df) {
+    list(
+      dff_col_name = pick_ancombc2_col(target_df, "diff", group),
+      lfc_col_name = pick_ancombc2_col(target_df, "lfc", group),
+      ss_col_name  = pick_ancombc2_col(target_df, "passed_ss", group),
+      se_col_name  = pick_ancombc2_col(target_df, "se", group),
+      p_col_name   = pick_ancombc2_col(target_df, "p", group),
+      q_col_name   = pick_ancombc2_col(target_df, "q", group)
+    )
+  }
+
+  cols <- resolve_cols(df)
+  if (is.na(cols$lfc_col_name) && !is.null(res_pair) && nrow(res_pair) > 0) {
+    df <- res_pair
+    cols <- resolve_cols(df)
+  }
+
+  if (is.na(cols$lfc_col_name)) {
+    stop(
+      "Could not identify ANCOMBC2 result columns for group '", group, "'. ",
+      "Available columns: ", paste(colnames(df), collapse = ", ")
+    )
+  }
+
+  cols$df <- df
+  cols
+}
+
 ### Run ANCOM
 #Example:
 
@@ -1751,103 +1922,69 @@ run_Maaslin2 <- function(ps_obj, taxa_level, group, analysis_method, normalizati
 #         plot_type = "dot", 
 #         plot_heights = c(1, 8))
 
-runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved_results=NULL, plot_type, plot_colors){
+runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, paired=TRUE, name_of_saved_results=NULL, plot_type, plot_colors){
   
+  if (!requireNamespace("ANCOMBC", quietly = TRUE)) {
+    stop("Package 'ANCOMBC' is required but not installed.")
+  }
+
   # Create a unique hash for the parameters
-  param_hash <- digest(list(ps_obj, tax_level, group, Log2FC_cutoff=NULL))
+  param_hash <- digest(list(ps_obj, tax_level, group, paired, Log2FC_cutoff))
   # File path for the analysis results
   result_file <- file.path("../saved_analysis_files/", paste0("ancombc2_result_", param_hash, ".rds"))
   
   if (file.exists(result_file)) {
-    message("Analysis already run. Loading results...")
+    message("Analysis already run. Loading results from: ", result_file)
     ancombc2_results <- readRDS(result_file)
   } else {
     message("Running analysis...")
-    
-    # Run ANCOMBC2
+
+    ancom_args <- list(
+      data = ps_obj,
+      assay_name = "counts",
+      tax_level = tax_level,
+      fix_formula = group,
+      p_adj_method = "holm",
+      group = group,
+      struc_zero = TRUE,
+      neg_lb = TRUE,
+      alpha = 0.05,
+      n_cl = 1
+    )
+    if (isTRUE(paired)) {
+      ancom_args$rand_formula <- "(1|Sample)"
+    }
+
     ancombc2_results <- tryCatch({
-      res <- ancombc2(
-        data = ps_obj,
-        assay_name = "counts",
-        tax_level = tax_level,
-        fix_formula = group,
-        p_adj_method = "holm",
-        group = group,
-        struc_zero = TRUE,
-        neg_lb = TRUE,
-        alpha = 0.05,
-        n_cl = 1
-      )
+      res <- do.call(ANCOMBC::ancombc2, ancom_args)
       saveRDS(res, result_file)
       res
     }, error = function(e) {
-      message("ANCOMBC2 failed: ", e$message)
-      return(NULL)
+      stop("ANCOMBC2 failed: ", e$message)
     })
-  
   }
-  df_fig <- ancombc2_results$res
+
+  ancombc_cols <- get_ancombc2_columns(ancombc2_results, group)
+  df_fig <- ancombc_cols$df
+  dff_col_name <- ancombc_cols$dff_col_name
+  lfc_col_name <- ancombc_cols$lfc_col_name
+  ss_col_name  <- ancombc_cols$ss_col_name
+  se_col_name  <- ancombc_cols$se_col_name
+  p_col_name   <- ancombc_cols$p_col_name
   
-  
-  #Save the column names to reference below
-  #This seems really complicated but it's not, it just makes the function flexible to whatever group you are comparing.
-  
-  #DFF column
-  dff_col_name <- grep(paste0("^diff_", group), colnames(df_fig), value = TRUE)
-  # If you want to check and store it
-  if (length(dff_col_name) > 0) {
-    # Save the first matching column name (if multiple matches)
-    dff_col_name <- dff_col_name[1]
-  } else {
-    print("No matching column found.")
-  }
-  
-  #LFC column
-  lfc_col_name <- grep(paste0("^lfc_", group), colnames(df_fig), value = TRUE)
-  # If you want to check and store it
-  if (length(lfc_col_name) > 0) {
-    # Save the first matching column name (if multiple matches)
-    lfc_col_name <- lfc_col_name[1]
-  } else {
-    print("No matching column found.")
-  }
-  
-  #SS condition column
-  ss_col_name <- grep(paste0("^passed_ss_", group), colnames(df_fig), value = TRUE)
-  # If you want to check and store it
-  if (length(ss_col_name) > 0) {
-    # Save the first matching column name (if multiple matches)
-    ss_col_name <- ss_col_name[1]
-  } else {
-    print("No matching column found.")
-  }
-  
-  #SE condition column
-  se_col_name <- grep(paste0("^se_", group), colnames(df_fig), value = TRUE)
-  # If you want to check and store it
-  if (length(se_col_name) > 0) {
-    # Save the first matching column name (if multiple matches)
-    se_col_name <- se_col_name[1]
-  } else {
-    print("No matching column found.")
-  }
-  
-  #P-val condition column
-  p_col_name <- grep(paste0("^p_", group), colnames(df_fig), value = TRUE)
-  # If you want to check and store it
-  if (length(p_col_name) > 0) {
-    # Save the first matching column name (if multiple matches)
-    p_col_name <- p_col_name[1]
-  } else {
-    print("No matching column found.")
-  }
   
   #Create a dataframe for results
-  df_fig <- ancombc2_results$res %>%
-    dplyr::filter(!!sym(dff_col_name) == TRUE) %>% 
-    dplyr::arrange(desc(!!sym(lfc_col_name))) %>%
-    dplyr::mutate(Enrichment = ifelse(!!sym(lfc_col_name) > 0, "Plaque", "Abscess"),
-                  color = ifelse(!!sym(ss_col_name) == 1, "aquamarine3", "black"))  # Color text based on ss condition
+  df_fig <- df_fig %>%
+    dplyr::filter(!!rlang::sym(dff_col_name) == TRUE) %>%
+    dplyr::arrange(desc(!!rlang::sym(lfc_col_name))) %>%
+    dplyr::mutate(Enrichment = ifelse(!!rlang::sym(lfc_col_name) > 0, "Plaque", "Abscess"))
+
+  if (!is.na(ss_col_name) && ss_col_name %in% colnames(df_fig)) {
+    df_fig <- df_fig %>%
+      dplyr::mutate(color = ifelse(!!rlang::sym(ss_col_name) == 1, "aquamarine3", "black"))
+  } else {
+    df_fig$color <- "black"
+  }
   
   df_fig$taxon = factor(df_fig$taxon, levels = df_fig$taxon)
   df_fig$Enrichment = factor(df_fig$Enrichment, 
@@ -2012,7 +2149,13 @@ runANCOM <- function(ps_obj, tax_level, group, Log2FC_cutoff=NULL, name_of_saved
     stop("Invalid plot type. Please specify 'box', 'violin', 'density' or 'dot'.")
   }
   
-  return(list(bar_plot = bar_plot, dot_plot = dot_plot, full_results = ancombc2_results$res, filtered_res = df_fig))
+  full_results <- if (is.list(ancombc2_results) && !is.null(ancombc2_results$res)) {
+    ancombc2_results$res
+  } else {
+    ancombc_cols$df
+  }
+
+  return(list(bar_plot = bar_plot, dot_plot = dot_plot, plot = plot, full_results = full_results, filtered_res = df_fig))
 
 
 }
@@ -2151,9 +2294,9 @@ iterate_aldex2 <- function(ps_obj, iterative_methods, resolutions, group, plot_c
    # Return the summary table
   summary_table_features_list <- summary_table %>%
     mutate(method = paste(normalization, transform, denoms, paired,  sep = "_")) %>%
-    select(c("resolution", "method", "features_list"))
+    dplyr::select(c("resolution", "method", "features_list"))
   
-  summary_table <- summary_table %>% select(-c("features_list"))
+  summary_table <- summary_table %>% dplyr::select(-c("features_list"))
 
   summary_table$resolution = factor(summary_table$resolution, 
                                levels = resolutions)
@@ -2229,65 +2372,216 @@ iterate_aldex2 <- function(ps_obj, iterative_methods, resolutions, group, plot_c
 
 ### Run Aldex
 
-run_aldex2 <- function(ps_obj, group, tax_rank, method, transform, normalization, plot_colors) {
+standardize_aldex2_marker_table <- function(aldex2_res) {
+  aldex2_res <- as.data.frame(aldex2_res)
+
+  if (!"ef_aldex" %in% colnames(aldex2_res) && "ef_logFC" %in% colnames(aldex2_res)) {
+    aldex2_res$ef_aldex <- aldex2_res$ef_logFC
+  }
+
+  if (!"padj" %in% colnames(aldex2_res) && "pvalue" %in% colnames(aldex2_res)) {
+    aldex2_res$padj <- aldex2_res$pvalue
+  }
+
+  required_cols <- c("ef_aldex", "padj", "feature")
+  if (!all(required_cols %in% colnames(aldex2_res))) {
+    stop(
+      "ALDEx2 results missing expected columns. Need ef_aldex/ef_logFC, padj/pvalue, and feature. Found: ",
+      paste(colnames(aldex2_res), collapse = ", ")
+    )
+  }
+
+  aldex2_res
+}
+
+prepare_aldex2_input <- function(ps_obj, group, tax_rank, paired = FALSE, patient_col = "Sample") {
+  if (!tax_rank %in% phyloseq::rank_names(ps_obj)) {
+    stop("Taxonomic rank '", tax_rank, "' not found in phyloseq object.")
+  }
+
+  ps_glom <- phyloseq::tax_glom(ps_obj, tax_rank)
+
+  otu_mat <- phyloseq::otu_table(ps_glom)
+  # ALDEx2 expects features as rows and samples as columns
+  if (phyloseq::taxa_are_rows(otu_mat)) {
+    count_mat <- as.matrix(otu_mat)
+  } else {
+    count_mat <- t(as.matrix(otu_mat))
+  }
+  storage.mode(count_mat) <- "numeric"
+  count_mat <- round(count_mat)
+  count_mat[count_mat < 0] <- 0
+
+  meta_df <- as.data.frame(phyloseq::sample_data(ps_glom))
+  if (!group %in% colnames(meta_df)) {
+    stop("Group variable '", group, "' not found in sample metadata.")
+  }
+
+  sample_ids <- colnames(count_mat)
+  conds <- as.character(meta_df[[group]])
+  names(conds) <- rownames(meta_df)
+  conds <- conds[sample_ids]
+
+  if (any(is.na(conds))) {
+    stop("Sample metadata is missing group labels for one or more samples.")
+  }
+
+  if (isTRUE(paired)) {
+    if (!patient_col %in% colnames(meta_df)) {
+      stop("Paired ALDEx2 requires a '", patient_col, "' column in sample metadata.")
+    }
+
+    pair_df <- data.frame(
+      sample = sample_ids,
+      condition = conds,
+      patient = as.character(meta_df[sample_ids, patient_col]),
+      stringsAsFactors = FALSE
+    )
+
+    group_levels <- sort(unique(pair_df$condition))
+    if (length(group_levels) != 2) {
+      stop("ALDEx2 pairing requires exactly two groups.")
+    }
+
+    valid_patients <- pair_df %>%
+      dplyr::group_by(patient) %>%
+      dplyr::summarise(
+        n_samples = dplyr::n(),
+        n_groups = dplyr::n_distinct(condition),
+        .groups = "drop"
+      ) %>%
+      dplyr::filter(n_samples == 2, n_groups == 2)
+
+    if (nrow(valid_patients) == 0) {
+      stop("No complete patient pairs found for paired ALDEx2.")
+    }
+
+    ordered_samples <- unlist(lapply(valid_patients$patient, function(patient_id) {
+      patient_rows <- pair_df %>%
+        dplyr::filter(patient == patient_id) %>%
+        dplyr::arrange(match(condition, group_levels))
+      patient_rows$sample
+    }), use.names = FALSE)
+
+    count_mat <- count_mat[, ordered_samples, drop = FALSE]
+    conds <- conds[ordered_samples]
+  }
+
+  tax_df <- phyloseq::tax_table(ps_glom) %>% as.matrix() %>% as.data.frame()
+
+  list(
+    reads = as.data.frame(count_mat),
+    conditions = unname(conds),
+    tax_df = tax_df,
+    tax_rank = tax_rank
+  )
+}
+
+run_aldex2_core <- function(ps_obj, group, tax_rank, method = "wilcox.test", paired = FALSE,
+                            pvalue_cutoff = 0.05, mc_samples = 128, patient_col = "Sample") {
+  if (!requireNamespace("ALDEx2", quietly = TRUE)) {
+    stop("Package 'ALDEx2' is required but not installed. Install with BiocManager::install('ALDEx2').")
+  }
+
+  aldex_input <- prepare_aldex2_input(
+    ps_obj = ps_obj,
+    group = group,
+    tax_rank = tax_rank,
+    paired = paired,
+    patient_col = patient_col
+  )
+
+  # ALDEx2 test = "t" runs both Welch t-test and Wilcoxon; use wi.* columns for Wilcoxon
+  aldex_test <- "t"
+  use_wilcox <- method %in% c("wilcox.test", "wilcox")
+
+  aldex_args <- list(
+    reads = aldex_input$reads,
+    conditions = aldex_input$conditions,
+    mc.samples = mc_samples,
+    test = aldex_test,
+    effect = TRUE,
+    include.sample.summary = FALSE,
+    denom = "all",
+    verbose = FALSE
+  )
+  if (isTRUE(paired)) {
+    aldex_args$paired.test <- TRUE
+  }
+
+  aldex_out <- do.call(ALDEx2::aldex, aldex_args)
+
+  padj_col <- if (use_wilcox) "wi.eBH" else "we.eBH"
+  pval_col <- if (use_wilcox) "wi.ep" else "we.ep"
+  if (!padj_col %in% colnames(aldex_out)) {
+    stop(
+      "ALDEx2 output missing expected column '", padj_col, "'. Found: ",
+      paste(colnames(aldex_out), collapse = ", ")
+    )
+  }
+
+  taxa_ids <- rownames(aldex_out)
+  feature_labels <- if (all(taxa_ids %in% rownames(aldex_input$tax_df))) {
+    as.character(aldex_input$tax_df[taxa_ids, aldex_input$tax_rank])
+  } else {
+    taxa_ids
+  }
+
+  aldex2_res <- data.frame(
+    feature = feature_labels,
+    ef_aldex = as.numeric(aldex_out$effect),
+    padj = as.numeric(aldex_out[[padj_col]]),
+    pvalue = as.numeric(aldex_out[[pval_col]]),
+    stringsAsFactors = FALSE
+  )
+
+  aldex2_res <- aldex2_res %>%
+    dplyr::filter(!is.na(padj), padj <= pvalue_cutoff) %>%
+    dplyr::arrange(dplyr::desc(abs(ef_aldex)))
+
+  if (nrow(aldex2_res) == 0) {
+    stop(
+      "ALDEx2 found no taxa with BH-adjusted p <= ", pvalue_cutoff,
+      " at rank '", tax_rank, "'."
+    )
+  }
+
+  standardize_aldex2_marker_table(aldex2_res)
+}
+
+run_aldex2 <- function(ps_obj, group, tax_rank, method, transform, normalization, plot_colors,
+                       paired = FALSE, pvalue_cutoff = 0.05, mc_samples = 128) {
   library(dplyr)
   library(ggplot2)
-  library(microbiomeMarker)
   library(patchwork)
-  
-  message("Running ALDEx2...")
-  
-  # Try running ALDEx2
-  aldex2_results <- tryCatch({
-    microbiomeMarker::run_aldex(
-      ps_obj,
-      group,
-      method = method,
-      norm = normalization,
-      transform = transform,
-      taxa_rank = tax_rank,
-      pvalue_cutoff = 0.05,
-      denom = "all",
-      paired = FALSE
+
+  message("Running ALDEx2 via ALDEx2 package (CLR Monte Carlo)...")
+  if (!identical(normalization, "none") || !identical(transform, "identity")) {
+    message(
+      "Note: ALDEx2 uses its own CLR Monte Carlo workflow. ",
+      "Arguments 'normalization = ", normalization, "' and 'transform = ", transform,
+      "' are ignored."
     )
-  }, error = function(e) {
-    message("ALDEx2 failed: ", e$message)
-    return(NULL)
-  })
-  
-  # Exit if it failed
-  if (is.null(aldex2_results)) {
-    return(invisible(NULL))
   }
-  
-  # Extract results
-  if (!"marker_table" %in% slotNames(aldex2_results) || nrow(aldex2_results@marker_table) == 0) {
-    message("ALDEx2 returned no marker results.")
-    return(invisible(NULL))
-  }
-  
-  # Convert and assign result table
-  aldex2_res <- aldex2_results@marker_table %>% as.matrix() %>% as.data.frame()
+
+  aldex2_res <- run_aldex2_core(
+    ps_obj = ps_obj,
+    group = group,
+    tax_rank = tax_rank,
+    method = method,
+    paired = paired,
+    pvalue_cutoff = pvalue_cutoff,
+    mc_samples = mc_samples
+  )
+
   assign(paste0("aldex2_res_", tax_rank), aldex2_res, envir = .GlobalEnv)
   
-  # Ensure required columns exist
-  if (!all(c("ef_aldex", "padj", "feature") %in% colnames(aldex2_res))) {
-    message("Missing expected columns in ALDEx2 result.")
-    return(invisible(NULL))
-  }
-  
-  # Prepare results for plotting
   df_fig <- aldex2_res %>%
     mutate(
       ef_aldex = as.numeric(ef_aldex),
       padj = as.numeric(padj),
       Enrichment = ifelse(ef_aldex > 0, "Plaque", "Abscess")
     )
-  
-  if (nrow(df_fig) == 0) {
-    message("No significant taxa found in ALDEx2 results.")
-    return(invisible(NULL))
-  }
   
   df_fig$feature <- factor(df_fig$feature, levels = df_fig$feature)
   df_fig$Enrichment <- factor(df_fig$Enrichment, levels = c("Plaque", "Abscess"))
@@ -2373,13 +2667,14 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
              Maaslin2_value = value)
     
     # ANCOMBC2  (use all_of for the dynamic names!)
-    dff_col_name <- grep(paste0("^diff_", group), colnames(ancombc2_results), value = TRUE)
-    lfc_col_name <- grep(paste0("^lfc_",  group), colnames(ancombc2_results), value = TRUE)
-    ss_col_name  <- grep(paste0("^passed_ss_", group), colnames(ancombc2_results), value = TRUE)
-    p_col_name   <- grep(paste0("^p_",    group), colnames(ancombc2_results), value = TRUE)
-    q_col_name   <- grep(paste0("^q_",    group), colnames(ancombc2_results), value = TRUE)
+    ancombc_cols <- get_ancombc2_columns(ancombc2_results, group)
+    dff_col_name <- ancombc_cols$dff_col_name
+    lfc_col_name <- ancombc_cols$lfc_col_name
+    ss_col_name  <- ancombc_cols$ss_col_name
+    p_col_name   <- ancombc_cols$p_col_name
+    q_col_name   <- ancombc_cols$q_col_name
     
-    ancombc2_results_clean <- ancombc2_results %>%
+    ancombc2_results_clean <- ancombc_cols$df %>%
       dplyr::mutate(taxon = clean_taxon(taxon)) %>%
       dplyr::select(taxon,
              ANCOMBC2_DFF       = all_of(dff_col_name),
@@ -2390,7 +2685,7 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
       dplyr::filter(ANCOMBC2_DFF %in% TRUE) 
     
     # ALDEx2
-    aldex2_res_clean <- aldex2_results %>%
+    aldex2_res_clean <- standardize_aldex2_marker_table(aldex2_results) %>%
       dplyr::mutate(ef_aldex = as.numeric(ef_aldex),
              padj     = as.numeric(padj),
              feature  = as.character(feature)) %>%
@@ -2860,7 +3155,7 @@ combine_DA_with_bubbles <- function(da,
       Abscess_enriched = replace_na(Abscess_enriched, 0L),
       Plaque_enriched  = replace_na(Plaque_enriched, 0L)
     ) %>%
-    select(taxon, confidence, Abscess_enriched, Plaque_enriched) %>%
+    dplyr::select(taxon, confidence, Abscess_enriched, Plaque_enriched) %>%
     pivot_longer(
       cols = c(Abscess_enriched, Plaque_enriched),
       names_to = "group2", values_to = "count"
@@ -3044,7 +3339,7 @@ rank_rf_feature_table <- function(df, folds, mtry = NULL, top_n = NULL, add_mean
       imp <- transmute(imp, Feature, Score = .data[[score_cols]])
     } else {
       imp <- imp %>% mutate(Score = rowMeans(across(all_of(score_cols)), na.rm = TRUE)) %>%
-        select(Feature, Score)
+        dplyr::select(Feature, Score)
     }
     
     # rank (1 = most important)
@@ -3568,7 +3863,7 @@ plot_beta_heatmaps <- function(lda_result, n_topics, n_top_topics, normalized_co
       arrange(Type) %>%
       mutate(Type = as.character(Type)) %>%
       arrange(Type) %>%
-      select(-Type) %>%
+      dplyr::select(-Type) %>%
       tibble::column_to_rownames("Sample") %>%
       as.matrix() %>%
       t() %>% as.data.frame() %>%
@@ -3601,13 +3896,13 @@ plot_beta_heatmaps <- function(lda_result, n_topics, n_top_topics, normalized_co
     
     # Column annotations (samples x Type)
     type_annot <- normalized_count_table %>%
-      select(Sample, Type) %>%
+      dplyr::select(Sample, Type) %>%
       tibble::column_to_rownames("Sample")
     
     ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
     
     # Build heatmap (silent)
-    pheatmap(
+    pheatmap::pheatmap(
       log(data_mat),                  # safer than log()
       annotation_col    = type_annot,
       annotation_colors = ann_colors,
@@ -3640,7 +3935,7 @@ heatmap_gamma <- function(lda_results, type_column, g_df){
       pivot_wider(names_from = topic,
                   values_from = gamma)
 
-    topics_wide_type <- meta_data%>% select(type_column) %>% 
+    topics_wide_type <- meta_data%>% dplyr::select(type_column) %>% 
       rownames_to_column(var="document") %>% 
       merge.data.frame(topics_wide, by="document") %>%
       dplyr::arrange(type_column) %>%
@@ -3649,15 +3944,15 @@ heatmap_gamma <- function(lda_results, type_column, g_df){
 
     #Set annotation colors
     type_annot <- meta_data %>%
-          select(c(type_column))
+          dplyr::select(c(type_column))
     ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
     
     data <- topics_wide_type %>% 
-      select(-type_column) %>% 
+      dplyr::select(-type_column) %>% 
       remove_rownames() %>% column_to_rownames(var="document") %>% t()
     
     # Create the heatmap
-    pheatmap(
+    pheatmap::pheatmap(
           log(data),
           annotation_col = type_annot,  # Add column annotations
           scale = "none",               # Scale rows (optional)
@@ -3667,7 +3962,8 @@ heatmap_gamma <- function(lda_results, type_column, g_df){
           show_rownames = TRUE,        # Show row names
           show_colnames = TRUE,         # Show column names
           annotation_colors = ann_colors,
-          gaps_row =  1:(nrow(data) - 1)
+          gaps_row =  1:(nrow(data) - 1),
+          silent = TRUE
         )
 }
 
@@ -3854,7 +4150,7 @@ data <- data %>% mutate(
   column_to_rownames(var = "term")
   
   type_annot <- ps_fs_genus_csv %>%
-    select(c(Type, Sample)) %>% column_to_rownames(var="Sample")
+    dplyr::select(c(Type, Sample)) %>% column_to_rownames(var="Sample")
   
   ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
   
@@ -3862,7 +4158,7 @@ data <- data %>% mutate(
   
 
   # Create the heatmap
-  p <- pheatmap(log(data),
+  p <- pheatmap::pheatmap(log(data),
                 main = paste0("Topic ", topic_no),
                 annotation_col = type_annot,  # Add column annotations
                 scale = "none",               # Scale rows (optional)
@@ -3873,7 +4169,8 @@ data <- data %>% mutate(
                 show_rownames = TRUE,        # Show row names
                 show_colnames = FALSE,         # Show column names
                 labels_row = italic_labels,       
-                annotation_colors = ann_colors
+                annotation_colors = ann_colors,
+                silent = TRUE
   )
   return(list(heatmap = p, data =data)) 
 }

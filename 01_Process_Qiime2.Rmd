@@ -28,7 +28,10 @@ knitr::opts_chunk$set(message = FALSE,
 ### 1.1.1 Outside Packages
 ```{r 1.1_load-packages}
 library("pacman")
-pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "microViz")
+pacman::p_load("rmarkdown", "tidyverse", "phyloseq", "knitr","kableExtra", "here", "plyr", "microViz", "conflicted")
+
+source("MK_Microbiome_Functions.R")
+prefer_analysis_conflicts()
 
 #Create directories for output
 output_path = "output/data/"

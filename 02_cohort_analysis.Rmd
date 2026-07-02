@@ -35,11 +35,14 @@ pacman::p_load(
   rmarkdown, tidyverse, phyloseq, knitr, kableExtra, here, plyr, ggpubr, microViz,
   microbiome, pheatmap, vegan, reshape2, magrittr, microshades, data.table,
   Polychrome, fantaxtic, cetcolor, cowplot, MicrobiomeStat, randomForest, caret,
-  mlbench, MLmetrics, mia, patchwork, digest, ANCOMBC, Maaslin2, microbiomeMarker,
+  mlbench, MLmetrics, mia, patchwork, digest, ANCOMBC, Maaslin2, ALDEx2, microbiomeMarker,
   topicmodels, ldatuning, umap, tidytext, cluster, viridis, ComplexHeatmap,
   circlize, ggnewscale, stringi, corrplot, ggalluvial, Hmisc, dplyr, stringr,
-  forcats, purrr, rlang, tidyr, tibble, ggplot2
+  forcats, purrr, rlang, tidyr, tibble, ggplot2, conflicted
 )
+
+source("MK_Microbiome_Functions.R")
+prefer_analysis_conflicts()
 
 #Create directories for output
 output_path = "output/"
@@ -52,7 +55,7 @@ dir.create(output_path, showWarnings = FALSE, recursive = TRUE)
 
 ### 1.1.2 My packages
 ```{r}
-source("MK_Microbiome_Functions.R")
+# MK_Microbiome_Functions.R is sourced in the packages chunk above
 ```
 
 
@@ -448,7 +451,7 @@ ggsave("output/Genus_Average_Barplot.png", width = 3.5, height = 4, dpi=600)
 ## 4.2 Heatmap
 ### 4.2.1 Fig 2B: Genus
 ```{r, fig.height=5, fig.width=6.5}
-df <- ps_fs_genus_csv %>% select(-Type) %>% column_to_rownames(var="Sample") %>% as.matrix %>% t()
+df <- ps_fs_genus_csv %>% dplyr::select(-Type) %>% column_to_rownames(var="Sample") %>% as.matrix %>% t()
 #df <- df[order(rowSums(df), decreasing = TRUE)[1:50], ] #select top 50
 
 # Extract Type information from sample_data
@@ -481,7 +484,7 @@ ggsave("output/Genus_Heatmap.png", width = 6.5, height = 5, dpi=600)
 
 ### 4.2.1 Fig S1B: Species
 ```{r, fig.height=5, fig.width=6.5}
-df <- ps_fs_species_csv %>% select(-Type) %>% column_to_rownames(var="Sample") %>% as.matrix %>% t()
+df <- ps_fs_species_csv %>% dplyr::select(-Type) %>% column_to_rownames(var="Sample") %>% as.matrix %>% t()
 #df <- df[order(rowSums(df), decreasing = TRUE)[1:50], ] #select top 50
 
 # Extract Type information from sample_data
@@ -555,11 +558,19 @@ ggsave("output/Species_Taxa_Shifts.png", taxa_shifts_species$combined_plot, widt
 # 6.0 Differential Abundance
 ## 6.1 ANCOMBC2
 
+```{r}
+source("MK_Microbiome_Functions.R")
+```
+
+
 ### 6.1.1 Phylum
 ```{r, fig.height=7, fig.width=10}
+
+library("ANCOMBC")
 ANCOM_ph <- runANCOM(ps_fs, 
          tax_level = "Phylum", 
          group = "Type", 
+         paired = TRUE,
          name_of_saved_results = "../saved_analysis_files/ancombc_results_phy", 
          plot_type = "dot",
          Log2FC_cutoff = 0.5,
@@ -571,6 +582,7 @@ ANCOM_ph <- runANCOM(ps_fs,
 ANCOM_genus <- runANCOM(ps_fs, 
          tax_level = "Genus", 
          group = "Type", 
+         paired = TRUE,
          name_of_saved_results = "../saved_analysis_files/ancombc_results_gen", 
          plot_type = "dot",
          plot_colors = colors_all )
@@ -581,6 +593,7 @@ ANCOM_genus <- runANCOM(ps_fs,
 ANCOM_sp <- runANCOM(ps_fs, 
          tax_level = "Species", 
          group = "Type", 
+         paired = TRUE,
          name_of_saved_results = "../saved_analysis_files/ancombc_results_sp", 
          plot_type = "dot",
          plot_colors = colors_all )
@@ -608,6 +621,7 @@ ANCOM_sp <- runANCOM(ps_fs,
 MaaslinPhylum <- run_Maaslin2(ps_obj = ps_fs, 
                                  taxa_level = "Phylum", 
                                  group = "Type",
+                                 paired = TRUE,
                                  analysis_method = "LM", 
                                  normalization = "CSS",
                                  transform = "LOG", 
@@ -617,13 +631,13 @@ MaaslinPhylum <- run_Maaslin2(ps_obj = ps_fs,
 MaaslinPhylum$results
 ```
 
-
 #### Genus
 ```{r, fig.width=10, fig.height=65}
 MaaslinGenus <- run_Maaslin2(ps_obj = ps_fs, 
                                  taxa_level = "Genus", 
                                  group = "Type",
                                  analysis_method = "LM", 
+                                 paired = TRUE,
                                  normalization = "CSS",
                                  transform = "LOG", 
                                  plot_colors = colors_all,
@@ -638,6 +652,7 @@ MaaslinGenus$results
 Maaslinsp <- run_Maaslin2(ps_obj = ps_fs, 
                                  taxa_level = "Species", 
                                  group = "Type",
+                                 paired = TRUE,
                                  analysis_method = "LM", 
                                  normalization = "CSS",
                                  transform = "LOG", 
@@ -680,6 +695,7 @@ ALDEx2 uses by default the centred log-ratio (clr) transformation which is scale
 
 #### Phylum
 ```{r, fig.width=10, fig.height=3}
+
 ALDEX_ph <- run_aldex2(ps_fs, 
                   "Type", 
                   "Phylum",
@@ -700,7 +716,7 @@ ALDEX_genus <- run_aldex2(ps_fs,
                   transform = "log10",
                   normalization = "CSS", 
                  plot_colors = colors_all)
-ALDEX_genus$result
+ALDEX_genus$results
 ```
 
 
@@ -729,6 +745,9 @@ write_csv(DA_results_df_Phylum$results, "output/phylum_DA_combined_results.csv")
 ```
 
 ```{r, fig.width=6.2, fig.height=3}
+source("MK_Microbiome_Functions.R")
+
+
 phylum_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
   CSV_formatted_relab_df = ps_fs_phylum_csv,
   group = "Type",               # your contrast label used in ANCOMBC2 column names
@@ -1077,7 +1096,7 @@ rank_table %>% kable()
 
 
 mat <- rank_table %>%
-  select(-Feature, -MeanRank) %>%
+  dplyr::select(-Feature, -MeanRank) %>%
   as.data.frame() 
 
 
@@ -1115,12 +1134,12 @@ lift_df <-  data.frame()
 
 for (fold in unique(for_lift$resample)) {
   fold_df <- dplyr::filter(for_lift, resample == fold)
-  lift_obj_data <- lift(Class ~ rf, data = fold_df, class = "Plaque")$data
+  lift_obj_data <- caret::lift(Class ~ rf, data = fold_df, class = "Plaque")$data
   lift_obj_data$fold = fold
   lift_df = rbind(lift_df, lift_obj_data)
 }
 
-lift_obj <- lift(Class ~ rf, data = for_lift, class = "Plaque")
+lift_obj <- caret::lift(Class ~ rf, data = for_lift, class = "Plaque")
 
 roc_p <- ggplot(lift_df) +
   geom_line(aes(x = 1 - Sp, y = Sn, color = fold)) +
@@ -1237,7 +1256,7 @@ rank_table %>% kable()
 
 
 mat <- rank_table %>%
-  select(-Feature, -MeanRank) %>%
+  dplyr::select(-Feature, -MeanRank) %>%
   as.data.frame() 
 
 
@@ -1279,12 +1298,12 @@ lift_df <-  data.frame()
 
 for (fold in unique(for_lift$resample)) {
   fold_df <- dplyr::filter(for_lift, resample == fold)
-  lift_obj_data <- lift(Class ~ rf, data = fold_df, class = "Plaque")$data
+  lift_obj_data <- caret::lift(Class ~ rf, data = fold_df, class = "Plaque")$data
   lift_obj_data$fold = fold
   lift_df = rbind(lift_df, lift_obj_data)
 }
 
-lift_obj <- lift(Class ~ rf, data = for_lift, class = "Plaque")
+lift_obj <- caret::lift(Class ~ rf, data = for_lift, class = "Plaque")
 
 roc_p <- ggplot(lift_df) +
   geom_line(aes(x = 1 - Sp, y = Sn, color = fold)) +
@@ -1589,7 +1608,7 @@ heatmap_gamma_genus <- heatmap_gamma(result_genus, "Type", result_genus$g_df)
 png("output/Topic_Model_Gamma_Heatmap_Genus.png",
     width = 9, height = 2, units = "in", res = 600)
 
-ComplexHeatmap::draw(heatmap_gamma_genus)  # <- explicitly use this one
+draw_heatmap(heatmap_gamma_genus)  # <- explicitly use this one
 
 dev.off()
 ```
@@ -1611,99 +1630,99 @@ ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Genus.png", UMAP_res_genus$sil_
 
 ## Fig S9: Relab heatmaps by topic
 ```{r, fig.height=2, fig.width=7}
-topic1_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 1)
+topic1_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 1)
 
 png("output/Topic_Model_RelAb_Heatmap_Topic1_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic1_res_genus$heatmap)
+draw_heatmap(topic1_res_genus$heatmap)
 
 dev.off()
 
-topic1_res_genus$heatmap
+draw_heatmap(topic1_res_genus$heatmap)
 ```
 
 ```{r, fig.height=2, fig.width=7.5}
-topic2_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 2)
+topic2_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 2)
 
 png("output/Topic_Model_RelAb_Heatmap_Topic2_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic2_res_genus$heatmap)  # <- explicitly use this one
+draw_heatmap(topic2_res_genus$heatmap)  # <- explicitly use this one
 
 dev.off()
 
-topic2_res_genus$heatmap
+draw_heatmap(topic2_res_genus$heatmap)
 
 ```
 
 ```{r, fig.height=2.5, fig.width=6.5}
-topic3_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 3)
+topic3_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 3)
 
 png("output/Topic_Model_RelAb_Heatmap_Topic3_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic3_res_genus$heatmap)  # <- explicitly use this one
+draw_heatmap(topic3_res_genus$heatmap)  # <- explicitly use this one
 
 dev.off()
 
-topic3_res_genus$heatmap
+draw_heatmap(topic3_res_genus$heatmap)
 ```
 
 ```{r, fig.height=2, fig.width=7}
-topic4_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 4)
+topic4_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 4)
 
 png("output/Topic_Model_RelAb_Heatmap_Topic4_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic4_res_genus$heatmap)  # <- explicitly use this one
+draw_heatmap(topic4_res_genus$heatmap)  # <- explicitly use this one
 
 dev.off()
 
-topic4_res_genus$heatmap
+draw_heatmap(topic4_res_genus$heatmap)
 
 ```
 
 ```{r, fig.height=2, fig.width=7}
-topic5_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 5)
+topic5_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 5)
 
 
 png("output/Topic_Model_RelAb_Heatmap_Topic5_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic5_res_genus$heatmap)
+draw_heatmap(topic5_res_genus$heatmap)
 
 dev.off()
 
-topic5_res_genus$heatmap
+draw_heatmap(topic5_res_genus$heatmap)
 ```
 
 ```{r, fig.height=2, fig.width=7}
-topic6_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 6)
+topic6_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 6)
 
 
 png("output/Topic_Model_RelAb_Heatmap_Topic6_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic6_res_genus$heatmap)
+draw_heatmap(topic6_res_genus$heatmap)
 
 dev.off()
 
-topic6_res_genus$heatmap
+draw_heatmap(topic6_res_genus$heatmap)
 ```
 
 ```{r, fig.height=2, fig.width=7}
-topic7_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic = 7)
+topic7_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 7)
 
 
 png("output/Topic_Model_RelAb_Heatmap_Topic7_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic7_res_genus$heatmap)
+draw_heatmap(topic7_res_genus$heatmap)
 
 dev.off()
 
-topic7_res_genus$heatmap
+draw_heatmap(topic7_res_genus$heatmap)
 ```
 
 
@@ -1821,7 +1840,7 @@ heatmap_gamma_species <- heatmap_gamma(result_species, "Type", result_species$g_
 png("output/Topic_Model_Gamma_Heatmap_Species.png",
     width = 9, height = 2.3, units = "in", res = 600)
 
-ComplexHeatmap::draw(heatmap_gamma_species)  # <- explicitly use this one
+draw_heatmap(heatmap_gamma_species)  # <- explicitly use this one
 
 dev.off()
 ```
@@ -1845,85 +1864,85 @@ ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Species.png", UMAP_res_sp$sil_p
 
 ## Fig S6, S7: Relab heatmaps by topic
 ```{r, fig.height=2, fig.width=7}
-topic1_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic = 1)
+topic1_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic_no = 1)
 
 png("output/Topic_Model_RelAb_Heatmap_Topic1_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic1_res_species$heatmap)
+draw_heatmap(topic1_res_species$heatmap)
 
 dev.off()
 
-topic1_res_species$heatmap
+draw_heatmap(topic1_res_species$heatmap)
 ```
 
 ```{r, fig.height=2, fig.width=7.5}
-topic2_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 12, topic = 2)
+topic2_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 12, topic_no = 2)
 
 png("output/Topic_Model_RelAb_Heatmap_Topic2_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic2_res_species$heatmap)  # <- explicitly use this one
+draw_heatmap(topic2_res_species$heatmap)  # <- explicitly use this one
 
 dev.off()
 
-topic2_res_species$heatmap
+draw_heatmap(topic2_res_species$heatmap)
 
 ```
 
 ```{r, fig.height=2.5, fig.width=6.5}
-topic3_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 12, topic = 3)
+topic3_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 12, topic_no = 3)
 
 png("output/Topic_Model_RelAb_Heatmap_Topic3_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic3_res_species$heatmap)  # <- explicitly use this one
+draw_heatmap(topic3_res_species$heatmap)  # <- explicitly use this one
 
 dev.off()
 
-topic3_res_species$heatmap
+draw_heatmap(topic3_res_species$heatmap)
 ```
 
 ```{r, fig.height=2, fig.width=7}
-topic4_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic = 4)
+topic4_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic_no = 4)
 
 png("output/Topic_Model_RelAb_Heatmap_Topic4_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic4_res_species$heatmap)  # <- explicitly use this one
+draw_heatmap(topic4_res_species$heatmap)  # <- explicitly use this one
 
 dev.off()
 
-topic4_res_species$heatmap
+draw_heatmap(topic4_res_species$heatmap)
 
 ```
 
 ```{r, fig.height=2, fig.width=7}
-topic5_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic = 5)
+topic5_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic_no = 5)
 
 
 png("output/Topic_Model_RelAb_Heatmap_Topic5_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic5_res_species$heatmap)
+draw_heatmap(topic5_res_species$heatmap)
 
 dev.off()
 
-topic5_res_species$heatmap
+draw_heatmap(topic5_res_species$heatmap)
 ```
 
 ```{r, fig.height=2, fig.width=7}
-topic6_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic = 6)
+topic6_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic_no = 6)
 
 
 png("output/Topic_Model_RelAb_Heatmap_Topic6_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
-ComplexHeatmap::draw(topic6_res_species$heatmap)
+draw_heatmap(topic6_res_species$heatmap)
 
 dev.off()
 
-topic6_res_species$heatmap
+draw_heatmap(topic6_res_species$heatmap)
 ```
 
 
