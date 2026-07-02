@@ -2394,6 +2394,17 @@ standardize_aldex2_marker_table <- function(aldex2_res) {
   aldex2_res
 }
 
+resolve_aldex2_test_cols <- function(method) {
+  method <- tolower(as.character(method))
+  if (method %in% c("wilcox.test", "wilcox", "wilcoxon")) {
+    return(list(test = "t", pval_col = "wi.ep", padj_col = "wi.eBH", label = "Wilcoxon"))
+  }
+  if (method %in% c("t.test", "t", "welch", "ttest")) {
+    return(list(test = "t", pval_col = "we.ep", padj_col = "we.eBH", label = "Welch t-test"))
+  }
+  stop("Unsupported ALDEx2 method '", method, "'. Use 't.test' or 'wilcox.test'.")
+}
+
 prepare_aldex2_input <- function(ps_obj, group, tax_rank, paired = FALSE, patient_col = "Sample") {
   if (!tax_rank %in% phyloseq::rank_names(ps_obj)) {
     stop("Taxonomic rank '", tax_rank, "' not found in phyloseq object.")
@@ -2412,15 +2423,27 @@ prepare_aldex2_input <- function(ps_obj, group, tax_rank, paired = FALSE, patien
   count_mat <- round(count_mat)
   count_mat[count_mat < 0] <- 0
 
-  meta_df <- as.data.frame(phyloseq::sample_data(ps_glom))
+  meta_df <- as.data.frame(
+    as.matrix(phyloseq::sample_data(ps_glom)),
+    stringsAsFactors = FALSE
+  )
   if (!group %in% colnames(meta_df)) {
     stop("Group variable '", group, "' not found in sample metadata.")
   }
 
   sample_ids <- colnames(count_mat)
-  conds <- as.character(meta_df[[group]])
-  names(conds) <- rownames(meta_df)
-  conds <- conds[sample_ids]
+  meta_idx <- match(sample_ids, rownames(meta_df))
+  if (any(is.na(meta_idx))) {
+    missing_ids <- sample_ids[is.na(meta_idx)]
+    stop(
+      "Sample metadata is missing rows for: ",
+      paste(head(missing_ids, 5), collapse = ", "),
+      if (length(missing_ids) > 5) " ..." else ""
+    )
+  }
+
+  conds <- as.character(meta_df[[group]][meta_idx])
+  names(conds) <- sample_ids
 
   if (any(is.na(conds))) {
     stop("Sample metadata is missing group labels for one or more samples.")
@@ -2434,7 +2457,7 @@ prepare_aldex2_input <- function(ps_obj, group, tax_rank, paired = FALSE, patien
     pair_df <- data.frame(
       sample = sample_ids,
       condition = conds,
-      patient = as.character(meta_df[sample_ids, patient_col]),
+      patient = as.character(meta_df[[patient_col]][meta_idx]),
       stringsAsFactors = FALSE
     )
 
@@ -2477,7 +2500,10 @@ prepare_aldex2_input <- function(ps_obj, group, tax_rank, paired = FALSE, patien
   )
 }
 
-run_aldex2_core <- function(ps_obj, group, tax_rank, method = "wilcox.test", paired = FALSE,
+run_aldex2_core <- function(ps_obj, group, tax_rank,
+                            method = "t.test",
+                            paired = FALSE,
+                            effect = TRUE,
                             pvalue_cutoff = 0.05, mc_samples = 128, patient_col = "Sample") {
   if (!requireNamespace("ALDEx2", quietly = TRUE)) {
     stop("Package 'ALDEx2' is required but not installed. Install with BiocManager::install('ALDEx2').")
@@ -2491,16 +2517,14 @@ run_aldex2_core <- function(ps_obj, group, tax_rank, method = "wilcox.test", pai
     patient_col = patient_col
   )
 
-  # ALDEx2 test = "t" runs both Welch t-test and Wilcoxon; use wi.* columns for Wilcoxon
-  aldex_test <- "t"
-  use_wilcox <- method %in% c("wilcox.test", "wilcox")
+  test_cols <- resolve_aldex2_test_cols(method)
 
   aldex_args <- list(
     reads = aldex_input$reads,
     conditions = aldex_input$conditions,
     mc.samples = mc_samples,
-    test = aldex_test,
-    effect = TRUE,
+    test = test_cols$test,
+    effect = isTRUE(effect),
     include.sample.summary = FALSE,
     denom = "all",
     verbose = FALSE
@@ -2511,13 +2535,16 @@ run_aldex2_core <- function(ps_obj, group, tax_rank, method = "wilcox.test", pai
 
   aldex_out <- do.call(ALDEx2::aldex, aldex_args)
 
-  padj_col <- if (use_wilcox) "wi.eBH" else "we.eBH"
-  pval_col <- if (use_wilcox) "wi.ep" else "we.ep"
+  padj_col <- test_cols$padj_col
+  pval_col <- test_cols$pval_col
   if (!padj_col %in% colnames(aldex_out)) {
     stop(
-      "ALDEx2 output missing expected column '", padj_col, "'. Found: ",
+      "ALDEx2 output missing expected column '", padj_col, "' for ", test_cols$label, ". Found: ",
       paste(colnames(aldex_out), collapse = ", ")
     )
+  }
+  if (isTRUE(effect) && !"effect" %in% colnames(aldex_out)) {
+    stop("ALDEx2 output missing 'effect' column. Re-run with effect = TRUE.")
   }
 
   taxa_ids <- rownames(aldex_out)
@@ -2529,7 +2556,7 @@ run_aldex2_core <- function(ps_obj, group, tax_rank, method = "wilcox.test", pai
 
   aldex2_res <- data.frame(
     feature = feature_labels,
-    ef_aldex = as.numeric(aldex_out$effect),
+    ef_aldex = if (isTRUE(effect)) as.numeric(aldex_out$effect) else NA_real_,
     padj = as.numeric(aldex_out[[padj_col]]),
     pvalue = as.numeric(aldex_out[[pval_col]]),
     stringsAsFactors = FALSE
@@ -2549,13 +2576,21 @@ run_aldex2_core <- function(ps_obj, group, tax_rank, method = "wilcox.test", pai
   standardize_aldex2_marker_table(aldex2_res)
 }
 
-run_aldex2 <- function(ps_obj, group, tax_rank, method, transform, normalization, plot_colors,
-                       paired = FALSE, pvalue_cutoff = 0.05, mc_samples = 128) {
+run_aldex2 <- function(ps_obj, group, tax_rank, method = "t.test", transform, normalization, plot_colors,
+                       paired = FALSE, effect = TRUE, pvalue_cutoff = 0.05, mc_samples = 128,
+                       patient_col = "Sample") {
   library(dplyr)
   library(ggplot2)
   library(patchwork)
 
-  message("Running ALDEx2 via ALDEx2 package (CLR Monte Carlo)...")
+  test_cols <- resolve_aldex2_test_cols(method)
+  message(
+    "Running ALDEx2 via ALDEx2 package (CLR Monte Carlo; ",
+    test_cols$label,
+    if (isTRUE(paired)) ", paired" else ", unpaired",
+    if (isTRUE(effect)) ", effect sizes" else "",
+    ")..."
+  )
   if (!identical(normalization, "none") || !identical(transform, "identity")) {
     message(
       "Note: ALDEx2 uses its own CLR Monte Carlo workflow. ",
@@ -2570,8 +2605,10 @@ run_aldex2 <- function(ps_obj, group, tax_rank, method, transform, normalization
     tax_rank = tax_rank,
     method = method,
     paired = paired,
+    effect = effect,
     pvalue_cutoff = pvalue_cutoff,
-    mc_samples = mc_samples
+    mc_samples = mc_samples,
+    patient_col = patient_col
   )
 
   assign(paste0("aldex2_res_", tax_rank), aldex2_res, envir = .GlobalEnv)

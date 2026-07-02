@@ -570,11 +570,13 @@ library("ANCOMBC")
 ANCOM_ph <- runANCOM(ps_fs, 
          tax_level = "Phylum", 
          group = "Type", 
-         paired = TRUE,
+         paired = FALSE,
          name_of_saved_results = "../saved_analysis_files/ancombc_results_phy", 
          plot_type = "dot",
          Log2FC_cutoff = 0.5,
          plot_colors = colors_all)
+
+ANCOM_ph$full_results
 ```
 
 ### 6.1.2 Genus
@@ -582,7 +584,7 @@ ANCOM_ph <- runANCOM(ps_fs,
 ANCOM_genus <- runANCOM(ps_fs, 
          tax_level = "Genus", 
          group = "Type", 
-         paired = TRUE,
+         paired = FALSE,
          name_of_saved_results = "../saved_analysis_files/ancombc_results_gen", 
          plot_type = "dot",
          plot_colors = colors_all )
@@ -593,7 +595,7 @@ ANCOM_genus <- runANCOM(ps_fs,
 ANCOM_sp <- runANCOM(ps_fs, 
          tax_level = "Species", 
          group = "Type", 
-         paired = TRUE,
+         paired = FALSE,
          name_of_saved_results = "../saved_analysis_files/ancombc_results_sp", 
          plot_type = "dot",
          plot_colors = colors_all )
@@ -695,11 +697,13 @@ ALDEx2 uses by default the centred log-ratio (clr) transformation which is scale
 
 #### Phylum
 ```{r, fig.width=10, fig.height=3}
-
+source("MK_Microbiome_Functions.R")
 ALDEX_ph <- run_aldex2(ps_fs, 
                   "Type", 
                   "Phylum",
-                  method = "wilcox.test",
+                  paired = TRUE,
+                  method = "t.test",
+                  effect = TRUE,
                   transform = "log10",
                   normalization = "CSS", 
                  plot_colors = colors_all)
@@ -712,23 +716,28 @@ ALDEX_ph$results
 ALDEX_genus <- run_aldex2(ps_fs, 
                   "Type", 
                   "Genus",
-                  method = "wilcox.test",
+                  paired = TRUE,
+                  method = "t.test",
+                  effect = TRUE,
                   transform = "log10",
                   normalization = "CSS", 
                  plot_colors = colors_all)
 ALDEX_genus$results
 ```
 
-
 #### Species
 ```{r, fig.width=7, fig.height=5}
 ALDEX_sp <- run_aldex2(ps_fs, 
                   "Type", 
                   "Species",
-                  method = "wilcox.test",
+                  paired = TRUE,
+                  method = "t.test",
+                  effect = TRUE,
                   transform = "log10",
                   normalization = "CSS", 
                  plot_colors = colors_all)
+ALDEX_sp$results
+
 ```
 
 
