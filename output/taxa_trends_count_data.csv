@@ -1,0 +1,41 @@
+Rank,Taxa_clean,A,P
+genus,Prevotella,20,5
+genus,Treponema,22,3
+genus,Dialister,21,4
+genus,Oribacterium,17,8
+genus,Lancefieldella,22,3
+genus,Solobacterium,19,6
+genus,Veillonellaceae G-1,18,7
+genus,Fretibacterium,20,5
+genus,Lactobacillus,20,5
+genus,Bacteroidetes G-3,21,4
+genus,Abiotrophia,3,22
+genus,Kingella,5,20
+genus,Rothia,4,21
+genus,Corynebacterium,3,22
+genus,Actinomyces,4,21
+genus,Lautropia,4,21
+genus,Haemophilus,6,19
+genus,Capnocytophaga,7,18
+genus,Leptotrichia,4,21
+genus,Neisseria,7,18
+species,Prevotella oris,22,3
+species,Dialister invisus,20,5
+species,Alloprevotella tannerae,24,1
+species,Oribacterium sp. HMT 078,19,6
+species,Solobacterium moorei,19,6
+species,Prevotella sp. HMT 292,20,5
+species,Lancefieldella rimae,20,5
+species,Treponema sp. HMT 231,20,5
+species,Peptococcus sp. HMT 167,21,4
+species,Porphyromonas endodontalis,21,4
+species,Corynebacterium matruchotii,4,21
+species,Capnocytophaga sputigena,6,19
+species,Abiotrophia defectiva,3,22
+species,Fusobacterium periodonticum,6,19
+species,Porphyromonas pasteri,7,18
+species,Haemophilus parainfluenzae,4,21
+species,Lautropia mirabilis,4,21
+species,Streptococcus sanguinis,2,23
+species,Neisseria flava,6,19
+species,Streptococcus oralis subsp. dentisani clade 058,4,21

@@ -529,8 +529,6 @@ taxa_shifts_genus$combined_plot
 count_data_genus <- taxa_shifts_genus$bubble_data %>%
   pivot_wider(names_from = group2, values_from = count) 
 
-write_csv(count_data_genus, "output/taxa_trends_genus_count_data.csv")
-
 ggsave("output/Genus_Taxa_Shifts.png", taxa_shifts_genus$combined_plot, width = 7, height = 5, dpi=600)
 ```
 
@@ -547,10 +545,17 @@ taxa_shifts_species$combined_plot
 count_data_species <- taxa_shifts_species$bubble_data %>%
   pivot_wider(names_from = group2, values_from = count) 
 
-
-write_csv(count_data_species, "output/taxa_trends_species_count_data.csv")
-
 ggsave("output/Species_Taxa_Shifts.png", taxa_shifts_species$combined_plot, width = 12, height = 5, dpi=600)
+```
+
+```{r}
+taxa_trends_count_data <- dplyr::bind_rows(
+  count_data_genus %>% dplyr::mutate(Rank = "genus"),
+  count_data_species %>% dplyr::mutate(Rank = "species")
+) %>%
+  dplyr::relocate(Rank)
+
+write_csv(taxa_trends_count_data, "output/taxa_trends_count_data.csv")
 ```
 
 
@@ -570,7 +575,7 @@ library("ANCOMBC")
 ANCOM_ph <- runANCOM(ps_fs, 
          tax_level = "Phylum", 
          group = "Type", 
-         paired = FALSE,
+         paired = TRUE,
          name_of_saved_results = "../saved_analysis_files/ancombc_results_phy", 
          plot_type = "dot",
          Log2FC_cutoff = 0.5,
@@ -584,7 +589,7 @@ ANCOM_ph$full_results
 ANCOM_genus <- runANCOM(ps_fs, 
          tax_level = "Genus", 
          group = "Type", 
-         paired = FALSE,
+         paired = TRUE,
          name_of_saved_results = "../saved_analysis_files/ancombc_results_gen", 
          plot_type = "dot",
          plot_colors = colors_all )
@@ -595,7 +600,7 @@ ANCOM_genus <- runANCOM(ps_fs,
 ANCOM_sp <- runANCOM(ps_fs, 
          tax_level = "Species", 
          group = "Type", 
-         paired = FALSE,
+         paired = TRUE,
          name_of_saved_results = "../saved_analysis_files/ancombc_results_sp", 
          plot_type = "dot",
          plot_colors = colors_all )
@@ -750,7 +755,6 @@ DA_results_df_Phylum <- combine_DA(maaslin2_results_Phylum_0.05, ancombc2_result
 
 DA_results_df_Phylum$results
 
-write_csv(DA_results_df_Phylum$results, "output/phylum_DA_combined_results.csv")
 ```
 
 ```{r, fig.width=6.2, fig.height=3}
@@ -810,8 +814,6 @@ ggsave("output/Phylum_DA_Bubble_Abscess_no-labs.png", phylum_combined_bubbles_A$
 # Combine the count data results and write to a file
 phylum_count_data <- phylum_bubbledata_A %>%
   dplyr::full_join(phylum_bubbledata_P)
-
-write_csv(phylum_count_data, "output/phylum_count_data_DA_bubbledata.csv")
 ```
 
 
@@ -823,7 +825,6 @@ DA_results_df_genus <- combine_DA(maaslin2_results_Genus_0.05, ancombc2_results_
 
 DA_results_df_genus$results
 
-write_csv(DA_results_df_genus$results, "output/genus_DA_combined_results.csv")
 ```
 
 ```{r, fig.width=7.5, fig.height=8}
@@ -873,8 +874,6 @@ genus_combined_bubbles_A$combined_plot_nolabs
 # Combine the count data results and write to a file
 genus_count_data <- genus_bubbledata_A %>%
   dplyr::full_join(genus_bubbledata_P)
-
-write_csv(genus_count_data, "output/genus_count_data_DA_bubbledata.csv")
 ```
 
 
@@ -885,7 +884,6 @@ DA_results_df_sp <- combine_DA(maaslin2_results_Species_0.05, ancombc2_results_d
 
 DA_results_df_sp$results
 
-write_csv(DA_results_df_sp$results, "output/species_DA_combined_results.csv")
 ```
 
 ```{r, fig.width=10.6, fig.height=11.1}
@@ -940,12 +938,347 @@ species_combined_bubbles_A$combined_plot_nolabs
 # Combine the count data results and write to a file
 sp_count_data <- sp_bubbledata_A %>%
   dplyr::full_join(sp_bubbledata_P)
-
-write_csv(sp_count_data, "output/species_count_data_DA_bubbledata.csv")
-
 ```
 
-## 6.5 Per taxa plots
+```{r}
+DA_combined_results <- dplyr::bind_rows(
+  DA_results_df_Phylum$results %>% dplyr::mutate(Rank = "phylum"),
+  DA_results_df_genus$results %>% dplyr::mutate(Rank = "genus"),
+  DA_results_df_sp$results %>% dplyr::mutate(Rank = "species")
+) %>%
+  dplyr::relocate(Rank)
+
+write_csv(DA_combined_results, "output/DA_combined_results.csv")
+
+DA_bubbledata_count_data <- dplyr::bind_rows(
+  phylum_count_data %>% dplyr::mutate(Rank = "phylum"),
+  genus_count_data %>% dplyr::mutate(Rank = "genus"),
+  sp_count_data %>% dplyr::mutate(Rank = "species")
+) %>%
+  dplyr::relocate(Rank)
+
+write_csv(DA_bubbledata_count_data, "output/DA_bubbledata_count_data.csv")
+```
+
+## 6.5 Run non-paired samples
+
+Sensitivity analysis: repeat MaAsLin2, ALDEx2, and ANCOM-BC2 without pairing. Combined tables and figures mirror section 6.4, with `_unpaired` suffix on outputs.
+
+### 6.5.1 ANCOMBC2 (unpaired)
+
+```{r}
+ANCOM_ph_unpaired <- runANCOM(ps_fs,
+         tax_level = "Phylum",
+         group = "Type",
+         paired = FALSE,
+         name_of_saved_results = "../saved_analysis_files/ancombc_results_phy_unpaired",
+         plot_type = "dot",
+         Log2FC_cutoff = 0.5,
+         plot_colors = colors_all)
+
+ANCOM_genus_unpaired <- runANCOM(ps_fs,
+         tax_level = "Genus",
+         group = "Type",
+         paired = FALSE,
+         name_of_saved_results = "../saved_analysis_files/ancombc_results_gen_unpaired",
+         plot_type = "dot",
+         plot_colors = colors_all)
+
+ANCOM_sp_unpaired <- runANCOM(ps_fs,
+         tax_level = "Species",
+         group = "Type",
+         paired = FALSE,
+         name_of_saved_results = "../saved_analysis_files/ancombc_results_sp_unpaired",
+         plot_type = "dot",
+         plot_colors = colors_all)
+```
+
+### 6.5.2 MaAsLin2 (unpaired)
+
+```{r}
+MaaslinPhylum_unpaired <- run_Maaslin2(ps_obj = ps_fs,
+                                 taxa_level = "Phylum",
+                                 group = "Type",
+                                 paired = FALSE,
+                                 analysis_method = "LM",
+                                 normalization = "CSS",
+                                 transform = "LOG",
+                                 plot_colors = colors_all,
+                                 plot_type = "dot",
+                                 qval_threshold = .05)
+
+MaaslinGenus_unpaired <- run_Maaslin2(ps_obj = ps_fs,
+                                 taxa_level = "Genus",
+                                 group = "Type",
+                                 paired = FALSE,
+                                 analysis_method = "LM",
+                                 normalization = "CSS",
+                                 transform = "LOG",
+                                 plot_colors = colors_all,
+                                 plot_type = "dot",
+                                 qval_threshold = .05)
+
+Maaslinsp_unpaired <- run_Maaslin2(ps_obj = ps_fs,
+                                 taxa_level = "Species",
+                                 group = "Type",
+                                 paired = FALSE,
+                                 analysis_method = "LM",
+                                 normalization = "CSS",
+                                 transform = "LOG",
+                                 plot_colors = colors_all,
+                                 plot_type = "dot",
+                                 qval_threshold = .05)
+```
+
+### 6.5.3 ALDEx2 (unpaired)
+
+```{r}
+ALDEX_ph_unpaired <- run_aldex2(ps_fs,
+                  "Type",
+                  "Phylum",
+                  paired = FALSE,
+                  method = "t.test",
+                  effect = TRUE,
+                  transform = "log10",
+                  normalization = "CSS",
+                 plot_colors = colors_all)
+
+ALDEX_genus_unpaired <- run_aldex2(ps_fs,
+                  "Type",
+                  "Genus",
+                  paired = FALSE,
+                  method = "t.test",
+                  effect = TRUE,
+                  transform = "log10",
+                  normalization = "CSS",
+                 plot_colors = colors_all)
+
+ALDEX_sp_unpaired <- run_aldex2(ps_fs,
+                  "Type",
+                  "Species",
+                  paired = FALSE,
+                  method = "t.test",
+                  effect = TRUE,
+                  transform = "log10",
+                  normalization = "CSS",
+                 plot_colors = colors_all)
+```
+
+### 6.5.4 Combine results (unpaired)
+
+#### Phylum
+```{r, fig.height=3.6, fig.width=3.2}
+DA_results_unpaired_Phylum <- combine_DA(
+  maaslin2_results_Phylum_0.05,
+  ancombc2_results_df_Phylum,
+  aldex2_res_Phylum,
+  "Type",
+  "Phylum"
+)
+
+DA_results_unpaired_Phylum$results
+```
+
+```{r, fig.width=6.2, fig.height=3}
+phylum_unpaired_bubbles_P <- combine_DA_with_bubbles(
+  da = DA_results_unpaired_Phylum,
+  CSV_formatted_relab_df = ps_fs_phylum_csv,
+  group = "Type",
+  tax_level = "Phylum",
+  heatmap_side = "Plaque",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+phylum_unpaired_bubbles_P$combined_plot
+ggsave("output/Phylum_DA_Bubble_Plaque_labs_unpaired.png", phylum_unpaired_bubbles_P$combined_plot, width = 6.2, height = 3, dpi = 600)
+
+phylum_unpaired_bubbledata_P <- phylum_unpaired_bubbles_P$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Plaque")
+```
+
+```{r, fig.width=3.2, fig.height=1.1}
+phylum_unpaired_bubbles_P$combined_plot_nolabs
+ggsave("output/Phylum_DA_Bubble_Plaque_no-labs_unpaired.png", phylum_unpaired_bubbles_P$combined_plot_nolabs, width = 3.2, height = 1.1, dpi = 600)
+```
+
+```{r, fig.width=6, fig.height=3.4}
+phylum_unpaired_bubbles_A <- combine_DA_with_bubbles(
+  da = DA_results_unpaired_Phylum,
+  CSV_formatted_relab_df = ps_fs_phylum_csv,
+  group = "Type",
+  tax_level = "Phylum",
+  heatmap_side = "Abscess",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+phylum_unpaired_bubbles_A$combined_plot
+ggsave("output/Phylum_DA_Bubble_Abscess_labs_unpaired.png", phylum_unpaired_bubbles_A$combined_plot, width = 6, height = 3.4, dpi = 600)
+
+phylum_unpaired_bubbledata_A <- phylum_unpaired_bubbles_A$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Abscess")
+```
+
+```{r, fig.width=3.8, fig.height=1.45}
+phylum_unpaired_bubbles_A$combined_plot_nolabs
+ggsave("output/Phylum_DA_Bubble_Abscess_no-labs_unpaired.png", phylum_unpaired_bubbles_A$combined_plot_nolabs, width = 3.8, height = 1.45, dpi = 600)
+```
+
+```{r}
+phylum_unpaired_count_data <- phylum_unpaired_bubbledata_A %>%
+  dplyr::full_join(phylum_unpaired_bubbledata_P)
+```
+
+#### Genus
+```{r, fig.height=12, fig.width=3.9}
+DA_results_unpaired_genus <- combine_DA(
+  maaslin2_results_Genus_0.05,
+  ancombc2_results_df_Genus,
+  aldex2_res_Genus,
+  "Type",
+  "Genus"
+)
+
+DA_results_unpaired_genus$results
+```
+
+```{r, fig.width=7.5, fig.height=8}
+genus_unpaired_bubbles_P <- combine_DA_with_bubbles(
+  da = DA_results_unpaired_genus,
+  CSV_formatted_relab_df = ps_fs_genus_csv,
+  group = "Type",
+  tax_level = "genus",
+  heatmap_side = "Plaque",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+genus_unpaired_bubbles_P$combined_plot
+ggsave("output/Genus_DA_Bubble_Plaque_labs_unpaired.png", genus_unpaired_bubbles_P$combined_plot, width = 7.5, height = 8, dpi = 600)
+
+genus_unpaired_bubbledata_P <- genus_unpaired_bubbles_P$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Plaque")
+```
+
+```{r, eval=FALSE, fig.width=11.5, fig.height=9}
+genus_unpaired_bubbles_P$combined_plot_nolabs
+```
+
+```{r, fig.width=7.9, fig.height=6.8}
+genus_unpaired_bubbles_A <- combine_DA_with_bubbles(
+  da = DA_results_unpaired_genus,
+  CSV_formatted_relab_df = ps_fs_genus_csv,
+  group = "Type",
+  tax_level = "genus",
+  heatmap_side = "Abscess",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+genus_unpaired_bubbles_A$combined_plot
+ggsave("output/Genus_DA_Bubble_Abscess_labs_unpaired.png", genus_unpaired_bubbles_A$combined_plot, width = 7.9, height = 6.8, dpi = 600)
+
+genus_unpaired_bubbledata_A <- genus_unpaired_bubbles_A$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Abscess")
+```
+
+```{r, eval=FALSE, fig.width=12, fig.height=7}
+genus_unpaired_bubbles_A$combined_plot_nolabs
+```
+
+```{r}
+genus_unpaired_count_data <- genus_unpaired_bubbledata_A %>%
+  dplyr::full_join(genus_unpaired_bubbledata_P)
+```
+
+#### Species
+```{r, fig.height=11, fig.width=5.5}
+DA_results_unpaired_sp <- combine_DA(
+  maaslin2_results_Species_0.05,
+  ancombc2_results_df_Species,
+  aldex2_res_Species,
+  "Type",
+  "Species"
+)
+
+DA_results_unpaired_sp$results
+```
+
+```{r, fig.width=10.6, fig.height=11.1}
+sp_unpaired_bubbles_P <- combine_DA_with_bubbles(
+  da = DA_results_unpaired_sp,
+  CSV_formatted_relab_df = ps_fs_species_csv,
+  group = "Type",
+  tax_level = "species",
+  heatmap_side = "Plaque",
+  bubble_max_size = 7,
+  plot_layout_widths = c(2, 1)
+)
+
+sp_unpaired_bubbles_P$combined_plot
+ggsave("output/Species_DA_Bubble_Plaque_labs_unpaired.png", sp_unpaired_bubbles_P$combined_plot, width = 10.6, height = 11.1, dpi = 600)
+
+sp_unpaired_bubbledata_P <- sp_unpaired_bubbles_P$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Plaque")
+```
+
+```{r, fig.width=3.5, fig.height=12}
+sp_unpaired_bubbles_P$combined_plot_nolabs
+```
+
+```{r, fig.width=10.9, fig.height=7.2}
+sp_unpaired_bubbles_A <- combine_DA_with_bubbles(
+  da = DA_results_unpaired_sp,
+  CSV_formatted_relab_df = ps_fs_species_csv,
+  group = "Type",
+  tax_level = "species",
+  heatmap_side = "Abscess",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+sp_unpaired_bubbles_A$combined_plot
+ggsave("output/Species_DA_Bubble_Abscess_labs_unpaired.png", sp_unpaired_bubbles_A$combined_plot, width = 10.9, height = 7.2, dpi = 600)
+
+sp_unpaired_bubbledata_A <- sp_unpaired_bubbles_A$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Abscess")
+```
+
+```{r, fig.width=3.5, fig.height=6}
+sp_unpaired_bubbles_A$combined_plot_nolabs
+```
+
+```{r}
+sp_unpaired_count_data <- sp_unpaired_bubbledata_A %>%
+  dplyr::full_join(sp_unpaired_bubbledata_P)
+
+DA_combined_results_unpaired <- dplyr::bind_rows(
+  DA_results_unpaired_Phylum$results %>% dplyr::mutate(Rank = "phylum", pairing = "unpaired"),
+  DA_results_unpaired_genus$results %>% dplyr::mutate(Rank = "genus", pairing = "unpaired"),
+  DA_results_unpaired_sp$results %>% dplyr::mutate(Rank = "species", pairing = "unpaired")
+) %>%
+  dplyr::relocate(Rank, pairing)
+
+write_csv(DA_combined_results_unpaired, "output/DA_combined_results_unpaired.csv")
+
+DA_bubbledata_count_data_unpaired <- dplyr::bind_rows(
+  phylum_unpaired_count_data %>% dplyr::mutate(Rank = "phylum", pairing = "unpaired"),
+  genus_unpaired_count_data %>% dplyr::mutate(Rank = "genus", pairing = "unpaired"),
+  sp_unpaired_count_data %>% dplyr::mutate(Rank = "species", pairing = "unpaired")
+) %>%
+  dplyr::relocate(Rank, pairing)
+
+write_csv(DA_bubbledata_count_data_unpaired, "output/DA_bubbledata_count_data_unpaired.csv")
+```
+
+## 6.6 Per taxa plots
 
 ### Fig S3A: Fusobacteria phylum
 ```{r, fig.width=2.5, fig.height=2.8}
