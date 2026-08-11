@@ -1,0 +1,136 @@
+Level,Confidence,Taxa,Abscess Count,Plaque Count,Enrichment
+Phylum,High,Spirochaetes,22,3,Abscess
+Phylum,Low,Tenericutes,19,6,Abscess
+Phylum,Low,Synergistetes,20,5,Abscess
+Phylum,Medium,Proteobacteria,4,21,Plaque
+Phylum,Low,Gracilibacteria GN02,12,13,Plaque
+Phylum,Low,Absconditabacteria SR1,11,14,Plaque
+Genus,High,Treponema,22,3,Abscess
+Genus,High,Dialister,21,4,Abscess
+Genus,Medium,Veillonellaceae G1,18,7,Abscess
+Genus,Medium,Peptococcus,19,6,Abscess
+Genus,Medium,Lancefieldella,22,3,Abscess
+Genus,Low,Solobacterium,19,6,Abscess
+Genus,Low,Scardovia,19,6,Abscess
+Genus,Low,Peptostreptococcaceae G4,20,5,Abscess
+Genus,Low,Mycoplasma,19,6,Abscess
+Genus,Low,Lactobacillus,20,5,Abscess
+Genus,Low,Lacticaseibacillus,17,8,Abscess
+Genus,Low,Johnsonella,17,8,Abscess
+Genus,Low,Fretibacterium,20,5,Abscess
+Genus,Low,Bacteroidetes G5,19,6,Abscess
+Genus,Low,Bacteroidetes G3,21,4,Abscess
+Genus,Low,Bacteroidales G2,17,8,Abscess
+Genus,Low,Acidipropionibacterium,20,5,Abscess
+Genus,High,Leptotrichia,4,21,Plaque
+Genus,High,Corynebacterium,3,22,Plaque
+Genus,High,Actinomyces,4,21,Plaque
+Genus,Medium,Rothia,4,21,Plaque
+Genus,Medium,Peptidiphaga,7,18,Plaque
+Genus,Medium,Neisseria,7,18,Plaque
+Genus,Medium,Lautropia,4,21,Plaque
+Genus,Medium,Lachnoanaerobaculum,7,18,Plaque
+Genus,Medium,Kingella,5,20,Plaque
+Genus,Medium,Haemophilus,6,19,Plaque
+Genus,Medium,Arachnia,6,19,Plaque
+Genus,Medium,Abiotrophia,3,22,Plaque
+Genus,Low,Weeksellaceae G1,9,16,Plaque
+Genus,Low,Veillonella,8,17,Plaque
+Genus,Low,Streptococcus,6,19,Plaque
+Genus,Low,Schaalia,8,17,Plaque
+Genus,Low,Saccharibacteria TM7 G6,12,13,Plaque
+Genus,Low,Saccharibacteria TM7 G1,9,16,Plaque
+Genus,Low,Ruminococcaceae G1,10,15,Plaque
+Genus,Low,Riemerella,6,19,Plaque
+Genus,Low,Granulicatella,8,17,Plaque
+Genus,Low,Gracilibacteria GN02 G1,12,13,Plaque
+Genus,Low,Gemella,6,19,Plaque
+Genus,Low,Cardiobacterium,11,14,Plaque
+Genus,Low,Capnocytophaga,7,18,Plaque
+Genus,Low,Aggregatibacter,10,15,Plaque
+Genus,Low,Absconditabacteria SR1 G1,11,14,Plaque
+Species,Medium,Prevotella nigrescens,19,6,Abscess
+Species,Medium,Oribacterium sp HMT 078,19,6,Abscess
+Species,Low,Veillonellaceae G1 bacterium HMT 150,20,5,Abscess
+Species,Low,Treponema sp HMT 237,20,5,Abscess
+Species,Low,Treponema sp HMT 231,20,5,Abscess
+Species,Low,Treponema socranskii,20,5,Abscess
+Species,Low,Treponema maltophilum,21,4,Abscess
+Species,Low,Treponema lecithinolyticum,20,5,Abscess
+Species,Low,Treponema denticola,19,6,Abscess
+Species,Low,Tannerella forsythia,20,5,Abscess
+Species,Low,Streptococcus constellatus,18,7,Abscess
+Species,Low,Solobacterium moorei,19,6,Abscess
+Species,Low,Selenomonas sp HMT 134,20,5,Abscess
+Species,Low,Prevotella sp HMT 315,19,6,Abscess
+Species,Low,Prevotella sp HMT 292,20,5,Abscess
+Species,Low,Prevotella pleuritidis,20,5,Abscess
+Species,Low,Prevotella oris,22,3,Abscess
+Species,Low,Porphyromonas endodontalis,21,4,Abscess
+Species,Low,Peptostreptococcaceae G4 bacterium HMT 369,20,5,Abscess
+Species,Low,Peptostreptococcaceae G1 Eubacterium infirmum,20,5,Abscess
+Species,Low,Peptococcus sp HMT 167,21,4,Abscess
+Species,Low,Mycoplasma salivarium,19,6,Abscess
+Species,Low,Lacticaseibacillus casei,17,8,Abscess
+Species,Low,Johnsonella ignava,17,8,Abscess
+Species,Low,Fusobacterium nucleatum,19,6,Abscess
+Species,Low,Fretibacterium fastidiosum,20,5,Abscess
+Species,Low,Dialister pneumosintes,19,6,Abscess
+Species,Low,Dialister invisus,20,5,Abscess
+Species,Low,Bacteroidales G2 bacterium HMT 274,17,8,Abscess
+Species,Low,Alloprevotella tannerae,24,1,Abscess
+Species,Low,Alloprevotella rava,21,4,Abscess
+Species,High,Streptococcus sanguinis,2,23,Plaque
+Species,Medium,Streptococcus oralis subsp dentisani clade 058,4,21,Plaque
+Species,Medium,Rothia aeria,8,17,Plaque
+Species,Medium,Porphyromonas pasteri,7,18,Plaque
+Species,Medium,Peptidiphaga sp HMT 183,10,15,Plaque
+Species,Medium,Leptotrichia shahii,11,14,Plaque
+Species,Medium,Leptotrichia buccalis,8,17,Plaque
+Species,Medium,Lautropia mirabilis,4,21,Plaque
+Species,Medium,Haemophilus parainfluenzae,4,21,Plaque
+Species,Medium,Fusobacterium periodonticum,6,19,Plaque
+Species,Medium,Corynebacterium durum,6,19,Plaque
+Species,Medium,Capnocytophaga sputigena,6,19,Plaque
+Species,Medium,Alloprevotella sp HMT 473,11,14,Plaque
+Species,Medium,Aggregatibacter sp HMT 458,11,14,Plaque
+Species,Medium,Actinomyces oris,9,16,Plaque
+Species,Low,Weeksellaceae G1 sp HMT 907,12,13,Plaque
+Species,Low,Veillonella sp HMT 780,10,15,Plaque
+Species,Low,Streptococcus lactarius,10,15,Plaque
+Species,Low,Streptococcus cristatus clade 578,6,19,Plaque
+Species,Low,Selenomonas sp HMT 137,11,14,Plaque
+Species,Low,Schaalia sp HMT 178,12,13,Plaque
+Species,Low,Saccharibacteria TM7 G6 bacterium HMT 870,12,13,Plaque
+Species,Low,Saccharibacteria TM7 G1 bacterium HMT 348,11,14,Plaque
+Species,Low,Ruminococcaceae G1 bacterium HMT 075,10,15,Plaque
+Species,Low,Rothia dentocariosa,8,17,Plaque
+Species,Low,Riemerella sp HMT 322,6,19,Plaque
+Species,Low,Prevotella melaninogenica,7,18,Plaque
+Species,Low,Porphyromonas sp HMT 930,8,17,Plaque
+Species,Low,Porphyromonas catoniae,9,16,Plaque
+Species,Low,Neisseria subflava,9,16,Plaque
+Species,Low,Neisseria perflava,12,13,Plaque
+Species,Low,Neisseria flava,6,19,Plaque
+Species,Low,Neisseria elongata,7,18,Plaque
+Species,Low,Leptotrichia sp HMT 498,10,15,Plaque
+Species,Low,Leptotrichia sp HMT 392,11,14,Plaque
+Species,Low,Leptotrichia sp HMT 215,8,17,Plaque
+Species,Low,Leptotrichia hofstadii,10,15,Plaque
+Species,Low,Lachnoanaerobaculum umeaense,9,16,Plaque
+Species,Low,Kingella oralis,4,21,Plaque
+Species,Low,Haemophilus sp HMT 036,10,15,Plaque
+Species,Low,Granulicatella elegans,7,18,Plaque
+Species,Low,Gemella morbillorum,7,18,Plaque
+Species,Low,Fusobacterium hwasookii,10,15,Plaque
+Species,Low,Corynebacterium matruchotii,4,21,Plaque
+Species,Low,Cardiobacterium hominis,10,15,Plaque
+Species,Low,Capnocytophaga granulosa,6,19,Plaque
+Species,Low,Arachnia propionica,7,18,Plaque
+Species,Low,Alloprevotella sp HMT 914,10,15,Plaque
+Species,Low,Alloprevotella sp HMT 912,14,11,Plaque
+Species,Low,Actinomyces sp HMT 169,10,15,Plaque
+Species,Low,Actinomyces massiliensis,7,18,Plaque
+Species,Low,Actinomyces dentalis,14,11,Plaque
+Species,Low,Absconditabacteria SR1 G1 bacterium HMT 874,13,12,Plaque
+Species,Low,Abiotrophia defectiva,3,22,Plaque

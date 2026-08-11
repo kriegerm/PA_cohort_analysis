@@ -1,0 +1,10 @@
+method,Rank,n_paired,n_unpaired,n_shared,n_paired_only,n_unpaired_only,taxa_paired_only,taxa_unpaired_only
+MaAsLin2,phylum,6,4,4,2,0,"Absconditabacteria SR1, Gracilibacteria GN02",
+ANCOMBC2,phylum,1,2,1,0,1,,Proteobacteria
+ALDEx2,phylum,1,2,1,0,1,,Synergistetes
+MaAsLin2,genus,41,30,30,11,0,"Absconditabacteria SR1 G1, Acidipropionibacterium, Aggregatibacter, Bacteroidetes G5, Cardiobacterium, Granulicatella, Peptococcus, Ruminococcaceae G1, Saccharibacteria TM7 G1, Scardovia, Schaalia",
+ANCOMBC2,genus,2,11,2,0,9,,"Actinomyces, Bacteroidales G2, Corynebacterium, Dialister, Johnsonella, Leptotrichia, Peptidiphaga, Peptococcus, Veillonellaceae G1"
+ALDEx2,genus,12,13,12,0,1,,Lancefieldella
+MaAsLin2,species,78,54,54,24,0,"Absconditabacteria SR1 G1 bacterium HMT 874, Actinomyces sp HMT 169, Aggregatibacter sp HMT 458, Alloprevotella rava, Fusobacterium nucleatum, Haemophilus sp HMT 036, Leptotrichia shahii, Leptotrichia sp HMT 392, Mycoplasma salivarium, Neisseria perflava, Peptidiphaga sp HMT 183, Peptostreptococcaceae G4 bacterium HMT 369, Porphyromonas sp HMT 930, Prevotella nigrescens, Prevotella pleuritidis, Prevotella sp HMT 315, Ruminococcaceae G1 bacterium HMT 075, Saccharibacteria TM7 G1 bacterium HMT 348, Schaalia sp HMT 178, Selenomonas sp HMT 137, Streptococcus constellatus, Tannerella forsythia, Treponema sp HMT 237, Veillonella sp HMT 780",
+ANCOMBC2,species,1,20,1,0,19,,"Actinomyces dentalis, Actinomyces oris, Aggregatibacter sp HMT 458, Alloprevotella sp HMT 473, Alloprevotella sp HMT 912, Bacteroidales G2 bacterium HMT 274, Corynebacterium durum, Fusobacterium hwasookii, Johnsonella ignava, Leptotrichia buccalis, Leptotrichia shahii, Oribacterium sp HMT 078, Peptidiphaga sp HMT 183, Porphyromonas catoniae, Porphyromonas pasteri, Prevotella nigrescens, Rothia aeria, Streptococcus oralis subsp dentisani clade 058, Streptococcus sanguinis"
+ALDEx2,species,5,4,4,1,0,Haemophilus parainfluenzae,

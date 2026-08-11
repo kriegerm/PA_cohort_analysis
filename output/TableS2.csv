@@ -1,0 +1,41 @@
+Level,Taxa,Abscess Count,Plaque Count,Overall Enrichment Direction
+Genus,Prevotella,20,5,Abscess
+Genus,Fusobacterium,19,6,Abscess
+Genus,Treponema,22,3,Abscess
+Genus,Dialister,21,4,Abscess
+Genus,Tannerella,18,7,Abscess
+Genus,Lancefieldella,22,3,Abscess
+Genus,Solobacterium,19,6,Abscess
+Genus,Veillonellaceae G-1,18,7,Abscess
+Genus,Peptococcus,19,6,Abscess
+Genus,Fretibacterium,20,5,Abscess
+Genus,Kingella,5,20,Plaque
+Genus,Rothia,4,21,Plaque
+Genus,Corynebacterium,3,22,Plaque
+Genus,Actinomyces,4,21,Plaque
+Genus,Lautropia,4,21,Plaque
+Genus,Haemophilus,6,19,Plaque
+Genus,Capnocytophaga,7,18,Plaque
+Genus,Leptotrichia,4,21,Plaque
+Genus,Neisseria,7,18,Plaque
+Genus,Streptococcus,6,19,Plaque
+Species,Prevotella nigrescens,19,6,Abscess
+Species,Prevotella oris,22,3,Abscess
+Species,Dialister invisus,20,5,Abscess
+Species,Alloprevotella tannerae,24,1,Abscess
+Species,Treponema socranskii,20,5,Abscess
+Species,Oribacterium sp. HMT 078,19,6,Abscess
+Species,Solobacterium moorei,19,6,Abscess
+Species,Prevotella sp. HMT 292,20,5,Abscess
+Species,Lancefieldella rimae,20,5,Abscess
+Species,Treponema sp. HMT 231,20,5,Abscess
+Species,Corynebacterium matruchotii,4,21,Plaque
+Species,Capnocytophaga sputigena,6,19,Plaque
+Species,Abiotrophia defectiva,3,22,Plaque
+Species,Fusobacterium periodonticum,6,19,Plaque
+Species,Porphyromonas pasteri,7,18,Plaque
+Species,Haemophilus parainfluenzae,4,21,Plaque
+Species,Lautropia mirabilis,4,21,Plaque
+Species,Streptococcus sanguinis,2,23,Plaque
+Species,Neisseria flava,6,19,Plaque
+Species,Streptococcus oralis subsp. dentisani clade 058,4,21,Plaque

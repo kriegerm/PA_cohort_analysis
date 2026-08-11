@@ -53,12 +53,6 @@ dir.create(output_path, showWarnings = FALSE, recursive = TRUE)
 ``` 
 
 
-### 1.1.2 My packages
-```{r}
-# MK_Microbiome_Functions.R is sourced in the packages chunk above
-```
-
-
 
 ### 1.1.2 Colors and presents
 ```{r}
@@ -173,7 +167,7 @@ Species_PCoA_res <- run_ordination_with_validation(
 Species_PCoA_res$plot
 Species_PCoA_res$lib_size_with_Axis1_corr
 
-ggsave("output/Species_PCoA_relab_bray_plot.png", Species_PCoA_res$plot, width = 5, height = 3.5, dpi=600)
+ggsave("output/FigS1_Species_PCoA_relab_bray_plot.png", Species_PCoA_res$plot, width = 5, height = 3.5, dpi=600)
 
 ```
 
@@ -196,7 +190,7 @@ Species_PCoA_res_scores_df <- analyze_type_clustering_on_pca(Species_PCoA_res_sc
                                           component_num = 2,
                                           colors_list = colors_all)
 Species_PCoA_res_scores_df$sil_plot
-ggsave("output/Species_PCoA_relab_bray_sil_scores.png",Species_PCoA_res_scores_df$sil_plot, width = 3, height = 3, dpi=600)
+ggsave("output/FigS1_Species_PCoA_relab_bray_sil_scores.png",Species_PCoA_res_scores_df$sil_plot, width = 3, height = 3, dpi=600)
 
 ```
 
@@ -220,7 +214,7 @@ Genus_PCoA_res <- run_ordination_with_validation(
 Genus_PCoA_res$plot
 Genus_PCoA_res$lib_size_with_Axis1_corr
 
-ggsave("output/Genus_PCoA_relab_bray_plot.png", Genus_PCoA_res$plot, width = 5, height = 3.5, dpi=600)
+ggsave("output/Fig2_Genus_PCoA_relab_bray_plot.png", Genus_PCoA_res$plot, width = 5, height = 3.5, dpi=600)
 
 ```
 
@@ -243,7 +237,7 @@ Genus_PCoA_res_scores_df_sil <- analyze_type_clustering_on_pca(Genus_PCoA_res_sc
                                           component_num = 2,
                                           colors_list = colors_all)
 Genus_PCoA_res_scores_df_sil$sil_plot
-ggsave("output/Genus_PCoA_relab_bray_sil_scores.png",Genus_PCoA_res_scores_df_sil$sil_plot, width = 3, height = 3, dpi=600)
+ggsave("output/Fig2_Genus_PCoA_relab_bray_sil_scores.png",Genus_PCoA_res_scores_df_sil$sil_plot, width = 3, height = 3, dpi=600)
 
 ```
 
@@ -266,7 +260,7 @@ Phylum_PCoA_res <- run_ordination_with_validation(
 Phylum_PCoA_res$plot
 Phylum_PCoA_res$lib_size_with_Axis1_corr
 
-ggsave("output/Phylum_PCoA_relab_bray.png", Phylum_PCoA_res$plot, width = 5, height = 3.5, dpi=600)
+ggsave("output/Fig2_Phylum_PCoA_relab_bray.png", Phylum_PCoA_res$plot, width = 5, height = 3.5, dpi=600)
 
 ```
 
@@ -290,7 +284,7 @@ Phylum_PCoA_res_scores_df_sil <- analyze_type_clustering_on_pca(Phylum_PCoA_res_
                                           colors_list = colors_all)
 Phylum_PCoA_res_scores_df_sil$sil_plot
 
-ggsave("output/Phylum_PCoA_relab_bray_sil_scores.png", Phylum_PCoA_res_scores_df_sil$sil_plot, width = 3, height = 3, dpi=600)
+ggsave("output/Fig2_Phylum_PCoA_relab_bray_sil_scores.png", Phylum_PCoA_res_scores_df_sil$sil_plot, width = 3, height = 3, dpi=600)
 
 ```
 
@@ -351,12 +345,8 @@ p_Observed <- ggplot(ob_df, aes(x=Type, y=value, color=Type)) +
 combined_alpha <- p_Shannon + p_Observed
 combined_alpha
 
-ggsave("output/Alpha_Diversity_Plots.png", combined_alpha, width = 3.3, height = 3, dpi=600)
+ggsave("output/Fig2_Alpha_Diversity_Plots.png", combined_alpha, width = 3.3, height = 3, dpi=600)
 ```
-```{r}
-
-```
-
 
 # 4.0 Taxa Plots
 
@@ -403,7 +393,7 @@ top_df %>%
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
-ggsave("output/Phylum_Average_Barplot.png", width = 4.2, height = 4, dpi=600)
+ggsave("output/Fig3_Phylum_Average_Barplot.png", width = 4.2, height = 4, dpi=600)
 
 ```
 
@@ -444,7 +434,7 @@ top_df %>%
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
-ggsave("output/Genus_Average_Barplot.png", width = 3.5, height = 4, dpi=600)
+ggsave("output/Fig3_Genus_Average_Barplot.png", width = 3.5, height = 4, dpi=600)
 ```
 
 
@@ -478,7 +468,7 @@ pheatmap(log(df),
          color = my_colors,
          border_color = NA)
 
-ggsave("output/Genus_Heatmap.png", width = 6.5, height = 5, dpi=600)
+ggsave("output/Fig2_Genus_Heatmap.png", width = 6.5, height = 5, dpi=600)
 ```
 
 
@@ -497,7 +487,7 @@ ann_colors <- list(Type = c(Plaque = "#3185FC", Abscess = "#FF495C"))
 my_colors <- viridis(100, option = "inferno")
 
 # Plot heatmap with annotation
-p <- pheatmap(log(df),
+pheatmap(log(df),
          scale = "none",
          clustering_distance_rows = "correlation",
          clustering_distance_cols = "correlation",
@@ -509,11 +499,9 @@ p <- pheatmap(log(df),
          annotation_col = type_annot,
          annotation_colors = ann_colors,
          color = my_colors,
-         filename = "./output/Species_Heatmap.png",
-         height = 5,
-         width = 6.5,
          border_color = NA)
-p
+
+ggsave("output/FigS1_Species_Heatmap.png", width = 6.5, height = 5, dpi=600)
 ```
 
 
@@ -529,7 +517,7 @@ taxa_shifts_genus$combined_plot
 count_data_genus <- taxa_shifts_genus$bubble_data %>%
   pivot_wider(names_from = group2, values_from = count) 
 
-ggsave("output/Genus_Taxa_Shifts.png", taxa_shifts_genus$combined_plot, width = 7, height = 5, dpi=600)
+ggsave("output/Fig3_Genus_Taxa_Shifts.png", taxa_shifts_genus$combined_plot, width = 7, height = 5, dpi=600)
 ```
 
 
@@ -545,27 +533,71 @@ taxa_shifts_species$combined_plot
 count_data_species <- taxa_shifts_species$bubble_data %>%
   pivot_wider(names_from = group2, values_from = count) 
 
-ggsave("output/Species_Taxa_Shifts.png", taxa_shifts_species$combined_plot, width = 12, height = 5, dpi=600)
+ggsave("output/Fig3_Species_Taxa_Shifts.png", taxa_shifts_species$combined_plot, width = 12, height = 5, dpi=600)
 ```
 
 ```{r}
-taxa_trends_count_data <- dplyr::bind_rows(
-  count_data_genus %>% dplyr::mutate(Rank = "genus"),
-  count_data_species %>% dplyr::mutate(Rank = "species")
+table_s1 <- dplyr::bind_rows(
+  taxa_shifts_genus$data %>%
+    dplyr::mutate(Rank = "genus") %>%
+    dplyr::rename(
+      Taxon = Taxa_clean,
+      Enrichment = direction,
+      p_value = p,
+      BH_adjusted_p_value = padj,
+      difference_in_median = diff_median,
+      difference_in_mean = diff_mean
+    ) %>%
+    dplyr::select(
+      Rank, Taxon, n_pairs, n_plaque, n_abscess,
+      median_plaque, median_abscess, mean_plaque, mean_abscess,
+      p_value, difference_in_median, difference_in_mean,
+      Enrichment, BH_adjusted_p_value
+    ),
+  taxa_shifts_species$data %>%
+    dplyr::mutate(Rank = "species") %>%
+    dplyr::rename(
+      Taxon = Taxa_clean,
+      Enrichment = direction,
+      p_value = p,
+      BH_adjusted_p_value = padj,
+      difference_in_median = diff_median,
+      difference_in_mean = diff_mean
+    ) %>%
+    dplyr::select(
+      Rank, Taxon, n_pairs, n_plaque, n_abscess,
+      median_plaque, median_abscess, mean_plaque, mean_abscess,
+      p_value, difference_in_median, difference_in_mean,
+      Enrichment, BH_adjusted_p_value
+    )
 ) %>%
-  dplyr::relocate(Rank)
+  dplyr::relocate(Rank, Taxon)
 
-write_csv(taxa_trends_count_data, "output/taxa_trends_count_data.csv")
+write_csv(table_s1, "output/TableS1_S3.csv")
+
+table_s2 <- dplyr::bind_rows(
+  count_data_genus %>% dplyr::mutate(Level = "Genus"),
+  count_data_species %>% dplyr::mutate(Level = "Species")
+) %>%
+  dplyr::rename(
+    Taxa = Taxa_clean,
+    `Abscess Count` = A,
+    `Plaque Count` = P
+  ) %>%
+  dplyr::mutate(
+    `Overall Enrichment Direction` = dplyr::if_else(
+      `Abscess Count` > `Plaque Count`, "Abscess", "Plaque"
+    )
+  ) %>%
+  dplyr::select(Level, Taxa, `Abscess Count`, `Plaque Count`, `Overall Enrichment Direction`)
+
+write_csv(table_s2, "output/TableS2.csv")
 ```
 
 
 
 # 6.0 Differential Abundance
 ## 6.1 ANCOMBC2
-
-```{r}
-source("MK_Microbiome_Functions.R")
-```
 
 
 ### 6.1.1 Phylum
@@ -748,221 +780,11 @@ ALDEX_sp$results
 
 ## 6.4 Combine results
 
-### Fig 4A: Phylum
-```{r, fig.height=3.6, fig.width=3.2}
-DA_results_df_Phylum <- combine_DA(maaslin2_results_Phylum_0.05, ancombc2_results_df_Phylum, aldex2_res_Phylum, "Type", "Phylum")
-
-
-DA_results_df_Phylum$results
-
-```
-
-```{r, fig.width=6.2, fig.height=3}
-source("MK_Microbiome_Functions.R")
-
-
-phylum_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
-  CSV_formatted_relab_df = ps_fs_phylum_csv,
-  group = "Type",               # your contrast label used in ANCOMBC2 column names
-  tax_level = "Phylum",
-  heatmap_side = "Plaque",        # or "Abscess"
-  bubble_max_size = 9,
-  plot_layout_widths = c(2, 1))
-
-phylum_combined_bubbles_P$combined_plot
-ggsave("output/Phylum_DA_Bubble_Plaque_labs.png", phylum_combined_bubbles_P$combined_plot, width = 6.2, height = 3, dpi=600)
-
-phylum_bubbledata_P <- phylum_combined_bubbles_P$bubble_data %>% 
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Plaque")
-```
-
-```{r, fig.width=3.2, fig.height=1.1}
-phylum_combined_bubbles_P$combined_plot_nolabs
-
-ggsave("output/Phylum_DA_Bubble_Plaque_no-labs.png", phylum_combined_bubbles_P$combined_plot_nolabs, width = 3.2, height = 1.1, dpi=600)
-
-```
-
-
-```{r, fig.width=6, fig.height=3.4}
-phylum_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_Phylum,
-  CSV_formatted_relab_df = ps_fs_phylum_csv,
-  group = "Type",               # your contrast label used in ANCOMBC2 column names
-  tax_level = "Phylum",
-  heatmap_side = "Abscess",        
-  bubble_max_size = 9,
-  plot_layout_widths = c(2, 1))
-phylum_combined_bubbles_A$combined_plot
-
-ggsave("output/Phylum_DA_Bubble_Abscess_labs.png", phylum_combined_bubbles_A$combined_plot, width = 6, height = 3.4, dpi=600)
-
-phylum_bubbledata_A <- phylum_combined_bubbles_A$bubble_data %>% 
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Abscess")
-```
-
-
-
-```{r, fig.width=3.8, fig.height=1.45}
-phylum_combined_bubbles_A$combined_plot_nolabs
-
-ggsave("output/Phylum_DA_Bubble_Abscess_no-labs.png", phylum_combined_bubbles_A$combined_plot_nolabs, width = 3.8, height = 1.45, dpi=600)
-```
-
-```{r}
-# Combine the count data results and write to a file
-phylum_count_data <- phylum_bubbledata_A %>%
-  dplyr::full_join(phylum_bubbledata_P)
-```
-
-
-### Fig 4B: Genus
-
-
-```{r, fig.height=12, fig.width=3.9}
-DA_results_df_genus <- combine_DA(maaslin2_results_Genus_0.05, ancombc2_results_df_Genus, aldex2_res_Genus, "Type", "Genus", filter_confidence = NULL)
-
-DA_results_df_genus$results
-
-```
-
-```{r, fig.width=7.5, fig.height=8}
-genus_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_genus,
-  CSV_formatted_relab_df = ps_fs_genus_csv,
-  group = "Type",               # your contrast label used in ANCOMBC2 column names
-  tax_level = "genus",
-  heatmap_side = "Plaque",        # or "Abscess"
-  bubble_max_size = 9,
-  plot_layout_widths = c(2, 1))
-genus_combined_bubbles_P$combined_plot
-
-ggsave("output/Genus_DA_Bubble_Plaque_labs.png", genus_combined_bubbles_P$combined_plot, width = 7.5, height = 8, dpi=600)
-
-genus_bubbledata_P <- genus_combined_bubbles_P$bubble_data %>% 
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Plaque")
-```
-
-```{r,  eval=FALSE, fig.width=11.5, fig.height=9}
-genus_combined_bubbles_P$combined_plot_nolabs
-```
-
-```{r, fig.width=7.9, fig.height=6.8}
-
-genus_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_genus,
-  CSV_formatted_relab_df = ps_fs_genus_csv,
-  group = "Type",               
-  tax_level = "genus",
-  heatmap_side = "Abscess",        
-  bubble_max_size = 9,
-  plot_layout_widths = c(2, 1))
-genus_combined_bubbles_A$combined_plot
-
-ggsave("output/Genus_DA_Bubble_Abscess_labs.png", genus_combined_bubbles_A$combined_plot, width = 7.9, height = 6.8, dpi=600)
-
-genus_bubbledata_A <- genus_combined_bubbles_A$bubble_data %>% 
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Abscess")
-```
-
-```{r,  eval=FALSE,  fig.width=12, fig.height=7}
-genus_combined_bubbles_A$combined_plot_nolabs
-```
-
-```{r}
-# Combine the count data results and write to a file
-genus_count_data <- genus_bubbledata_A %>%
-  dplyr::full_join(genus_bubbledata_P)
-```
-
-
-
-### Fig 5: Species
-```{r, fig.height=11, fig.width=5.5}
-DA_results_df_sp <- combine_DA(maaslin2_results_Species_0.05, ancombc2_results_df_Species, aldex2_res_Species, "Type", "Species")
-
-DA_results_df_sp$results
-
-```
-
-```{r, fig.width=10.6, fig.height=11.1}
-sp_combined_bubbles_P <- combine_DA_with_bubbles(da = DA_results_df_sp,
-  CSV_formatted_relab_df = ps_fs_species_csv,
-  group = "Type",               
-  tax_level = "species",
-  heatmap_side = "Plaque",        
-  bubble_max_size = 7,
-  plot_layout_widths = c(2, 1))
-sp_combined_bubbles_P$combined_plot
-
-ggsave("output/Species_DA_Bubble_Plaque_labs.png", sp_combined_bubbles_P$combined_plot, width = 10.6, height = 11.1, dpi=600)
-
-sp_bubbledata_P <- sp_combined_bubbles_P$bubble_data %>% 
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Plaque")
-
-
-```
-
-
-```{r, fig.width=3.5, fig.height=12}
-sp_combined_bubbles_P$combined_plot_nolabs
-```
-
-```{r, fig.width=10.9, fig.height=7.2}
-species_combined_bubbles_A <- combine_DA_with_bubbles(da = DA_results_df_sp,
-  CSV_formatted_relab_df = ps_fs_species_csv,
-  group = "Type",               
-  tax_level = "species",
-  heatmap_side = "Abscess",        
-  bubble_max_size = 9,
-  plot_layout_widths = c(2, 1))
-species_combined_bubbles_A$combined_plot
-
-ggsave("output/Species_DA_Bubble_Abscess_labs.png", species_combined_bubbles_A$combined_plot, width = 10.9, height = 7.2, dpi=600)
-
-sp_bubbledata_A <- species_combined_bubbles_A$bubble_data %>% 
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Abscess")
-
-
-```
-
-
-```{r, fig.width=3.5, fig.height=6}
-species_combined_bubbles_A$combined_plot_nolabs
-```
-
-```{r}
-# Combine the count data results and write to a file
-sp_count_data <- sp_bubbledata_A %>%
-  dplyr::full_join(sp_bubbledata_P)
-```
-
-```{r}
-DA_combined_results <- dplyr::bind_rows(
-  DA_results_df_Phylum$results %>% dplyr::mutate(Rank = "phylum"),
-  DA_results_df_genus$results %>% dplyr::mutate(Rank = "genus"),
-  DA_results_df_sp$results %>% dplyr::mutate(Rank = "species")
-) %>%
-  dplyr::relocate(Rank)
-
-write_csv(DA_combined_results, "output/DA_combined_results.csv")
-
-DA_bubbledata_count_data <- dplyr::bind_rows(
-  phylum_count_data %>% dplyr::mutate(Rank = "phylum"),
-  genus_count_data %>% dplyr::mutate(Rank = "genus"),
-  sp_count_data %>% dplyr::mutate(Rank = "species")
-) %>%
-  dplyr::relocate(Rank)
-
-write_csv(DA_bubbledata_count_data, "output/DA_bubbledata_count_data.csv")
-```
+Primary combined tables use MaAsLin2 and ALDEx2 results from paired analyses and ANCOM-BC2 results from unpaired analyses (see section 6.7 for rationale). Tables are generated after section 6.5 so that unpaired ANCOM-BC2 results are available. Figures are generated in section 6.7.
 
 ## 6.5 Run non-paired samples
 
-Sensitivity analysis: repeat MaAsLin2, ALDEx2, and ANCOM-BC2 without pairing. Combined tables and figures mirror section 6.4, with `_unpaired` suffix on outputs.
+Sensitivity analysis: repeat MaAsLin2, ALDEx2, and ANCOM-BC2 without pairing. Combined tables are exported to CSV only (no figures).
 
 ### 6.5.1 ANCOMBC2 (unpaired)
 
@@ -1064,10 +886,32 @@ ALDEX_sp_unpaired <- run_aldex2(ps_fs,
                  plot_colors = colors_all)
 ```
 
-### 6.5.4 Combine results (unpaired)
+### 6.4 Combine results (primary tables)
 
-#### Phylum
-```{r, fig.height=3.6, fig.width=3.2}
+```{r}
+source("MK_Microbiome_Functions.R")
+
+DA_results_df_Phylum <- combine_DA_primary(ps_fs, "Phylum", group = "Type", plot_colors = colors_all)
+DA_results_df_genus <- combine_DA_primary(ps_fs, "Genus", group = "Type", plot_colors = colors_all)
+DA_results_df_sp <- combine_DA_primary(ps_fs, "Species", group = "Type", plot_colors = colors_all)
+
+DA_results_df_Phylum$results
+DA_results_df_genus$results
+DA_results_df_sp$results
+
+DA_combined_results <- dplyr::bind_rows(
+  DA_results_df_Phylum$results %>% dplyr::mutate(Rank = "phylum"),
+  DA_results_df_genus$results %>% dplyr::mutate(Rank = "genus"),
+  DA_results_df_sp$results %>% dplyr::mutate(Rank = "species")
+) %>%
+  dplyr::relocate(Rank)
+
+write_csv(DA_combined_results, "output/TableS4_DA_combined_results.csv")
+```
+
+### 6.5.4 Combine results (unpaired sensitivity)
+
+```{r}
 DA_results_unpaired_Phylum <- combine_DA(
   maaslin2_results_Phylum_0.05,
   ancombc2_results_df_Phylum,
@@ -1076,64 +920,6 @@ DA_results_unpaired_Phylum <- combine_DA(
   "Phylum"
 )
 
-DA_results_unpaired_Phylum$results
-```
-
-```{r, fig.width=6.2, fig.height=3}
-phylum_unpaired_bubbles_P <- combine_DA_with_bubbles(
-  da = DA_results_unpaired_Phylum,
-  CSV_formatted_relab_df = ps_fs_phylum_csv,
-  group = "Type",
-  tax_level = "Phylum",
-  heatmap_side = "Plaque",
-  bubble_max_size = 9,
-  plot_layout_widths = c(2, 1)
-)
-
-phylum_unpaired_bubbles_P$combined_plot
-ggsave("output/Phylum_DA_Bubble_Plaque_labs_unpaired.png", phylum_unpaired_bubbles_P$combined_plot, width = 6.2, height = 3, dpi = 600)
-
-phylum_unpaired_bubbledata_P <- phylum_unpaired_bubbles_P$bubble_data %>%
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Plaque")
-```
-
-```{r, fig.width=3.2, fig.height=1.1}
-phylum_unpaired_bubbles_P$combined_plot_nolabs
-ggsave("output/Phylum_DA_Bubble_Plaque_no-labs_unpaired.png", phylum_unpaired_bubbles_P$combined_plot_nolabs, width = 3.2, height = 1.1, dpi = 600)
-```
-
-```{r, fig.width=6, fig.height=3.4}
-phylum_unpaired_bubbles_A <- combine_DA_with_bubbles(
-  da = DA_results_unpaired_Phylum,
-  CSV_formatted_relab_df = ps_fs_phylum_csv,
-  group = "Type",
-  tax_level = "Phylum",
-  heatmap_side = "Abscess",
-  bubble_max_size = 9,
-  plot_layout_widths = c(2, 1)
-)
-
-phylum_unpaired_bubbles_A$combined_plot
-ggsave("output/Phylum_DA_Bubble_Abscess_labs_unpaired.png", phylum_unpaired_bubbles_A$combined_plot, width = 6, height = 3.4, dpi = 600)
-
-phylum_unpaired_bubbledata_A <- phylum_unpaired_bubbles_A$bubble_data %>%
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Abscess")
-```
-
-```{r, fig.width=3.8, fig.height=1.45}
-phylum_unpaired_bubbles_A$combined_plot_nolabs
-ggsave("output/Phylum_DA_Bubble_Abscess_no-labs_unpaired.png", phylum_unpaired_bubbles_A$combined_plot_nolabs, width = 3.8, height = 1.45, dpi = 600)
-```
-
-```{r}
-phylum_unpaired_count_data <- phylum_unpaired_bubbledata_A %>%
-  dplyr::full_join(phylum_unpaired_bubbledata_P)
-```
-
-#### Genus
-```{r, fig.height=12, fig.width=3.9}
 DA_results_unpaired_genus <- combine_DA(
   maaslin2_results_Genus_0.05,
   ancombc2_results_df_Genus,
@@ -1142,62 +928,6 @@ DA_results_unpaired_genus <- combine_DA(
   "Genus"
 )
 
-DA_results_unpaired_genus$results
-```
-
-```{r, fig.width=7.5, fig.height=8}
-genus_unpaired_bubbles_P <- combine_DA_with_bubbles(
-  da = DA_results_unpaired_genus,
-  CSV_formatted_relab_df = ps_fs_genus_csv,
-  group = "Type",
-  tax_level = "genus",
-  heatmap_side = "Plaque",
-  bubble_max_size = 9,
-  plot_layout_widths = c(2, 1)
-)
-
-genus_unpaired_bubbles_P$combined_plot
-ggsave("output/Genus_DA_Bubble_Plaque_labs_unpaired.png", genus_unpaired_bubbles_P$combined_plot, width = 7.5, height = 8, dpi = 600)
-
-genus_unpaired_bubbledata_P <- genus_unpaired_bubbles_P$bubble_data %>%
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Plaque")
-```
-
-```{r, eval=FALSE, fig.width=11.5, fig.height=9}
-genus_unpaired_bubbles_P$combined_plot_nolabs
-```
-
-```{r, fig.width=7.9, fig.height=6.8}
-genus_unpaired_bubbles_A <- combine_DA_with_bubbles(
-  da = DA_results_unpaired_genus,
-  CSV_formatted_relab_df = ps_fs_genus_csv,
-  group = "Type",
-  tax_level = "genus",
-  heatmap_side = "Abscess",
-  bubble_max_size = 9,
-  plot_layout_widths = c(2, 1)
-)
-
-genus_unpaired_bubbles_A$combined_plot
-ggsave("output/Genus_DA_Bubble_Abscess_labs_unpaired.png", genus_unpaired_bubbles_A$combined_plot, width = 7.9, height = 6.8, dpi = 600)
-
-genus_unpaired_bubbledata_A <- genus_unpaired_bubbles_A$bubble_data %>%
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Abscess")
-```
-
-```{r, eval=FALSE, fig.width=12, fig.height=7}
-genus_unpaired_bubbles_A$combined_plot_nolabs
-```
-
-```{r}
-genus_unpaired_count_data <- genus_unpaired_bubbledata_A %>%
-  dplyr::full_join(genus_unpaired_bubbledata_P)
-```
-
-#### Species
-```{r, fig.height=11, fig.width=5.5}
 DA_results_unpaired_sp <- combine_DA(
   maaslin2_results_Species_0.05,
   ancombc2_results_df_Species,
@@ -1206,79 +936,214 @@ DA_results_unpaired_sp <- combine_DA(
   "Species"
 )
 
-DA_results_unpaired_sp$results
-```
-
-```{r, fig.width=10.6, fig.height=11.1}
-sp_unpaired_bubbles_P <- combine_DA_with_bubbles(
-  da = DA_results_unpaired_sp,
-  CSV_formatted_relab_df = ps_fs_species_csv,
-  group = "Type",
-  tax_level = "species",
-  heatmap_side = "Plaque",
-  bubble_max_size = 7,
-  plot_layout_widths = c(2, 1)
-)
-
-sp_unpaired_bubbles_P$combined_plot
-ggsave("output/Species_DA_Bubble_Plaque_labs_unpaired.png", sp_unpaired_bubbles_P$combined_plot, width = 10.6, height = 11.1, dpi = 600)
-
-sp_unpaired_bubbledata_P <- sp_unpaired_bubbles_P$bubble_data %>%
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Plaque")
-```
-
-```{r, fig.width=3.5, fig.height=12}
-sp_unpaired_bubbles_P$combined_plot_nolabs
-```
-
-```{r, fig.width=10.9, fig.height=7.2}
-sp_unpaired_bubbles_A <- combine_DA_with_bubbles(
-  da = DA_results_unpaired_sp,
-  CSV_formatted_relab_df = ps_fs_species_csv,
-  group = "Type",
-  tax_level = "species",
-  heatmap_side = "Abscess",
-  bubble_max_size = 9,
-  plot_layout_widths = c(2, 1)
-)
-
-sp_unpaired_bubbles_A$combined_plot
-ggsave("output/Species_DA_Bubble_Abscess_labs_unpaired.png", sp_unpaired_bubbles_A$combined_plot, width = 10.9, height = 7.2, dpi = 600)
-
-sp_unpaired_bubbledata_A <- sp_unpaired_bubbles_A$bubble_data %>%
-  pivot_wider(names_from = group2, values_from = count) %>%
-  dplyr::mutate(Type = "Abscess")
-```
-
-```{r, fig.width=3.5, fig.height=6}
-sp_unpaired_bubbles_A$combined_plot_nolabs
-```
-
-```{r}
-sp_unpaired_count_data <- sp_unpaired_bubbledata_A %>%
-  dplyr::full_join(sp_unpaired_bubbledata_P)
-
 DA_combined_results_unpaired <- dplyr::bind_rows(
   DA_results_unpaired_Phylum$results %>% dplyr::mutate(Rank = "phylum", pairing = "unpaired"),
   DA_results_unpaired_genus$results %>% dplyr::mutate(Rank = "genus", pairing = "unpaired"),
   DA_results_unpaired_sp$results %>% dplyr::mutate(Rank = "species", pairing = "unpaired")
 ) %>%
   dplyr::relocate(Rank, pairing)
-
-write_csv(DA_combined_results_unpaired, "output/DA_combined_results_unpaired.csv")
-
-DA_bubbledata_count_data_unpaired <- dplyr::bind_rows(
-  phylum_unpaired_count_data %>% dplyr::mutate(Rank = "phylum", pairing = "unpaired"),
-  genus_unpaired_count_data %>% dplyr::mutate(Rank = "genus", pairing = "unpaired"),
-  sp_unpaired_count_data %>% dplyr::mutate(Rank = "species", pairing = "unpaired")
-) %>%
-  dplyr::relocate(Rank, pairing)
-
-write_csv(DA_bubbledata_count_data_unpaired, "output/DA_bubbledata_count_data_unpaired.csv")
 ```
 
-## 6.6 Per taxa plots
+## 6.6 Paired vs unpaired comparison
+
+Compare the number of significant taxa at each rank for `paired = TRUE` vs `paired = FALSE` within each DA method. Taxa exclusive to one pairing setting are listed separately.
+
+```{r}
+source("MK_Microbiome_Functions.R")
+
+da_pairing_comparison <- compare_da_pairing(
+  ps_obj = ps_fs,
+  group = "Type",
+  tax_levels = c("Phylum", "Genus", "Species"),
+  plot_colors = colors_all,
+  maaslin_qval_threshold = 0.05,
+  ancom_log2fc_cutoffs = c(Phylum = 0.5, Genus = NA, Species = NA),
+  aldex_method = "t.test",
+  aldex_pvalue_cutoff = 0.05,
+  aldex_mc_samples = 128
+)
+
+da_pairing_comparison$summary %>%
+  knitr::kable(caption = "Significant taxa counts: paired vs unpaired")
+
+da_pairing_comparison$unique_taxa
+
+write_csv(da_pairing_comparison$summary, "output/TableS11_DA_pairing_comparison_summary.csv")
+```
+
+## 6.7 Combined DA figures (primary analysis)
+
+To assess whether accounting for the matched study design influenced differential abundance inference, we repeated MaAsLin2, ANCOM-BC2, and ALDEx2 analyses with and without pairing at the phylum, genus, and species levels. Independent of these tests, other analyses indicated clear separation between plaque and abscess communities in this cohort, supporting the presence of biologically meaningful group differences. MaAsLin2 and ALDEx2 identified substantial numbers of significant taxa under paired analysis, consistent with detection of within-patient plaque–abscess differences after accounting for inter-individual variation. In contrast, paired ANCOM-BC2 identified very few significant taxa, whereas the unpaired analysis returned a larger set of discoveries, suggesting that pairing in ANCOM-BC2 was overly conservative in this dataset. We therefore used **paired MaAsLin2 and ALDEx2** and **unpaired ANCOM-BC2** for the primary combined figures below.
+
+### Fig 4A: Phylum
+```{r, fig.width=7, fig.height=3}
+source("MK_Microbiome_Functions.R")
+DA_results_df_Phylum <- combine_DA_primary(ps_fs, "Phylum", group = "Type", plot_colors = colors_all)
+
+phylum_combined_bubbles_P <- combine_DA_with_bubbles(
+  da = DA_results_df_Phylum,
+  CSV_formatted_relab_df = ps_fs_phylum_csv,
+  group = "Type",
+  tax_level = "Phylum",
+  heatmap_side = "Plaque",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+phylum_combined_bubbles_P$combined_plot
+ggsave("output/Fig4_Phylum_DA_Bubble_Plaque_labs.png", phylum_combined_bubbles_P$combined_plot, width = 7, height = 3.1, dpi = 600)
+
+phylum_bubbledata_P <- phylum_combined_bubbles_P$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Plaque")
+```
+
+
+```{r, fig.width=5.2, fig.height=3.1}
+phylum_combined_bubbles_A <- combine_DA_with_bubbles(
+  da = DA_results_df_Phylum,
+  CSV_formatted_relab_df = ps_fs_phylum_csv,
+  group = "Type",
+  tax_level = "Phylum",
+  heatmap_side = "Abscess",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+phylum_combined_bubbles_A$combined_plot
+ggsave("output/Fig4_Phylum_DA_Bubble_Abscess_labs.png", phylum_combined_bubbles_A$combined_plot, width = 5.2, height = 3.1, dpi = 600)
+
+phylum_bubbledata_A <- phylum_combined_bubbles_A$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Abscess")
+```
+
+
+### Fig 4B: Genus
+```{r, fig.width=7.5, fig.height=8}
+DA_results_df_genus <- combine_DA_primary(ps_fs, "Genus", group = "Type", plot_colors = colors_all)
+
+genus_combined_bubbles_P <- combine_DA_with_bubbles(
+  da = DA_results_df_genus,
+  CSV_formatted_relab_df = ps_fs_genus_csv,
+  group = "Type",
+  tax_level = "genus",
+  heatmap_side = "Plaque",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+genus_combined_bubbles_P$combined_plot
+ggsave("output/Fig4_Genus_DA_Bubble_Plaque_labs.png", genus_combined_bubbles_P$combined_plot, width = 7.5, height = 8, dpi = 600)
+
+genus_bubbledata_P <- genus_combined_bubbles_P$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Plaque")
+```
+
+
+```{r, fig.width=7.9, fig.height=6.8}
+genus_combined_bubbles_A <- combine_DA_with_bubbles(
+  da = DA_results_df_genus,
+  CSV_formatted_relab_df = ps_fs_genus_csv,
+  group = "Type",
+  tax_level = "genus",
+  heatmap_side = "Abscess",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+genus_combined_bubbles_A$combined_plot
+ggsave("output/Fig4_Genus_DA_Bubble_Abscess_labs.png", genus_combined_bubbles_A$combined_plot, width = 7.9, height = 6.8, dpi = 600)
+
+genus_bubbledata_A <- genus_combined_bubbles_A$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Abscess")
+```
+
+
+### Fig 5: Species
+```{r, fig.width=8, fig.height=12}
+
+source("MK_Microbiome_Functions.R")
+species_combined_bubbles_P <- combine_DA_with_bubbles(
+  da = DA_results_df_sp,
+  CSV_formatted_relab_df = ps_fs_species_csv,
+  group = "Type",
+  tax_level = "Species",
+  heatmap_side = "Plaque",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+species_combined_bubbles_P$combined_plot
+ggsave(
+  "output/Fig5_Species_DA_Bubble_Plaque_labs.png",
+  species_combined_bubbles_P$combined_plot,
+  width = 11,
+  height = 12,
+  dpi = 600
+)
+
+sp_bubbledata_P <- species_combined_bubbles_P$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Plaque")
+```
+
+```{r, fig.width=8, fig.height=10}
+species_combined_bubbles_A <- combine_DA_with_bubbles(
+  da = DA_results_df_sp,
+  CSV_formatted_relab_df = ps_fs_species_csv,
+  group = "Type",
+  tax_level = "Species",
+  heatmap_side = "Abscess",
+  bubble_max_size = 9,
+  plot_layout_widths = c(2, 1)
+)
+
+species_combined_bubbles_A$combined_plot
+ggsave(
+  "output/Fig5_Species_DA_Bubble_Abscess_labs.png",
+  species_combined_bubbles_A$combined_plot,
+  width = 11.5,
+  height = 8,
+  dpi = 600
+)
+
+sp_bubbledata_A <- species_combined_bubbles_A$bubble_data %>%
+  pivot_wider(names_from = group2, values_from = count) %>%
+  dplyr::mutate(Type = "Abscess")
+```
+
+
+```{r}
+phylum_count_data <- phylum_bubbledata_A %>% dplyr::full_join(phylum_bubbledata_P)
+genus_count_data <- genus_bubbledata_A %>% dplyr::full_join(genus_bubbledata_P)
+sp_count_data <- sp_bubbledata_A %>% dplyr::full_join(sp_bubbledata_P)
+
+table_s5 <- dplyr::bind_rows(
+  phylum_count_data %>% dplyr::mutate(Level = "Phylum"),
+  genus_count_data %>% dplyr::mutate(Level = "Genus"),
+  sp_count_data %>% dplyr::mutate(Level = "Species")
+) %>%
+  dplyr::rename(
+    Confidence = confidence,
+    Taxa = taxon,
+    `Abscess Count` = A,
+    `Plaque Count` = P,
+    Enrichment = Type
+  ) %>%
+  dplyr::mutate(
+    Confidence = stringr::str_to_title(Confidence)
+  ) %>%
+  dplyr::select(Level, Confidence, Taxa, `Abscess Count`, `Plaque Count`, Enrichment)
+
+write_csv(table_s5, "output/TableS5.csv")
+```
+
+## 6.8 Per taxa plots
+
+
 
 ### Fig S3A: Fusobacteria phylum
 ```{r, fig.width=2.5, fig.height=2.8}
@@ -1290,7 +1155,7 @@ plot_all_taxa(ps_obj = ps_fs,
               plot_colors = colors_all,
               taxa_filter = c("p__Fusobacteria" ))
 
-ggsave("output/Selected_Phyla_Fusobacteria_Dotplot_TSS.png", width = 2.5, height = 2.8, dpi=600)
+ggsave("output/FigS3_Selected_Phyla_Fusobacteria_Dotplot_TSS.png", width = 2.5, height = 2.8, dpi=600)
 ```
 ```{r, fig.width=2.5, fig.height=2.8}
 plot_all_taxa(ps_obj = ps_fs,
@@ -1301,7 +1166,7 @@ plot_all_taxa(ps_obj = ps_fs,
               plot_colors = colors_all,
               taxa_filter = c("p__Fusobacteria" ))
 
-ggsave("output/Selected_Phyla_Fusobacteria_Dotplot_CLR.png", width = 2.5, height = 2.8, dpi=600)
+ggsave("output/FigS3_Selected_Phyla_Fusobacteria_Dotplot_CLR.png", width = 2.5, height = 2.8, dpi=600)
 ```
 
 ### Fig S2A-B: Selected Genus Plots
@@ -1314,7 +1179,7 @@ plot_all_taxa(ps_obj = ps_fs,
               plot_colors = colors_all,
               taxa_filter = c( "g__Actinomyces", "g__Corynebacterium", "g__Leptotrichia","g__Dialister", "g__Treponema",  "g__Veillonellaceae_[G-1]"))
 
-ggsave("output/Selected_Genus_Dotplot_1.png", width = 8, height = 3, dpi=600)
+ggsave("output/FigS2_Selected_Genus_Dotplot_1.png", width = 8, height = 3, dpi=600)
 ```
 
 ```{r, fig.width=8, fig.height=3}
@@ -1326,7 +1191,7 @@ plot_all_taxa(ps_obj = ps_fs,
               plot_colors = colors_all,
               taxa_filter = c("g__Lautropia", "g__Neisseria",  "g__Rothia", "g__Lancefieldella", "g__Oribacterium", "g__Solobacterium"))
 
-ggsave("output/Selected_Genus_Dotplot_2.png", width = 8, height = 3, dpi=600)
+ggsave("output/FigS2_Selected_Genus_Dotplot_2.png", width = 8, height = 3, dpi=600)
 ```
 
 ### Fig S3B: Fusobacterium genus
@@ -1339,7 +1204,7 @@ clr_fuso <- plot_all_taxa(ps_obj = ps_fs,
               plot_colors = colors_all,
               taxa_filter = c("g__Fusobacterium"))
 clr_fuso
-ggsave("output/Selected_Genus_CLR_Fusobacterium_Dotplot.png", clr_fuso, width = 2.5, height = 3, dpi=600)
+ggsave("output/FigS3_Selected_Genus_CLR_Fusobacterium_Dotplot.png", clr_fuso, width = 2.5, height = 3, dpi=600)
 
 tss_fuso <- plot_all_taxa(ps_obj = ps_fs,
               transformation = "TSS",
@@ -1349,7 +1214,7 @@ tss_fuso <- plot_all_taxa(ps_obj = ps_fs,
               plot_colors = colors_all,
               taxa_filter = c("g__Fusobacterium"))
 tss_fuso
-ggsave("output/Selected_Genus_TSS_Fusobacterium_Dotplot.png", tss_fuso, width = 2.5, height = 3, dpi=600)
+ggsave("output/FigS3_Selected_Genus_TSS_Fusobacterium_Dotplot.png", tss_fuso, width = 2.5, height = 3, dpi=600)
 
 ```
 
@@ -1363,7 +1228,7 @@ sp_fuso_tss <- plot_all_taxa(ps_obj = ps_fs,
               plot_colors = colors_all,
               taxa_filter = c("g__Fusobacterium_s__nucleatum", "g__Fusobacterium_s__periodonticum"))
 sp_fuso_tss
-ggsave("output/Selected_Species_TSS_Fusobacterium_Dotplot.png", sp_fuso_tss, width = 4, height = 3, dpi=600)
+ggsave("output/FigS3_Selected_Species_TSS_Fusobacterium_Dotplot.png", sp_fuso_tss, width = 4, height = 3, dpi=600)
 
 sp_fuso_clr <- plot_all_taxa(ps_obj = ps_fs,
               transformation = "CLR",
@@ -1373,7 +1238,7 @@ sp_fuso_clr <- plot_all_taxa(ps_obj = ps_fs,
               plot_colors = colors_all,
               taxa_filter = c("g__Fusobacterium_s__nucleatum", "g__Fusobacterium_s__periodonticum"))
 sp_fuso_clr
-ggsave("output/Selected_Species_CLR_Fusobacterium_Dotplot.png", sp_fuso_clr, width = 4, height = 3, dpi=600)
+ggsave("output/FigS3_Selected_Species_CLR_Fusobacterium_Dotplot.png", sp_fuso_clr, width = 4, height = 3, dpi=600)
 ```
 
 
@@ -1464,7 +1329,7 @@ p <- pheatmap(log(mat),
          main = "Feature Ranks per Fold")
 p 
 
-#ggsave("output/RF_Feature_Ranks_per_Fold_Heatmap.png", p, width = 3.8, height = 4, dpi=600)
+ggsave("output/FigS6_RF_Feature_Ranks_per_Fold_Heatmap.png", p, width = 3.8, height = 4, dpi=600)
 ```
 
 
@@ -1492,7 +1357,7 @@ roc_p <- ggplot(lift_df) +
   theme_bw()
 roc_p
 
-ggsave("output/RF_ROC_Curve_per_Fold.png", roc_p, width = 4, height = 3, dpi=600)
+ggsave("output/Fig6_RF_ROC_Curve_per_Fold.png", roc_p, width = 4, height = 3, dpi=600)
 ```
 
 
@@ -1623,12 +1488,14 @@ p <- pheatmap(
   display_numbers = round(as.matrix(mat), 1),
   fontsize_number = 10,
   main = "Feature Ranks per Fold",
-  filename = "output/RF_Feature_Ranks_per_Fold_Heatmap_species.png",
+  filename = "output/FigS4_RF_Feature_Ranks_per_Fold_Heatmap_species.png",
   width = 5,
   height = 5
 )
 
 p
+ggsave("output/FigS4_RF_Feature_Ranks_per_Fold_Heatmap.png", p, width = 5, height = 5, dpi=600)
+
 ```
 
 
@@ -1656,7 +1523,7 @@ roc_p <- ggplot(lift_df) +
   theme_bw()
 roc_p
 
-ggsave("output/RF_ROC_Curve_per_Fold_species.png", roc_p, width = 4, height = 3, dpi=600)
+ggsave("output/FigS4_RF_ROC_Curve_per_Fold_species.png", roc_p, width = 4, height = 3, dpi=600)
 ```
 
 
@@ -1828,8 +1695,6 @@ plot <- ggplot(core_df_genus, aes(x = prevalence, y = Genera, fill = value)) +
     legend.text = element_text(size = 8)
   )
 
-ggsave("output/Core_Genera_Heatmap.png", plot, width = 5, height = 5, dpi=600)
-
 ```
 
 # 9.0 Topic modeling: Genus
@@ -1850,10 +1715,6 @@ iterate_res$results %>%
     sil_rank = min_rank(dplyr::desc(sil_sum))) %>% # Rank from highest to lowest
     arrange(sil_rank) %>% kable() 
 
-# %>%
-#     kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-#                 full_width = F,
-#                 position = "center")
 ```
 
 ## Prep and scale input
@@ -1885,7 +1746,7 @@ metric_plot_genus <- res_genus$plot +
 
 
 
-ggsave("output/Topic_Model_FindTopicsNumber_Genus.png", metric_plot_genus, width = 6, height = 4, dpi=600)
+ggsave("output/FigS5_Topic_Model_FindTopicsNumber_Genus.png", metric_plot_genus, width = 6, height = 4, dpi=600)
 
 res_genus$metrics_df
 ```
@@ -1923,7 +1784,7 @@ plot_genus <- plot_genus + scale_x_discrete(labels = c("Abscess" = "A", "Plaque"
 
 plot_genus
 
-ggsave("output/Topic_Model_Topic_Membership_by_Type_Genus.png", plot_genus, width = 8.4, height = 2.5, dpi=600)
+ggsave("output/FigS8_Topic_Model_Topic_Membership_by_Type_Genus.png", plot_genus, width = 8.4, height = 2.5, dpi=600)
 ```
 
 
@@ -1939,7 +1800,7 @@ my_colors <- c("1" = "#3185FC", "4" = "#3185FC","6" = "#3185FC","3" = "#FF495C",
 p_genus <- plot_beta(result_genus, 10, result_genus$b_df,  fill_colors = my_colors)
 p_genus
 
-ggsave("output/Topic_Model_Beta_Barplots_Genus.png", p_genus, width = 20, height = 3, dpi=600)
+ggsave("output/FigS8_Topic_Model_Beta_Barplots_Genus.png", p_genus, width = 20, height = 3, dpi=600)
 ```
 
 
@@ -1959,14 +1820,10 @@ dev.off()
 ```{r fig.height=6, fig.width=6}
 UMAP_res_genus <- plot_gamma_umap(results_genus, "Type", colors_all, result_genus$g_df)
 UMAP_res_genus$umap
-
-ggsave("output/Topic_Model_Gamma_UMAP_Genus.png", UMAP_res_genus$umap, width = 5, height = 4, dpi=600)
 ```
 
 ```{r, fig.width=3, fig.height=3}
 UMAP_res_genus$sil_plot
-
-ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Genus.png", UMAP_res_genus$sil_plot, width = 3, height = 3, dpi=600)
 ```
 
 
@@ -1974,7 +1831,7 @@ ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Genus.png", UMAP_res_genus$sil_
 ```{r, fig.height=2, fig.width=7}
 topic1_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 1)
 
-png("output/Topic_Model_RelAb_Heatmap_Topic1_genus.png",
+png("output/FigS9_Topic_Model_RelAb_Heatmap_Topic1_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic1_res_genus$heatmap)
@@ -1987,7 +1844,7 @@ draw_heatmap(topic1_res_genus$heatmap)
 ```{r, fig.height=2, fig.width=7.5}
 topic2_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 2)
 
-png("output/Topic_Model_RelAb_Heatmap_Topic2_genus.png",
+png("output/FigS9_Topic_Model_RelAb_Heatmap_Topic2_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic2_res_genus$heatmap)  # <- explicitly use this one
@@ -2001,7 +1858,7 @@ draw_heatmap(topic2_res_genus$heatmap)
 ```{r, fig.height=2.5, fig.width=6.5}
 topic3_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 3)
 
-png("output/Topic_Model_RelAb_Heatmap_Topic3_genus.png",
+png("output/FigS9_Topic_Model_RelAb_Heatmap_Topic3_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic3_res_genus$heatmap)  # <- explicitly use this one
@@ -2014,7 +1871,7 @@ draw_heatmap(topic3_res_genus$heatmap)
 ```{r, fig.height=2, fig.width=7}
 topic4_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 4)
 
-png("output/Topic_Model_RelAb_Heatmap_Topic4_genus.png",
+png("output/FigS9_Topic_Model_RelAb_Heatmap_Topic4_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic4_res_genus$heatmap)  # <- explicitly use this one
@@ -2029,7 +1886,7 @@ draw_heatmap(topic4_res_genus$heatmap)
 topic5_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 5)
 
 
-png("output/Topic_Model_RelAb_Heatmap_Topic5_genus.png",
+png("output/FigS9_Topic_Model_RelAb_Heatmap_Topic5_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic5_res_genus$heatmap)
@@ -2043,7 +1900,7 @@ draw_heatmap(topic5_res_genus$heatmap)
 topic6_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 6)
 
 
-png("output/Topic_Model_RelAb_Heatmap_Topic6_genus.png",
+png("output/FigS9_Topic_Model_RelAb_Heatmap_Topic6_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic6_res_genus$heatmap)
@@ -2057,7 +1914,7 @@ draw_heatmap(topic6_res_genus$heatmap)
 topic7_res_genus <- heatmap_by_topic(result_genus$b_df, ps_fs_genus_csv, n_top = 10, topic_no = 7)
 
 
-png("output/Topic_Model_RelAb_Heatmap_Topic7_genus.png",
+png("output/FigS9_Topic_Model_RelAb_Heatmap_Topic7_genus.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic7_res_genus$heatmap)
@@ -2086,10 +1943,6 @@ iterate_res$results %>%
     sil_rank = min_rank(dplyr::desc(sil_sum))) %>% # Rank from highest to lowest
     arrange(sil_rank) %>% kable() 
 
-# %>%
-#     kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-#                 full_width = F,
-#                 position = "center")
 ```
 
 ## Prep and scale input
@@ -2119,7 +1972,7 @@ metric_plot_species <- res_species$plot +
   )
 metric_plot_species
 
-ggsave("output/Topic_Model_FindTopicsNumber_Species.png", metric_plot_species, width = 6, height = 4, dpi=600)
+ggsave("output/FigS5_Topic_Model_FindTopicsNumber_Species.png", metric_plot_species, width = 6, height = 4, dpi=600)
 
 res_species$metrics_df
 ```
@@ -2155,7 +2008,7 @@ plot_species <- plot_species + scale_x_discrete(labels = c("Abscess" = "A", "Pla
   )
 plot_species
 
-ggsave("output/Topic_Model_Topic_Membership_by_Type_Species.png", plot_species, width = 7.4, height = 2.5, dpi=600)
+ggsave("output/Fig7_Topic_Model_Topic_Membership_by_Type_Species.png", plot_species, width = 7.4, height = 2.5, dpi=600)
 ```
 
 ## Fig 7E: Plot beta
@@ -2168,18 +2021,17 @@ my_colors <- c("1" = "grey", "2" = "#3185FC", "3" = "#FF495C", "4"= "#3185FC", "
 
 result_species$b_df$topic <- factor(result_species$b_df$topic, levels = c("2", "4", "3", "1", "5", "6"))
 
-#my_colors <- c("1" = "#3185FC", "2" = "#3185FC", "3" = "#FF495C", "4" ="#FF495C" , "5" = "grey")
 p <- plot_beta(result_species, 10, result_species$b_df,  fill_colors = my_colors)
 p 
 
-ggsave("output/Topic_Model_Beta_Barplots_Species.png", p, width = 25, height = 3, dpi=600)
+ggsave("output/Fig7-FigS7_Topic_Model_Beta_Barplots_Species.png", p, width = 25, height = 3, dpi=600)
 ```
 
 ## Fig 7B: Heatmap of gamma scores 
 ```{r, fig.height=2.3, fig.width=9}
 heatmap_gamma_species <- heatmap_gamma(result_species, "Type", result_species$g_df)
 
-png("output/Topic_Model_Gamma_Heatmap_Species.png",
+png("output/Fig7_Topic_Model_Gamma_Heatmap_Species.png",
     width = 9, height = 2.3, units = "in", res = 600)
 
 draw_heatmap(heatmap_gamma_species)  # <- explicitly use this one
@@ -2193,13 +2045,11 @@ dev.off()
 UMAP_res_sp <- plot_gamma_umap(result_species, "Type", colors_all, result_species$g_df)
 UMAP_res_sp$umap
 
-ggsave("output/Topic_Model_Gamma_UMAP_Species.png", UMAP_res_sp$umap, width = 5, height = 4, dpi=600)
+ggsave("output/Fig7_Topic_Model_Gamma_UMAP_Species.png", UMAP_res_sp$umap, width = 5, height = 4, dpi=600)
 ```
 
 ```{r, fig.width=3, fig.height=3}
 UMAP_res_sp$sil_plot
-
-ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Species.png", UMAP_res_sp$sil_plot, width = 3, height = 3, dpi=600)
 ```
 
 
@@ -2208,7 +2058,7 @@ ggsave("output/Topic_Model_Gamma_UMAP_Silhouette_Species.png", UMAP_res_sp$sil_p
 ```{r, fig.height=2, fig.width=7}
 topic1_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic_no = 1)
 
-png("output/Topic_Model_RelAb_Heatmap_Topic1_Species.png",
+png("output/FigS6_Topic_Model_RelAb_Heatmap_Topic1_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic1_res_species$heatmap)
@@ -2221,7 +2071,7 @@ draw_heatmap(topic1_res_species$heatmap)
 ```{r, fig.height=2, fig.width=7.5}
 topic2_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 12, topic_no = 2)
 
-png("output/Topic_Model_RelAb_Heatmap_Topic2_Species.png",
+png("output/FigS6_Topic_Model_RelAb_Heatmap_Topic2_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic2_res_species$heatmap)  # <- explicitly use this one
@@ -2235,7 +2085,7 @@ draw_heatmap(topic2_res_species$heatmap)
 ```{r, fig.height=2.5, fig.width=6.5}
 topic3_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 12, topic_no = 3)
 
-png("output/Topic_Model_RelAb_Heatmap_Topic3_Species.png",
+png("output/FigS6_Topic_Model_RelAb_Heatmap_Topic3_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic3_res_species$heatmap)  # <- explicitly use this one
@@ -2248,7 +2098,7 @@ draw_heatmap(topic3_res_species$heatmap)
 ```{r, fig.height=2, fig.width=7}
 topic4_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic_no = 4)
 
-png("output/Topic_Model_RelAb_Heatmap_Topic4_Species.png",
+png("output/FigS6_Topic_Model_RelAb_Heatmap_Topic4_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic4_res_species$heatmap)  # <- explicitly use this one
@@ -2263,7 +2113,7 @@ draw_heatmap(topic4_res_species$heatmap)
 topic5_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic_no = 5)
 
 
-png("output/Topic_Model_RelAb_Heatmap_Topic5_Species.png",
+png("output/FigS6_Topic_Model_RelAb_Heatmap_Topic5_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic5_res_species$heatmap)
@@ -2277,7 +2127,7 @@ draw_heatmap(topic5_res_species$heatmap)
 topic6_res_species <- heatmap_by_topic(result_species$b_df, ps_fs_species_csv, n_top = 10, topic_no = 6)
 
 
-png("output/Topic_Model_RelAb_Heatmap_Topic6_Species.png",
+png("output/FigS6_Topic_Model_RelAb_Heatmap_Topic6_Species.png",
     width = 6.5, height = 2.5, units = "in", res = 600)
 
 draw_heatmap(topic6_res_species$heatmap)

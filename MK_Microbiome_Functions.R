@@ -350,41 +350,72 @@ plot_all_taxa <- function(ps_obj,
 plot_taxa_shifts <- function(top_number = 10,
                              input_df = ps_fs_genus_csv,
                              bubble_max_size = 10,
-                             count_max = 25) {
-  
-  
-  # --------- Long form + per-taxon stats
-  df_long <- input_df %>%
-    dplyr::select(-Sample) %>%
-    tidyr::pivot_longer(-Type, names_to = "Taxa", values_to = "Abundance")
-  
-  stopifnot(all(c("Type","Taxa","Abundance") %in% names(df_long)))
-  
-  summ <- df_long %>%
+                             count_max = 25,
+                             paired = TRUE) {
+
+  taxa_cols <- setdiff(names(input_df), c("Sample", "Type"))
+
+  paired_input <- input_df %>%
+    dplyr::mutate(Patient = sub("-.*$", "", Sample))
+
+  paired_wide <- paired_input %>%
+    tidyr::pivot_longer(
+      cols = dplyr::all_of(taxa_cols),
+      names_to = "Taxa",
+      values_to = "Abundance"
+    ) %>%
+    dplyr::group_by(Patient) %>%
+    dplyr::filter(dplyr::n_distinct(Type) == 2L) %>%
+    dplyr::ungroup() %>%
+    tidyr::pivot_wider(
+      id_cols = c(Patient, Taxa),
+      names_from = Type,
+      values_from = Abundance
+    )
+
+  if (!all(c("Plaque", "Abscess") %in% names(paired_wide))) {
+    stop("Paired taxa trend analysis requires both Plaque and Abscess sample types.")
+  }
+
+  paired_wide <- paired_wide %>%
+    dplyr::filter(!is.na(Plaque), !is.na(Abscess))
+
+  if (nrow(paired_wide) == 0) {
+    stop("No complete patient pairs found for taxa trend analysis.")
+  }
+
+  summ <- paired_wide %>%
     dplyr::group_by(Taxa) %>%
     dplyr::summarise(
-      n_plaque      = sum(Type == "Plaque"),
-      n_abscess     = sum(Type == "Abscess"),
-      median_plaque = median(Abundance[Type == "Plaque"],  na.rm = TRUE),
-      median_abscess= median(Abundance[Type == "Abscess"], na.rm = TRUE),
-      mean_plaque   = mean(Abundance[Type == "Plaque"],    na.rm = TRUE),
-      mean_abscess  = mean(Abundance[Type == "Abscess"],   na.rm = TRUE),
+      n_pairs       = dplyr::n(),
+      n_plaque      = n_pairs,
+      n_abscess     = n_pairs,
+      median_plaque = median(Plaque, na.rm = TRUE),
+      median_abscess = median(Abscess, na.rm = TRUE),
+      mean_plaque   = mean(Plaque, na.rm = TRUE),
+      mean_abscess  = mean(Abscess, na.rm = TRUE),
       p = tryCatch(
-        wilcox.test(Abundance[Type == "Plaque"], Abundance[Type == "Abscess"],
-                    exact = FALSE)$p.value,
+        stats::wilcox.test(Plaque, Abscess, paired = isTRUE(paired), exact = FALSE)$p.value,
         error = function(e) NA_real_
       ),
       .groups = "drop"
     ) %>%
     dplyr::mutate(
       diff_median = median_plaque - median_abscess,
-      diff_mean   = mean_plaque   - mean_abscess,
+      diff_mean   = mean_plaque - mean_abscess,
       direction   = dplyr::case_when(
-        diff_median >  0 ~ "Plaque",
-        diff_median <  0 ~ "Abscess",
-        TRUE             ~ "Tie"
+        diff_median > 0 ~ "Plaque",
+        diff_median < 0 ~ "Abscess",
+        TRUE            ~ "Tie"
       ),
-      padj = p.adjust(p, method = "BH")
+      padj = stats::p.adjust(p, method = "BH"),
+      Taxa_clean = Taxa %>%
+        stringr::str_remove("^g__") %>%
+        stringr::str_remove("^s__") %>%
+        stringr::str_remove_all("s__") %>%
+        stringr::str_replace_all("_", " ") %>%
+        stringr::str_replace_all("G ", "G") %>%
+        stringr::str_remove_all("\\[|\\]")
     )
   
   # ----- Pick top N per direction + clean taxon labels
@@ -456,7 +487,7 @@ plot_taxa_shifts <- function(top_number = 10,
   tax_pull <- topN %>% dplyr::pull(Taxa)
   
   data_pull <- input_df %>%
-    tidyr::pivot_longer(cols = starts_with("g_"), names_to = "Taxa", values_to = "relab") %>%
+    tidyr::pivot_longer(cols = dplyr::all_of(taxa_cols), names_to = "Taxa", values_to = "relab") %>%
     dplyr::filter(Taxa %in% tax_pull) %>%
     dplyr::mutate(
       Taxa_clean = Taxa %>%
@@ -2658,6 +2689,382 @@ run_aldex2 <- function(ps_obj, group, tax_rank, method = "t.test", transform, no
 }
 
 
+## ---- DA pairing comparison ----
+
+clean_da_taxon <- function(x) {
+  x %>%
+    stringi::stri_trans_nfkc() %>%
+    stringr::str_replace_all("^(g_|s_|p_)", "") %>%
+    stringr::str_replace_all("\\p{Z}+", " ") %>%
+    stringr::str_squish() %>%
+    stringr::str_replace_all("[\\p{P}\\p{S}]+", " ") %>%
+    stringr::str_replace_all("-", "") %>%
+    stringr::str_replace_all(" s ", " ") %>%
+    stringr::str_replace_all(" F ", " F") %>%
+    stringr::str_replace_all(" G ", " G") %>%
+    stringr::str_squish()
+}
+
+get_maaslin2_significant_taxa <- function(ps_obj,
+                                          taxa_level,
+                                          group = "Type",
+                                          paired = TRUE,
+                                          analysis_method = "LM",
+                                          normalization = "CSS",
+                                          transform = "LOG",
+                                          qval_threshold = 0.05,
+                                          plot_colors = NULL,
+                                          plot_type = "dot") {
+  if (is.null(plot_colors)) {
+    plot_colors <- c(Abscess = "#FF495C", Plaque = "#3185FC")
+  }
+
+  param_hash <- digest::digest(list(
+    ps_obj, taxa_level, group, paired, analysis_method,
+    normalization, transform, plot_colors, plot_type, qval_threshold
+  ))
+  result_file <- file.path(
+    "../saved_analysis_files/",
+    paste0("maaslin2_result_", param_hash, ".rds")
+  )
+
+  if (!file.exists(result_file)) {
+    stop(
+      "MaAsLin2 cache not found for ", taxa_level, " (paired = ", paired, "). ",
+      "Run sections 6.2 and 6.5 first."
+    )
+  }
+
+  maaslin2_results <- readRDS(result_file)
+  taxa <- maaslin2_results$results %>%
+    as.data.frame() %>%
+    dplyr::filter(qval <= qval_threshold) %>%
+    dplyr::pull(feature)
+
+  unique(clean_da_taxon(taxa))
+}
+
+get_ancombc_significant_taxa <- function(ps_obj,
+                                         tax_level,
+                                         group = "Type",
+                                         paired = TRUE,
+                                         Log2FC_cutoff = NULL) {
+  param_hash <- digest::digest(list(ps_obj, tax_level, group, paired, Log2FC_cutoff))
+  result_file <- file.path(
+    "../saved_analysis_files/",
+    paste0("ancombc2_result_", param_hash, ".rds")
+  )
+
+  if (!file.exists(result_file)) {
+    stop(
+      "ANCOM-BC2 cache not found for ", tax_level, " (paired = ", paired, "). ",
+      "Run sections 6.1 and 6.5 first."
+    )
+  }
+
+  ancombc2_results <- readRDS(result_file)
+  ancombc_cols <- get_ancombc2_columns(ancombc2_results, group)
+  dff_col_name <- ancombc_cols$dff_col_name
+
+  taxa <- ancombc_cols$df %>%
+    dplyr::filter(!!rlang::sym(dff_col_name) == TRUE) %>%
+    dplyr::pull(taxon)
+
+  unique(clean_da_taxon(taxa))
+}
+
+get_aldex2_significant_taxa <- function(ps_obj,
+                                        tax_rank,
+                                        group = "Type",
+                                        paired = FALSE,
+                                        method = "t.test",
+                                        effect = TRUE,
+                                        pvalue_cutoff = 0.05,
+                                        mc_samples = 128,
+                                        patient_col = "Sample") {
+  aldex2_res <- run_aldex2_core(
+    ps_obj = ps_obj,
+    group = group,
+    tax_rank = tax_rank,
+    method = method,
+    paired = paired,
+    effect = effect,
+    pvalue_cutoff = pvalue_cutoff,
+    mc_samples = mc_samples,
+    patient_col = patient_col
+  )
+
+  unique(clean_da_taxon(aldex2_res$feature))
+}
+
+load_maaslin2_results_table <- function(ps_obj,
+                                        taxa_level,
+                                        group = "Type",
+                                        paired = TRUE,
+                                        analysis_method = "LM",
+                                        normalization = "CSS",
+                                        transform = "LOG",
+                                        qval_threshold = 0.05,
+                                        plot_colors = NULL,
+                                        plot_type = "dot") {
+  if (is.null(plot_colors)) {
+    plot_colors <- c(Abscess = "#FF495C", Plaque = "#3185FC")
+  }
+
+  param_hash <- digest::digest(list(
+    ps_obj, taxa_level, group, paired, analysis_method,
+    normalization, transform, plot_colors, plot_type, qval_threshold
+  ))
+  result_file <- file.path(
+    "../saved_analysis_files/",
+    paste0("maaslin2_result_", param_hash, ".rds")
+  )
+
+  if (!file.exists(result_file)) {
+    stop(
+      "MaAsLin2 cache not found for ", taxa_level, " (paired = ", paired, "). ",
+      "Run sections 6.2 and 6.5 first."
+    )
+  }
+
+  readRDS(result_file)$results %>%
+    as.data.frame() %>%
+    dplyr::filter(qval <= qval_threshold) %>%
+    dplyr::mutate(Enrichment = ifelse(coef > 0, "Plaque", "Abscess"))
+}
+
+load_ancombc_results_table <- function(ps_obj,
+                                       tax_level,
+                                       group = "Type",
+                                       paired = TRUE,
+                                       Log2FC_cutoff = NULL) {
+  param_hash <- digest::digest(list(ps_obj, tax_level, group, paired, Log2FC_cutoff))
+  result_file <- file.path(
+    "../saved_analysis_files/",
+    paste0("ancombc2_result_", param_hash, ".rds")
+  )
+
+  if (!file.exists(result_file)) {
+    stop(
+      "ANCOM-BC2 cache not found for ", tax_level, " (paired = ", paired, "). ",
+      "Run sections 6.1 and 6.5 first."
+    )
+  }
+
+  ancombc2_results <- readRDS(result_file)
+  ancombc_cols <- get_ancombc2_columns(ancombc2_results, group)
+  lfc_col_name <- ancombc_cols$lfc_col_name
+  dff_col_name <- ancombc_cols$dff_col_name
+
+  ancombc_cols$df %>%
+    dplyr::filter(!!rlang::sym(dff_col_name) == TRUE) %>%
+    dplyr::mutate(Enrichment = ifelse(!!rlang::sym(lfc_col_name) > 0, "Plaque", "Abscess"))
+}
+
+load_aldex2_results_table <- function(ps_obj,
+                                      tax_rank,
+                                      group = "Type",
+                                      paired = FALSE,
+                                      method = "t.test",
+                                      effect = TRUE,
+                                      pvalue_cutoff = 0.05,
+                                      mc_samples = 128,
+                                      patient_col = "Sample") {
+  run_aldex2_core(
+    ps_obj = ps_obj,
+    group = group,
+    tax_rank = tax_rank,
+    method = method,
+    paired = paired,
+    effect = effect,
+    pvalue_cutoff = pvalue_cutoff,
+    mc_samples = mc_samples,
+    patient_col = patient_col
+  )
+}
+
+combine_DA_primary <- function(ps_obj,
+                             tax_level,
+                             group = "Type",
+                             plot_colors = NULL,
+                             maaslin_qval_threshold = 0.05,
+                             ancom_log2fc_cutoffs = c(Phylum = 0.5, Genus = NA, Species = NA),
+                             aldex_method = "t.test",
+                             aldex_pvalue_cutoff = 0.05,
+                             aldex_mc_samples = 128,
+                             filter_confidence = NULL) {
+  if (is.null(plot_colors)) {
+    plot_colors <- c(Abscess = "#FF495C", Plaque = "#3185FC")
+  }
+
+  log2fc_cutoff <- ancom_log2fc_cutoffs[[tax_level]]
+  if (is.na(log2fc_cutoff)) {
+    log2fc_cutoff <- NULL
+  }
+
+  combine_DA(
+    maaslin2_results = load_maaslin2_results_table(
+      ps_obj = ps_obj,
+      taxa_level = tax_level,
+      group = group,
+      paired = TRUE,
+      qval_threshold = maaslin_qval_threshold,
+      plot_colors = plot_colors
+    ),
+    ancombc2_results = load_ancombc_results_table(
+      ps_obj = ps_obj,
+      tax_level = tax_level,
+      group = group,
+      paired = FALSE,
+      Log2FC_cutoff = log2fc_cutoff
+    ),
+    aldex2_results = load_aldex2_results_table(
+      ps_obj = ps_obj,
+      tax_rank = tax_level,
+      group = group,
+      paired = TRUE,
+      method = aldex_method,
+      pvalue_cutoff = aldex_pvalue_cutoff,
+      mc_samples = aldex_mc_samples
+    ),
+    group = group,
+    tax_level = tax_level,
+    filter_confidence = filter_confidence
+  )
+}
+
+compare_da_pairing <- function(ps_obj,
+                               group = "Type",
+                               tax_levels = c("Phylum", "Genus", "Species"),
+                               plot_colors = NULL,
+                               maaslin_qval_threshold = 0.05,
+                               ancom_log2fc_cutoffs = c(Phylum = 0.5, Genus = NA, Species = NA),
+                               aldex_method = "t.test",
+                               aldex_pvalue_cutoff = 0.05,
+                               aldex_mc_samples = 128) {
+  if (is.null(plot_colors)) {
+    plot_colors <- c(Abscess = "#FF495C", Plaque = "#3185FC")
+  }
+
+  compare_taxa_sets <- function(method, rank, paired_taxa, unpaired_taxa) {
+    paired_only <- setdiff(paired_taxa, unpaired_taxa)
+    unpaired_only <- setdiff(unpaired_taxa, paired_taxa)
+    shared <- intersect(paired_taxa, unpaired_taxa)
+
+    summary_row <- tibble::tibble(
+      method = method,
+      Rank = tolower(rank),
+      n_paired = length(paired_taxa),
+      n_unpaired = length(unpaired_taxa),
+      n_shared = length(shared),
+      n_paired_only = length(paired_only),
+      n_unpaired_only = length(unpaired_only),
+      taxa_paired_only = paste(sort(paired_only), collapse = ", "),
+      taxa_unpaired_only = paste(sort(unpaired_only), collapse = ", ")
+    )
+
+    unique_rows <- dplyr::bind_rows(
+      if (length(paired_only) > 0) {
+        tibble::tibble(method = method, Rank = tolower(rank), taxon = paired_only, exclusive_to = "paired")
+      },
+      if (length(unpaired_only) > 0) {
+        tibble::tibble(method = method, Rank = tolower(rank), taxon = unpaired_only, exclusive_to = "unpaired")
+      }
+    )
+
+    list(summary = summary_row, unique_taxa = unique_rows)
+  }
+
+  summary_list <- list()
+  unique_list <- list()
+  idx <- 1
+
+  for (tax_level in tax_levels) {
+    log2fc_cutoff <- ancom_log2fc_cutoffs[[tax_level]]
+    if (is.na(log2fc_cutoff)) {
+      log2fc_cutoff <- NULL
+    }
+
+    maaslin_paired <- get_maaslin2_significant_taxa(
+      ps_obj = ps_obj,
+      taxa_level = tax_level,
+      group = group,
+      paired = TRUE,
+      qval_threshold = maaslin_qval_threshold,
+      plot_colors = plot_colors
+    )
+    maaslin_unpaired <- get_maaslin2_significant_taxa(
+      ps_obj = ps_obj,
+      taxa_level = tax_level,
+      group = group,
+      paired = FALSE,
+      qval_threshold = maaslin_qval_threshold,
+      plot_colors = plot_colors
+    )
+    maaslin_cmp <- compare_taxa_sets("MaAsLin2", tax_level, maaslin_paired, maaslin_unpaired)
+    summary_list[[idx]] <- maaslin_cmp$summary
+    unique_list[[idx]] <- maaslin_cmp$unique_taxa
+    idx <- idx + 1
+
+    ancom_paired <- get_ancombc_significant_taxa(
+      ps_obj = ps_obj,
+      tax_level = tax_level,
+      group = group,
+      paired = TRUE,
+      Log2FC_cutoff = log2fc_cutoff
+    )
+    ancom_unpaired <- get_ancombc_significant_taxa(
+      ps_obj = ps_obj,
+      tax_level = tax_level,
+      group = group,
+      paired = FALSE,
+      Log2FC_cutoff = log2fc_cutoff
+    )
+    ancom_cmp <- compare_taxa_sets("ANCOMBC2", tax_level, ancom_paired, ancom_unpaired)
+    summary_list[[idx]] <- ancom_cmp$summary
+    unique_list[[idx]] <- ancom_cmp$unique_taxa
+    idx <- idx + 1
+
+    aldex_paired <- get_aldex2_significant_taxa(
+      ps_obj = ps_obj,
+      tax_rank = tax_level,
+      group = group,
+      paired = TRUE,
+      method = aldex_method,
+      pvalue_cutoff = aldex_pvalue_cutoff,
+      mc_samples = aldex_mc_samples
+    )
+    aldex_unpaired <- get_aldex2_significant_taxa(
+      ps_obj = ps_obj,
+      tax_rank = tax_level,
+      group = group,
+      paired = FALSE,
+      method = aldex_method,
+      pvalue_cutoff = aldex_pvalue_cutoff,
+      mc_samples = aldex_mc_samples
+    )
+    aldex_cmp <- compare_taxa_sets("ALDEx2", tax_level, aldex_paired, aldex_unpaired)
+    summary_list[[idx]] <- aldex_cmp$summary
+    unique_list[[idx]] <- aldex_cmp$unique_taxa
+    idx <- idx + 1
+  }
+
+  summary <- dplyr::bind_rows(summary_list)
+  unique_taxa <- dplyr::bind_rows(unique_list)
+
+  if (nrow(unique_taxa) == 0) {
+    unique_taxa <- tibble::tibble(
+      method = character(),
+      Rank = character(),
+      taxon = character(),
+      exclusive_to = character()
+    )
+  }
+
+  list(summary = summary, unique_taxa = unique_taxa)
+}
+
+
 ## ---- Combine DA Methods----
 
 combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group, tax_level, filter_confidence = NULL){
@@ -2926,7 +3333,10 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
         drop   = TRUE,
         expand = expansion(mult = c(0, 0))  # <-- add this
       ) +
-      facet_grid(confidence ~ ., scales = "free_y", space = "free_y") +
+      facet_grid(confidence ~ ., scales = "free_y", space = "free_y",
+        labeller = ggplot2::as_labeller(function(x) {
+          dplyr::recode(x, Medium = "Med", .default = x)
+        })) +
       labs(x = NULL, y = NULL) +
       coord_cartesian(clip = "off") +
       theme_bw(base_size = 12) +
@@ -3048,7 +3458,10 @@ combine_DA <- function(maaslin2_results, ancombc2_results, aldex2_results, group
         drop   = TRUE,
         expand = expansion(mult = c(0, 0))  # <-- add this
       ) +
-  facet_grid(confidence ~ ., scales = "free_y", space = "free_y") +
+  facet_grid(confidence ~ ., scales = "free_y", space = "free_y",
+    labeller = ggplot2::as_labeller(function(x) {
+      dplyr::recode(x, Medium = "Med", .default = x)
+    })) +
   labs(x = NULL, y = NULL) +
   coord_cartesian(clip = "off") +
   theme_bw(base_size = 12) +
@@ -3079,7 +3492,9 @@ combine_DA_with_bubbles <- function(da,
     filter_confidence = NULL,
     heatmap_side = c("Plaque","Abscess"),
     bubble_max_size = 8,
-    plot_layout_widths = c(2, 1)){
+    plot_layout_widths = c(2, 1),
+    pad_to_rows = NULL,
+    cell_size_in = NULL){
   
   
   require(dplyr); require(stringr); require(tidyr)
@@ -3087,9 +3502,23 @@ combine_DA_with_bubbles <- function(da,
   require(ggnewscale); require(purrr)
   
   heatmap_side <- match.arg(heatmap_side)
+
+  size_scale <- if (!is.null(cell_size_in)) cell_size_in / 0.17 else 1
+  if (!is.null(cell_size_in)) {
+    bubble_max_size <- bubble_max_size * size_scale
+  }
   
   # ------ Get output of combine_DA function
   heatmap_plot <- if (heatmap_side == "Plaque") da$plaque_plot else da$abscess_plot
+
+  if (!is.null(cell_size_in)) {
+    heatmap_plot <- heatmap_plot +
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_text(size = 11 * size_scale),
+        axis.text.y = ggplot2::element_text(size = 12 * size_scale),
+        strip.text  = ggplot2::element_text(size = 12 * size_scale)
+      )
+  }
   
   df_plot <- da$df_plot %>%
     mutate(
@@ -3208,6 +3637,26 @@ combine_DA_with_bubbles <- function(da,
     filter(enrichment == enrich_pick) %>%
     arrange(enrichment, confidence, taxon) %>%
     pull(taxon) %>% unique() %>% rev()
+
+  n_data_rows <- length(y_levels)
+  pad_taxa <- character(0)
+  if (!is.null(pad_to_rows)) {
+    if (pad_to_rows > n_data_rows) {
+      n_pad <- pad_to_rows - n_data_rows
+      pad_taxa <- paste0(".pad", seq_len(n_pad), ".")
+      y_levels <- c(y_levels, pad_taxa)
+    } else if (pad_to_rows < n_data_rows) {
+      warning(
+        "pad_to_rows (", pad_to_rows, ") is less than the number of taxa (",
+        n_data_rows, "); ignoring pad.",
+        call. = FALSE
+      )
+    }
+  }
+
+  .figure4_hide_pad_labels <- function(x) {
+    ifelse(grepl("^\\.pad[0-9]+\\.$", x), "", x)
+  }
   
   # Lock bubble_df to global levels (order identical to heatmap)
   bubble_df <- bubble_df %>%
@@ -3281,10 +3730,13 @@ combine_DA_with_bubbles <- function(da,
     ) +
     scale_size_area(max_size = bubble_max_size, limits = c(0, NA)) +
     scale_x_discrete(labels = c(A = "A", P = "P")) +
-    facet_grid(confidence ~ ., scales = "free_y", space = "free_y") +
+    facet_grid(confidence ~ ., scales = "free_y", space = "free_y",
+      labeller = ggplot2::as_labeller(function(x) {
+        dplyr::recode(x, Medium = "Med", .default = x)
+      })) +
     coord_cartesian(clip = "off") +
     labs(x = NULL, y = NULL, size = "Count") +
-    theme_bw(base_size = 12) +
+    theme_bw(base_size = 12 * size_scale) +
     theme(
       text = element_text(color = "black"),
       panel.grid.major = element_blank(),
@@ -3315,13 +3767,57 @@ combine_DA_with_bubbles <- function(da,
   bubble_plot <- bubble_plot +
     scale_size_area(name="Count", limits=c(0,25), breaks=c(0,5,10,15,25),
                     guide = guide_legend(nrow = 3, byrow = TRUE, direction = "horizontal"))
+
+  if (length(pad_taxa) > 0) {
+    pad_df <- expand.grid(
+      confidence = factor("Low", levels = c("High", "Medium", "Low")),
+      taxon = factor(pad_taxa, levels = y_levels),
+      stringsAsFactors = FALSE
+    )
+    pad_bubble <- expand.grid(
+      confidence = factor("Low", levels = c("High", "Medium", "Low")),
+      taxon = factor(pad_taxa, levels = y_levels),
+      group2 = c("A", "P"),
+      stringsAsFactors = FALSE
+    )
+    y_scale <- ggplot2::scale_y_discrete(
+      limits = y_levels,
+      drop = FALSE,
+      labels = .figure4_hide_pad_labels,
+      expand = ggplot2::expansion(mult = c(0, 0))
+    )
+
+    heatmap_plot <- heatmap_plot +
+      ggplot2::geom_blank(
+        data = pad_df,
+        mapping = ggplot2::aes(x = 1, y = taxon)
+      ) +
+      y_scale
+
+    bubble_plot <- bubble_plot +
+      ggplot2::geom_blank(
+        data = pad_bubble,
+        mapping = ggplot2::aes(x = group2, y = taxon)
+      ) +
+      y_scale
+  }
   
   #Have to mask the heatmap legend so I can actually see the bubble plot legend and use it for scaling
   heatmap_masklegend <- heatmap_plot +
     theme(legend.position = "none")
   
-  combined <- (heatmap_masklegend + bubble_plot + plot_layout(widths = plot_layout_widths, guides = "collect")) &
-    theme(legend.position = "bottom", legend.box = "horizontal")
+  combined_base <- heatmap_masklegend + bubble_plot +
+    plot_layout(widths = plot_layout_widths, guides = "collect")
+
+  combined_plot_no_legend <- combined_base &
+    ggplot2::theme(
+      legend.position = "none",
+      plot.margin = ggplot2::margin(t = 5.5, r = 5.5, b = 5.5, l = 5.5, unit = "pt")
+    )
+
+  combined_plot <- combined_base &
+    theme(legend.position = "bottom", legend.box = "horizontal") &
+    ggplot2::guides(fill = "none", colour = "none", shape = "none")
   
   heatmap_noleg <- heatmap_plot + theme(legend.position = "none", 
                                         axis.title.y = element_blank(),
@@ -3340,13 +3836,553 @@ combine_DA_with_bubbles <- function(da,
     results       = da$results,
     heatmap       = heatmap_plot,
     bubble_plot   = bubble_plot,
-    combined_plot = combined,
+    combined_plot = combined_plot,
+    combined_plot_no_legend = combined_plot_no_legend,
     combined_plot_nolabs = combined_nolabs,
-    bubble_data   = bubble_df_full
+    bubble_data   = bubble_df_full,
+    n_rows        = n_data_rows,
+    n_rows_padded = length(y_levels)
   )
 }
 
 
+# ---- Figure 4/5: shared DA heatmap + bubble row layout ----
+
+.fig_da_ylab_margin_pt <- function(da, ylab_size) {
+  taxa <- da$df_plot %>%
+    dplyr::filter(!is.na(.data$enrichment)) %>%
+    dplyr::pull(.data$taxon) %>%
+    unique()
+  if (length(taxa) == 0) {
+    return(50)
+  }
+  max_chars <- max(nchar(taxa), na.rm = TRUE)
+  as.numeric(max(50, ylab_size * max_chars * 0.55))
+}
+
+.fig_da_heatmap_panel <- function(p, show_ylab = FALSE, ylab_size = 11,
+                                  xlab_size = 12, compact_facets = FALSE,
+                                  ylab_margin_l_pt = NULL) {
+  left_margin <- if (show_ylab) {
+    if (!is.null(ylab_margin_l_pt)) ylab_margin_l_pt else 10
+  } else {
+    5.5
+  }
+  p +
+    ggplot2::theme(
+      legend.position = "none",
+      plot.margin = ggplot2::margin(
+        t = 5.5, r = 4, b = 22, l = left_margin, unit = "pt"
+      ),
+      axis.text.y = if (show_ylab) {
+        ggplot2::element_text(face = "italic", size = ylab_size)
+      } else {
+        ggplot2::element_blank()
+      },
+      axis.ticks.y = if (show_ylab) {
+        ggplot2::element_line()
+      } else {
+        ggplot2::element_blank()
+      },
+      axis.text.x = ggplot2::element_text(
+        angle = 45, hjust = 1, vjust = 1, size = xlab_size
+      ),
+      panel.spacing.y = if (compact_facets) {
+        grid::unit(0.15, "lines")
+      } else {
+        grid::unit(1, "lines")
+      }
+    )
+}
+
+.fig_da_bubble_panel <- function(p, xlab_size = 11, x_expand = c(0.2, 0.75),
+                                 compact_facets = FALSE) {
+  p +
+    ggplot2::theme(
+      legend.position = "none",
+      plot.margin = ggplot2::margin(t = 5.5, r = 36, b = 8, l = 5.5, unit = "pt"),
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_text(size = xlab_size),
+      strip.text.y = ggplot2::element_text(size = 9, face = "bold"),
+      panel.spacing.y = if (compact_facets) {
+        grid::unit(0.15, "lines")
+      } else {
+        grid::unit(1, "lines")
+      }
+    ) +
+    ggplot2::scale_x_discrete(
+      labels = c(A = "A", P = "P"),
+      expand = ggplot2::expansion(add = x_expand)
+    )
+}
+
+.fig_da_count_side_rows <- function(da, side) {
+  enrich <- if (side == "Plaque") "Plaque" else "Abscess"
+  nrow(da$df_plot %>% dplyr::filter(enrichment == enrich))
+}
+
+.fig_da_make_quadrant <- function(da, csv, tax_level, side, group,
+                                  bubble_max_size, heatmap_bubble_widths) {
+  res <- combine_DA_with_bubbles(
+    da = da,
+    CSV_formatted_relab_df = csv,
+    group = group,
+    tax_level = tax_level,
+    heatmap_side = side,
+    bubble_max_size = bubble_max_size,
+    plot_layout_widths = heatmap_bubble_widths,
+    pad_to_rows = NULL
+  )
+
+  list(
+    res = res,
+    bubble_plot = res$bubble_plot,
+    bubble_data = res$bubble_data,
+    n_rows = res$n_rows,
+    n_rows_padded = res$n_rows_padded
+  )
+}
+
+.fig_da_build_sides <- function(da, csv, tax_level, group, row_cfg,
+                               bubble_count_max) {
+  require(dplyr)
+  require(cowplot)
+
+  left <- .fig_da_make_quadrant(
+    da, csv, tax_level, "Abscess", group,
+    bubble_max_size = row_cfg$bubble_max_size,
+    heatmap_bubble_widths = row_cfg$heatmap_bubble_widths
+  )
+  right <- .fig_da_make_quadrant(
+    da, csv, tax_level, "Plaque", group,
+    bubble_max_size = row_cfg$bubble_max_size,
+    heatmap_bubble_widths = row_cfg$heatmap_bubble_widths
+  )
+
+  hm_w <- row_cfg$heatmap_bubble_widths[1]
+  bub_w <- row_cfg$heatmap_bubble_widths[2]
+  ylab_margin_l_pt <- if (!is.null(row_cfg$ylab_margin_l_pt)) {
+    row_cfg$ylab_margin_l_pt
+  } else {
+    .fig_da_ylab_margin_pt(da, row_cfg$ylab_size)
+  }
+
+  abscess_side <- cowplot::plot_grid(
+    .fig_da_heatmap_panel(
+      left$res$heatmap, show_ylab = TRUE,
+      ylab_size = row_cfg$ylab_size, xlab_size = row_cfg$xlab_size,
+      compact_facets = row_cfg$compact_facets,
+      ylab_margin_l_pt = ylab_margin_l_pt
+    ),
+    .fig_da_bubble_panel(
+      left$res$bubble_plot,
+      xlab_size = row_cfg$bubble_xlab_size,
+      x_expand = row_cfg$bubble_x_expand,
+      compact_facets = row_cfg$compact_facets
+    ),
+    ncol = 2,
+    align = "hv",
+    axis = "tblr",
+    rel_widths = c(hm_w, bub_w)
+  )
+
+  plaque_side <- cowplot::plot_grid(
+    .fig_da_heatmap_panel(
+      right$res$heatmap, show_ylab = TRUE,
+      ylab_size = row_cfg$ylab_size, xlab_size = row_cfg$xlab_size,
+      compact_facets = row_cfg$compact_facets,
+      ylab_margin_l_pt = ylab_margin_l_pt
+    ),
+    .fig_da_bubble_panel(
+      right$res$bubble_plot,
+      xlab_size = row_cfg$bubble_xlab_size,
+      x_expand = row_cfg$bubble_x_expand,
+      compact_facets = row_cfg$compact_facets
+    ),
+    ncol = 2,
+    align = "hv",
+    axis = "tblr",
+    rel_widths = c(hm_w, bub_w)
+  )
+
+  legend_grob <- cowplot::get_legend(
+    right$bubble_plot +
+      ggplot2::theme(
+        legend.position = "bottom",
+        legend.box = "horizontal",
+        legend.direction = "horizontal"
+      ) +
+      ggplot2::scale_size_area(
+        name = "Count",
+        max_size = row_cfg$bubble_max_size,
+        limits = c(0, bubble_count_max),
+        breaks = c(0, 5, 10, 15, 25)
+      )
+  )
+
+  n_rows <- max(left$n_rows, right$n_rows)
+
+  list(
+    abscess_side = abscess_side,
+    plaque_side = plaque_side,
+    legend_grob = legend_grob,
+    left = left,
+    right = right,
+    n_rows = n_rows,
+    n_rows_abscess = left$n_rows,
+    n_rows_plaque = right$n_rows
+  )
+}
+
+.fig_da_make_row <- function(da, csv, tax_level, row_label, width, row_cfg,
+                            group, bubble_count_max) {
+  sides <- .fig_da_build_sides(
+    da, csv, tax_level, group, row_cfg, bubble_count_max
+  )
+
+  left <- sides$left
+  right <- sides$right
+  abscess_side <- sides$abscess_side
+  plaque_side <- sides$plaque_side
+  legend_grob <- sides$legend_grob
+  n_rows <- sides$n_rows
+
+  cell_h <- row_cfg$cell_height_in
+  abs_h_in <- left$n_rows * cell_h + row_cfg$chrome_in
+  pla_h_in <- right$n_rows * cell_h + row_cfg$chrome_in
+  canvas_h_in <- max(abs_h_in, pla_h_in)
+  total_h_in <- row_cfg$tag_height_in + row_cfg$legend_height_in + canvas_h_in
+
+  abs_frac <- abs_h_in / total_h_in
+  pla_frac <- pla_h_in / total_h_in
+  leg_frac <- row_cfg$legend_height_in / total_h_in
+  abs_y <- leg_frac + (canvas_h_in - abs_h_in) / total_h_in
+  pla_y <- leg_frac + (canvas_h_in - pla_h_in) / total_h_in
+
+  # Shorter side gets a narrower viewport so heatmap columns match the taller side
+  # after draw_plot stretches to fill (scale = TRUE).
+  .fig_da_side_draw_width <- function(side_frac, other_frac) {
+    if (side_frac <= other_frac) {
+      0.5 * side_frac / other_frac
+    } else {
+      0.5
+    }
+  }
+
+  abs_draw_w <- .fig_da_side_draw_width(abs_frac, pla_frac)
+  pla_draw_w <- .fig_da_side_draw_width(pla_frac, abs_frac)
+
+  if (isTRUE(row_cfg$lock_side_widths)) {
+    # Compact panels (phylum): match column widths on both sides.
+    both_draw_w <- min(abs_draw_w, pla_draw_w)
+    abs_draw_x <- (0.5 - both_draw_w) / 2
+    pla_draw_x <- 0.5 + (0.5 - both_draw_w) / 2
+    abs_plot_w <- both_draw_w
+    pla_plot_w <- both_draw_w
+  } else {
+    abs_draw_x <- if (abs_draw_w < 0.5) (0.5 - abs_draw_w) / 2 else 0
+    pla_draw_x <- 0.5 + if (pla_draw_w < 0.5) (0.5 - pla_draw_w) / 2 else 0
+    abs_plot_w <- abs_draw_w
+    pla_plot_w <- pla_draw_w
+  }
+
+  row_gg <- cowplot::ggdraw() +
+    cowplot::draw_plot(
+      abscess_side, x = abs_draw_x, y = abs_y,
+      width = abs_plot_w, height = abs_frac
+    ) +
+    cowplot::draw_plot(
+      plaque_side, x = pla_draw_x, y = pla_y,
+      width = pla_plot_w, height = pla_frac
+    ) +
+    cowplot::draw_grob(
+      legend_grob,
+      x = 0.28, y = 0.01, width = 0.44, height = leg_frac * 0.9
+    )
+
+  if (!is.null(row_label)) {
+    row_gg <- row_gg +
+      cowplot::draw_plot_label(
+        row_label,
+        x = 0.01, y = 0.99,
+        hjust = 0, vjust = 1,
+        fontfamily = "sans",
+        fontface = "bold",
+        size = 16
+      )
+  }
+
+  list(
+    plot = row_gg,
+    row = row_gg,
+    pair = row_gg,
+    width = width,
+    height = total_h_in,
+    n_rows = n_rows,
+    n_rows_abscess = left$n_rows,
+    n_rows_plaque = right$n_rows,
+    cell_height_in = cell_h,
+    left = left,
+    right = right
+  )
+}
+
+# ---- Figure 4/5: shared defaults and single-tax-level plotter ----
+
+#' Default row layout config for DA heatmap + bubble figures.
+#'
+#' Use the same values across Phylum, Genus, and Species so heatmap cells,
+#' bubble columns, and y-axis label size match exactly.
+.fig_da_default_row_cfg <- function(bubble_max_size = 8,
+                                    heatmap_bubble_widths = c(2.2, 2.2),
+                                    ylab_size = 11,
+                                    xlab_size = 11,
+                                    bubble_xlab_size = 12,
+                                    bubble_x_expand = c(0.12, 0.35),
+                                    compact_facets = TRUE,
+                                    cell_height_in = 0.30,
+                                    chrome_in = 1.15,
+                                    legend_height_in = 0.45,
+                                    tag_height_in = 0.12,
+                                    lock_side_widths = TRUE,
+                                    ylab_margin_l_pt = NULL) {
+  list(
+    bubble_max_size = bubble_max_size,
+    heatmap_bubble_widths = heatmap_bubble_widths,
+    ylab_size = ylab_size,
+    xlab_size = xlab_size,
+    bubble_xlab_size = bubble_xlab_size,
+    bubble_x_expand = bubble_x_expand,
+    compact_facets = compact_facets,
+    cell_height_in = cell_height_in,
+    chrome_in = chrome_in,
+    legend_height_in = legend_height_in,
+    tag_height_in = tag_height_in,
+    lock_side_widths = lock_side_widths,
+    ylab_margin_l_pt = ylab_margin_l_pt
+  )
+}
+
+#' Shared left margin for y-axis taxon labels across multiple DA panels.
+#'
+#' Pass the result as \code{ylab_margin_l_pt} to \code{plot_da_heatmap_bubble()}
+#' so long genus/species names do not shrink the heatmap area relative to phylum.
+fig_da_shared_ylab_margin_pt <- function(da_list, ylab_size = 11) {
+  margins <- vapply(
+    da_list,
+    function(da) .fig_da_ylab_margin_pt(da, ylab_size),
+    FUN.VALUE = numeric(1)
+  )
+  max(margins)
+}
+
+#' Single tax-level DA heatmap + bubble figure (Abscess | Plaque).
+#'
+#' Produces one figure with matched abscess/plaque panel widths and fixed
+#' heatmap row height (\code{cell_height_in}). Use identical layout arguments
+#' across tax levels; vary \code{ggsave()} height with \code{fig$height}.
+#'
+#' @param da Output from \code{combine_DA_primary()}.
+#' @param csv Relative-abundance CSV for bubble counts.
+#' @param tax_level Taxonomic level label (e.g. \code{"Phylum"}).
+#' @param group Metadata column used for A/P counts (default \code{"Type"}).
+#' @param bubble_max_size Bubble radius scale maximum.
+#' @param bubble_count_max Shared bubble count scale maximum (default 25).
+#' @param cell_height_in Fixed heatmap row height in inches.
+#' @param ylab_size Font size for heatmap y-axis taxon labels.
+#' @param heatmap_bubble_widths Column width ratios for heatmap vs bubble panels.
+#' @param bubble_x_expand Horizontal padding for bubble A/P columns.
+#' @param chrome_in Non-data vertical padding in inches (facets, axes).
+#' @param ylab_margin_l_pt Left plot margin in pt; use
+#'   \code{fig_da_shared_ylab_margin_pt()} for matched margins across figures.
+#' @param row_label Optional row tag drawn at top-left (e.g. \code{"A"}).
+#' @param width Stored layout width metadata.
+plot_da_heatmap_bubble <- function(da,
+                                   csv,
+                                   tax_level,
+                                   group = "Type",
+                                   bubble_max_size = 8,
+                                   bubble_count_max = 25,
+                                   cell_height_in = 0.30,
+                                   ylab_size = 11,
+                                   heatmap_bubble_widths = c(2.2, 2.2),
+                                   bubble_x_expand = c(0.12, 0.35),
+                                   chrome_in = 1.15,
+                                   ylab_margin_l_pt = NULL,
+                                   row_label = NULL,
+                                   width = 16) {
+  require(cowplot)
+
+  row_cfg <- .fig_da_default_row_cfg(
+    bubble_max_size = bubble_max_size,
+    heatmap_bubble_widths = heatmap_bubble_widths,
+    ylab_size = ylab_size,
+    bubble_x_expand = bubble_x_expand,
+    cell_height_in = cell_height_in,
+    chrome_in = chrome_in,
+    ylab_margin_l_pt = ylab_margin_l_pt,
+    lock_side_widths = TRUE
+  )
+
+  out <- .fig_da_make_row(
+    da, csv, tax_level, row_label, width, row_cfg, group, bubble_count_max
+  )
+  out$bubble_data_abscess <- out$left$bubble_data
+  out$bubble_data_plaque <- out$right$bubble_data
+  out
+}
+
+# ---- Figure 4: combined layout (reuses combine_DA_with_bubbles) ----
+
+#' Assemble Figure 4 from four combine_DA_with_bubbles panels
+#'
+#' Builds phylum (panel A) and genus (panel B) rows from
+#' \code{combine_DA_with_bubbles()}. Set \code{ggsave()} width and height manually
+#' when saving; \code{cell_height_in} controls internal row layout only.
+#'
+#' @param da_phylum,da_genus Output from \code{combine_DA_primary()}.
+#' @param csv_phylum,csv_genus Relative-abundance CSVs for bubble counts.
+#' @param group Metadata column used for A/P counts (default \code{"Type"}).
+#' @param bubble_max_size_phylum,bubble_max_size_genus Bubble radii per panel.
+#' @param bubble_count_max Shared bubble count scale maximum (default 25).
+#' @param cell_height_in Fixed heatmap row height in inches (identical in panels
+#'   A and B). Controls internal row layout only; set \code{ggsave()} dimensions
+#'   manually when saving.
+#' @param ylab_size Font size for heatmap y-axis taxon labels (shared across panels).
+#' @param ylab_margin_l_pt Left plot margin in pt; computed automatically when
+#'   \code{NULL}.
+#' @param bubble_x_expand Horizontal padding for bubble A/P columns.
+#' @param heatmap_bubble_widths Column width ratios for heatmap vs bubble panels.
+#' @param combine_rows If \code{TRUE}, also stack phylum and genus into one
+#'   figure. Default \code{FALSE} saves panels A and B separately.
+plot_figure4 <- function(da_phylum,
+                         da_genus,
+                         csv_phylum,
+                         csv_genus,
+                         group = "Type",
+                         bubble_max_size_phylum = 12,
+                         bubble_max_size_genus = 9,
+                         bubble_count_max = 25,
+                         cell_height_in = 0.30,
+                         ylab_size = 11,
+                         ylab_margin_l_pt = NULL,
+                         bubble_x_expand = c(0.12, 0.35),
+                         width_phylum = 16,
+                         width_genus = 16,
+                         heatmap_bubble_widths = c(2.2, 2.2),
+                         combine_rows = FALSE) {
+  require(dplyr)
+  require(cowplot)
+
+  if (is.null(ylab_margin_l_pt)) {
+    ylab_margin_l_pt <- fig_da_shared_ylab_margin_pt(
+      list(da_phylum, da_genus), ylab_size
+    )
+  }
+
+  cfg_shared <- function(bubble_max_size) {
+    .fig_da_default_row_cfg(
+      bubble_max_size = bubble_max_size,
+      heatmap_bubble_widths = heatmap_bubble_widths,
+      ylab_size = ylab_size,
+      bubble_x_expand = bubble_x_expand,
+      cell_height_in = cell_height_in,
+      ylab_margin_l_pt = ylab_margin_l_pt,
+      lock_side_widths = TRUE
+    )
+  }
+
+  panel_a <- .fig_da_make_row(
+    da_phylum, csv_phylum, "Phylum", "A", width_phylum,
+    cfg_shared(bubble_max_size_phylum), group, bubble_count_max
+  )
+  panel_b <- .fig_da_make_row(
+    da_genus, csv_genus, "Genus", "B", width_genus,
+    cfg_shared(bubble_max_size_genus), group, bubble_count_max
+  )
+
+  combined <- NULL
+  fig_width <- panel_a$width
+  fig_height <- panel_a$height
+
+  if (isTRUE(combine_rows)) {
+    combined <- cowplot::plot_grid(
+      panel_a$row,
+      panel_b$row,
+      nrow = 2,
+      rel_heights = c(panel_a$n_rows, panel_b$n_rows),
+      align = "none",
+      labels = c("A", "B"),
+      label_fontfamily = "sans",
+      label_fontface = "bold",
+      label_size = 16,
+      label_x = 0.02,
+      label_y = 0.98,
+      hjust = 0,
+      vjust = 1
+    )
+    fig_width  <- panel_a$width
+    fig_height <- panel_a$height + panel_b$height
+  }
+
+  list(
+    panel_a = panel_a,
+    panel_b = panel_b,
+    plot = if (isTRUE(combine_rows)) combined else NULL,
+    width = fig_width,
+    height = fig_height,
+    quadrants = list(
+      phylum_abscess = panel_a$left,
+      phylum_plaque  = panel_a$right,
+      genus_abscess  = panel_b$left,
+      genus_plaque   = panel_b$right
+    ),
+    n_rows = list(phylum = panel_a$n_rows, genus = panel_b$n_rows)
+  )
+}
+
+
+#' Assemble Figure 5 (species DA heatmap + bubble panel)
+#'
+#' Single-panel layout matching Figure 4 genus styling: Abscess left, Plaque
+#' right, fixed cell height, shared count legend.
+#'
+#' @param da_species Output from \code{combine_DA_primary()}.
+#' @param csv_species Relative-abundance CSV for bubble counts.
+#' @param group Metadata column used for A/P counts (default \code{"Type"}).
+#' @param bubble_max_size Bubble radius scale maximum.
+#' @param bubble_count_max Shared bubble count scale maximum (default 25).
+#' @param ylab_size Font size for heatmap y-axis taxon labels.
+#' @param bubble_x_expand Horizontal padding for bubble A/P columns.
+#' @param width Stored layout width (optional metadata).
+#' @param heatmap_bubble_widths Column width ratios for heatmap vs bubble panels.
+plot_figure5 <- function(da_species,
+                         csv_species,
+                         group = "Type",
+                         bubble_max_size = 10,
+                         bubble_count_max = 25,
+                         cell_height_in = 0.30,
+                         ylab_size = 11,
+                         ylab_margin_l_pt = NULL,
+                         bubble_x_expand = c(0.12, 0.35),
+                         width = 16,
+                         heatmap_bubble_widths = c(2.2, 2.2)) {
+  plot_da_heatmap_bubble(
+    da = da_species,
+    csv = csv_species,
+    tax_level = "Species",
+    group = group,
+    bubble_max_size = bubble_max_size,
+    bubble_count_max = bubble_count_max,
+    cell_height_in = cell_height_in,
+    ylab_size = ylab_size,
+    heatmap_bubble_widths = heatmap_bubble_widths,
+    bubble_x_expand = bubble_x_expand,
+    ylab_margin_l_pt = ylab_margin_l_pt,
+    width = width
+  )
+}
 
 
 # ---- Random Forest ----
